@@ -1,10 +1,6 @@
 # spring-actuator-demo
 
-This is a standalone Spring Boot application under `examples/spring-actuator-demo/` that StatLite can monitor through Spring Boot Actuator and Micrometer.
-
-## Purpose
-
-This is a minimal Spring Boot application for testing dashboards or collectors that consume Spring Boot Actuator and Micrometer metrics.
+Minimal Spring Boot application for testing StatLite dashboards and collectors with Actuator and Micrometer metrics.
 
 ## Requirements
 
