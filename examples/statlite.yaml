@@ -1,0 +1,15 @@
+server:
+  # Localhost by default; use 0.0.0.0 only behind firewall/VPN/proxy auth.
+  listen: "127.0.0.1:9091"
+
+storage:
+  sqlite_path: "./statlite-self.sqlite"
+
+polling:
+  interval: "30s"
+  timeout: "5s"
+
+targets:
+  - name: "statlite-local"
+    type: "statlite"
+    url: "http://127.0.0.1:9090/healthz"

@@ -1,0 +1,20 @@
+server:
+  # Localhost by default; use 0.0.0.0 only behind firewall/VPN/proxy auth.
+  listen: "127.0.0.1:9090"
+
+storage:
+  sqlite_path: "./statlite.sqlite"
+  # Default is 90 days; set to 0 for unlimited retention.
+  retention_days: 90
+
+polling:
+  interval: "5m"
+  timeout: "10s"
+
+targets:
+  - name: "my-app"
+    actuator_base_url: "https://example.com/actuator"
+    auth:
+      type: "basic"
+      username: "admin"
+      password: "change-me"

@@ -1,0 +1,43 @@
+package main
+
+import (
+	"bytes"
+	"strings"
+	"testing"
+
+	"github.com/pvrlabs/statlite/internal/version"
+)
+
+func TestPrintVersion(t *testing.T) {
+	var out bytes.Buffer
+	printVersion(&out)
+
+	got := out.String()
+	want := "statlite " + version.Version + "\n"
+	if got != want {
+		t.Fatalf("printVersion() = %q, want %q", got, want)
+	}
+	if !strings.HasPrefix(got, "statlite v") {
+		t.Fatalf("printVersion() = %q, want leading statlite v", got)
+	}
+}
+
+func TestPrintHelp(t *testing.T) {
+	var out bytes.Buffer
+	printHelp(&out)
+
+	got := out.String()
+	for _, want := range []string{
+		"StatLite - tiny self-hosted metrics dashboard for small servers.",
+		"Spring Boot Actuator",
+		"Usage:",
+		"statlite [--config path]",
+		"--version",
+		"--help",
+		"Docs: README.md, docs/configuration.md",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("printHelp() missing %q\n%s", want, got)
+		}
+	}
+}

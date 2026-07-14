@@ -1,0 +1,25 @@
+server:
+  # Localhost by default; use 0.0.0.0 only behind firewall/VPN/proxy auth.
+  listen: "127.0.0.1:9090"
+
+storage:
+  sqlite_path: "./statlite.sqlite"
+
+polling:
+  interval: "5m"
+  timeout: "10s"
+
+targets:
+  # Replace this with a real Spring Boot Actuator app.
+  # `example.org` is just a placeholder and is not an ideal target.
+  - name: "example-web"
+    actuator_base_url: "https://example.org/example-web/actuator"
+    auth:
+      type: "basic"
+      username: "admin"
+      password: "change-me"
+
+  # This is only useful as a demo target.
+  - name: "statlite-self"
+    type: "statlite"
+    url: "http://127.0.0.1:9090/healthz"

@@ -1,0 +1,15 @@
+[Unit]
+Description=StatLite metrics dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=statlite
+Group=statlite
+ExecStart=/usr/local/bin/statlite --config /etc/statlite/config.yaml
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

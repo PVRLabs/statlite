@@ -1,0 +1,15 @@
+# Built binaries (Quick Start and local builds)
+/statlite
+/dist/
+
+# Runtime SQLite and local config overrides
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+config.yaml
+
+# Release archives
+*.tar.gz
+
+# Editor / OS noise
+.DS_Store
