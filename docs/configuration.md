@@ -8,7 +8,7 @@ StatLite loads `statlite.yaml` by default. Override with `--config`:
 statlite --config /etc/statlite/config.yaml
 ```
 
-See `examples/` for starter templates (Actuator, multi-target, self-monitoring).
+See `examples/` for starter templates (Actuator, multi-target, self-monitoring) and `examples/spring-actuator-demo/` for a standalone Spring Boot demo app.
 
 ## Server
 
@@ -120,6 +120,7 @@ Selected target and time range are stored in the query string, so you can bookma
 | `examples/actuator.yaml` | Single Spring Boot Actuator target with Basic Auth placeholders |
 | `examples/statlite.yaml` | Monitor another StatLite instance |
 | `examples/multi-target.yaml` | Illustrative multi-target mix (Actuator + self) |
+| `examples/spring-actuator-demo/` | Standalone Spring Boot demo app that emits Actuator and Micrometer metrics |
 
 ## Systemd
 

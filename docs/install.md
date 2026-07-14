@@ -91,6 +91,8 @@ chmod 600 ./statlite.yaml
 
 For config fields and examples, see [configuration.md](configuration.md).
 
+For a runnable Spring Boot demo app that StatLite can monitor, see `examples/spring-actuator-demo/`.
+
 ## Verify
 
 Check the binary version:

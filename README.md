@@ -30,6 +30,7 @@ See `examples/` for config templates:
 | `examples/multi-target.yaml` | Generic multi-target starter (illustrative only) |
 | `examples/actuator.yaml` | Spring Boot Actuator (single target) |
 | `examples/statlite.yaml` | Another StatLite instance (self-monitoring) |
+| `examples/spring-actuator-demo/` | Standalone Spring Boot demo app for StatLite monitoring |
 
 ### Installed binary
 

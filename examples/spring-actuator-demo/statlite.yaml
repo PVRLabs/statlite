@@ -1,0 +1,14 @@
+server:
+  listen: "127.0.0.1:9090"
+
+storage:
+  sqlite_path: "./statlite-spring-demo.sqlite"
+  retention_days: 7
+
+polling:
+  interval: "10s"
+  timeout: "5s"
+
+targets:
+  - name: "spring-demo"
+    actuator_base_url: "http://127.0.0.1:8080/actuator"
