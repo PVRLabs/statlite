@@ -23,10 +23,10 @@ The first self-monitor poll may fail briefly before the HTTP server is ready. Th
 
 Edit `statlite.yaml` for the default single-target setup, or start from `examples/multi-target.yaml` if you want multiple targets in one instance.
 
-See `examples/` for config templates:
+See `examples/` for config templates and a demo app:
 
-| Config | Monitors |
-|--------|----------|
+| Path | Description |
+|------|-------------|
 | `examples/multi-target.yaml` | Generic multi-target starter (illustrative only) |
 | `examples/actuator.yaml` | Spring Boot Actuator (single target) |
 | `examples/statlite.yaml` | Another StatLite instance (self-monitoring) |
