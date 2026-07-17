@@ -24,9 +24,9 @@ type Series struct {
 }
 
 type SeriesPoint struct {
-	PollID                int64     `json:"poll_id"`
+	PollID                int64     `json:"poll_id,omitempty"`
 	Timestamp             time.Time `json:"timestamp"`
-	AppRunID              *int64    `json:"app_run_id"`
+	AppRunID              *int64    `json:"app_run_id,omitempty"`
 	Requests              *float64  `json:"requests"`
 	HTTP404               *float64  `json:"http_404"`
 	HTTP4xx               *float64  `json:"http_4xx"`

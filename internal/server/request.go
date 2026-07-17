@@ -5,6 +5,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -52,40 +53,52 @@ func clearCutoffCounterBaseline(series *storage.Series, cutoff time.Time) {
 	series.Points[cutoffIndex].AverageLatencySeconds = nil
 }
 
-func parseRange(r *http.Request) (time.Time, time.Time, error) {
+func parseRange(r *http.Request) (time.Time, time.Time, DashboardRange, error) {
 	query := r.URL.Query()
 	now := time.Now().UTC()
 	if query.Get("start") != "" || query.Get("end") != "" {
 		start, err := parseQueryTime(query.Get("start"), "start")
 		if err != nil {
-			return time.Time{}, time.Time{}, err
+			return time.Time{}, time.Time{}, "", err
 		}
 		end := now
 		if query.Get("end") != "" {
 			parsedEnd, err := parseQueryTime(query.Get("end"), "end")
 			if err != nil {
-				return time.Time{}, time.Time{}, err
+				return time.Time{}, time.Time{}, "", err
 			}
 			end = parsedEnd
 		}
 		if !start.Before(end) {
-			return time.Time{}, time.Time{}, fmt.Errorf("start must be before end")
+			return time.Time{}, time.Time{}, "", fmt.Errorf("start must be before end")
 		}
-		return start, end, nil
+		return start, end, DashboardRangeCustom, nil
 	}
 
 	switch strings.ToLower(strings.TrimSpace(query.Get("range"))) {
 	case "", "1h", "last_hour":
-		return now.Add(-time.Hour), now, nil
+		return now.Add(-time.Hour), now, DashboardRange1H, nil
 	case "today":
-		return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC), now, nil
+		return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC), now, DashboardRangeToday, nil
 	case "7d":
-		return now.AddDate(0, 0, -7), now, nil
+		return now.AddDate(0, 0, -7), now, DashboardRange7D, nil
 	case "30d":
-		return now.AddDate(0, 0, -30), now, nil
+		return now.AddDate(0, 0, -30), now, DashboardRange30D, nil
 	default:
-		return time.Time{}, time.Time{}, fmt.Errorf("unsupported range; use 1h, today, 7d, 30d, or start/end")
+		return time.Time{}, time.Time{}, "", fmt.Errorf("unsupported range; use 1h, today, 7d, 30d, or start/end")
 	}
+}
+
+func parseOptionalLimit(r *http.Request) (int, error) {
+	value := strings.TrimSpace(r.URL.Query().Get("limit"))
+	if value == "" {
+		return 0, nil
+	}
+	limit, err := strconv.Atoi(value)
+	if err != nil || limit <= 0 {
+		return 0, fmt.Errorf("limit must be a positive integer")
+	}
+	return limit, nil
 }
 
 func parseQueryTime(value, name string) (time.Time, error) {

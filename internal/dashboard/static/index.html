@@ -590,11 +590,11 @@ async function refresh() {
     const [summary, series, events] = await Promise.all([
       fetchJSON("/api/summary" + query),
       fetchJSON("/api/series" + query),
-      fetchJSON("/api/events" + query)
+      fetchJSON("/api/events" + query + "&limit=20")
     ]);
     state.target = (summary.selected_target && summary.selected_target.name) || state.target;
     updateURL();
-    renderSummary(summary, events);
+    renderSummary(summary);
     renderSeries(series);
     renderEvents(events);
     document.getElementById("latest-json").textContent = JSON.stringify(summary.latest || {}, null, 2);
@@ -628,7 +628,7 @@ async function fetchJSON(path) {
   return response.json();
 }
 
-function renderSummary(summary, events) {
+function renderSummary(summary) {
   const latest = summary.latest || {};
   const result = latest.result || {};
   const monitor = summary.monitor || {};
@@ -639,11 +639,30 @@ function renderSummary(summary, events) {
   setPill("health", result.health_status);
   setPill("db-health", result.db_health_status);
   setText("process-start", formatDateTime(result.process_start_time));
-  setText("restart-detected", formatDateTime(latestRestart(events)));
+  renderRestart(summary);
   setText("last-success", formatDateTime(monitor.last_successful_poll_at));
   setText("last-failure", monitor.last_failed_poll_at ? formatDateTime(monitor.last_failed_poll_at) : "None");
   setText("failures", String(monitor.consecutive_poll_failures || 0));
   setText("last-poll", formatDateTime(monitor.last_poll_at));
+}
+
+function renderRestart(summary) {
+  switch (summary.latest_restart_status) {
+    case "found":
+      setText("restart-detected", formatDateTime(summary.latest_restart));
+      break;
+    case "none":
+      setText("restart-detected", "None");
+      break;
+    case "invalid_range":
+      setText("restart-detected", "Invalid range");
+      break;
+    case "unavailable":
+      setText("restart-detected", "Unavailable");
+      break;
+    default:
+      setText("restart-detected", formatDateTime(summary.latest_restart));
+  }
 }
 
 function renderTargetContext(targets, selected) {
@@ -774,11 +793,6 @@ function setText(id, value) {
 
 function setNote(id, available) {
   document.getElementById(id).textContent = available ? "" : "No data";
-}
-
-function latestRestart(events) {
-  const event = (events || []).find((item) => item.type === "restart_detected");
-  return event ? event.timestamp : null;
 }
 
 function escapeHTML(value) {

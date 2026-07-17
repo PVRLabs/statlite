@@ -197,7 +197,7 @@ SELECT process_start_time FROM app_runs WHERE id = ?
 	return &parsed, nil
 }
 
-func (s *Store) Events(ctx context.Context, targetName string, start, end time.Time) ([]Event, error) {
+func (s *Store) Events(ctx context.Context, targetName string, start, end time.Time, limit int) ([]Event, error) {
 	if strings.TrimSpace(targetName) == "" {
 		return nil, fmt.Errorf("target name is required")
 	}
@@ -205,16 +205,35 @@ func (s *Store) Events(ctx context.Context, targetName string, start, end time.T
 		return nil, fmt.Errorf("events start must be before end")
 	}
 
-	rows, err := s.db.QueryContext(ctx, `
-SELECT p.id, p.started_at, e.severity, e.event_type, e.metric_key, e.message
-FROM collector_events e
-JOIN polls p ON p.id = e.poll_id
-JOIN targets t ON t.id = p.target_id
-WHERE t.name = ?
-  AND p.started_at >= ?
-  AND p.started_at <= ?
-ORDER BY p.started_at DESC, p.id DESC, e.id DESC
-`, targetName, formatTime(start), formatTime(end))
+	query, args := eventsQuery(targetName, start, end, "", limit)
+	return s.scanEvents(ctx, query, args)
+}
+
+// LatestEventByType returns the newest event of the given type in [start, end], or nil when none exist.
+func (s *Store) LatestEventByType(ctx context.Context, targetName, eventType string, start, end time.Time) (*Event, error) {
+	if strings.TrimSpace(targetName) == "" {
+		return nil, fmt.Errorf("target name is required")
+	}
+	if strings.TrimSpace(eventType) == "" {
+		return nil, fmt.Errorf("event type is required")
+	}
+	if !start.Before(end) {
+		return nil, fmt.Errorf("events start must be before end")
+	}
+
+	query, args := eventsQuery(targetName, start, end, eventType, 1)
+	events, err := s.scanEvents(ctx, query, args)
+	if err != nil {
+		return nil, err
+	}
+	if len(events) == 0 {
+		return nil, nil
+	}
+	return &events[0], nil
+}
+
+func (s *Store) scanEvents(ctx context.Context, query string, args []interface{}) ([]Event, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query events: %w", err)
 	}
@@ -242,4 +261,30 @@ ORDER BY p.started_at DESC, p.id DESC, e.id DESC
 		return nil, fmt.Errorf("iterate events: %w", err)
 	}
 	return events, nil
+}
+
+// eventsQuery builds the events SELECT. When limit > 0, a SQL LIMIT is applied
+// after the descending order so only the newest rows are loaded into Go.
+// When eventType is non-empty, results are restricted to that collector event type.
+func eventsQuery(targetName string, start, end time.Time, eventType string, limit int) (string, []interface{}) {
+	query := `
+SELECT p.id, p.started_at, e.severity, e.event_type, e.metric_key, e.message
+FROM collector_events e
+JOIN polls p ON p.id = e.poll_id
+JOIN targets t ON t.id = p.target_id
+WHERE t.name = ?
+  AND p.started_at >= ?
+  AND p.started_at <= ?
+`
+	args := []interface{}{targetName, formatTime(start), formatTime(end)}
+	if eventType != "" {
+		query += "  AND e.event_type = ?\n"
+		args = append(args, eventType)
+	}
+	query += "ORDER BY p.started_at DESC, p.id DESC, e.id DESC\n"
+	if limit > 0 {
+		query += "LIMIT ?\n"
+		args = append(args, limit)
+	}
+	return query, args
 }

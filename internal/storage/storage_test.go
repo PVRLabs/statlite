@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -334,7 +336,7 @@ func TestEvents(t *testing.T) {
 		t.Fatalf("SaveCollectionResult() error = %v", err)
 	}
 
-	events, err := store.Events(ctx, "app", start.Add(-time.Hour), start.Add(time.Hour))
+	events, err := store.Events(ctx, "app", start.Add(-time.Hour), start.Add(time.Hour), 0)
 	if err != nil {
 		t.Fatalf("Events() error = %v", err)
 	}
@@ -359,7 +361,7 @@ func TestEventsReturnsEmptyForNoData(t *testing.T) {
 	store := openTestStore(t)
 	defer store.Close()
 
-	events, err := store.Events(context.Background(), "app", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC))
+	events, err := store.Events(context.Background(), "app", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), 0)
 	if err != nil {
 		t.Fatalf("Events() error = %v", err)
 	}
@@ -375,7 +377,7 @@ func TestEventsValidatesTargetName(t *testing.T) {
 	store := openTestStore(t)
 	defer store.Close()
 
-	_, err := store.Events(context.Background(), "", time.Now(), time.Now().Add(time.Hour))
+	_, err := store.Events(context.Background(), "", time.Now(), time.Now().Add(time.Hour), 0)
 	if err == nil {
 		t.Fatal("Events() error = nil, want target name error")
 	}
@@ -386,9 +388,151 @@ func TestEventsValidatesRange(t *testing.T) {
 	defer store.Close()
 
 	now := time.Now()
-	_, err := store.Events(context.Background(), "app", now, now.Add(-time.Hour))
+	_, err := store.Events(context.Background(), "app", now, now.Add(-time.Hour), 0)
 	if err == nil {
 		t.Fatal("Events() error = nil, want start before end error")
+	}
+}
+
+func TestEventsRespectsLimitNewestFirst(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	base := time.Date(2026, 7, 7, 10, 0, 0, 0, time.UTC)
+	const eventLimit = 20
+	const total = 25
+	for i := 0; i < total; i++ {
+		started := base.Add(time.Duration(i) * time.Minute)
+		result := &collector.CollectionResult{
+			TargetName:     "app",
+			PollStartedAt:  started,
+			PollFinishedAt: started.Add(time.Second),
+			HealthStatus:   "UP",
+			Events: []collector.CollectorEvent{
+				{Severity: collector.EventSeverityWarning, Type: "metric_fetch_failed", Message: fmt.Sprintf("event-%02d", i)},
+			},
+		}
+		if _, err := store.SaveCollectionResult(ctx, result); err != nil {
+			t.Fatalf("SaveCollectionResult(%d) error = %v", i, err)
+		}
+	}
+
+	events, err := store.Events(ctx, "app", base.Add(-time.Hour), base.Add(time.Hour), eventLimit)
+	if err != nil {
+		t.Fatalf("Events() error = %v", err)
+	}
+	if len(events) != eventLimit {
+		t.Fatalf("events len = %d, want %d", len(events), eventLimit)
+	}
+	// Newest first: last inserted is event-24.
+	if events[0].Message != "event-24" {
+		t.Fatalf("first event message = %q, want event-24", events[0].Message)
+	}
+	if events[len(events)-1].Message != "event-05" {
+		t.Fatalf("last event message = %q, want event-05", events[len(events)-1].Message)
+	}
+	for i := 1; i < len(events); i++ {
+		if events[i].Timestamp.After(events[i-1].Timestamp) {
+			t.Fatalf("events not newest-first at %d: %v then %v", i, events[i-1].Timestamp, events[i].Timestamp)
+		}
+	}
+}
+
+func TestEventsQueryAppliesSQLLimit(t *testing.T) {
+	query, args := eventsQuery("app", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), "", 20)
+	if !strings.Contains(query, "LIMIT ?") {
+		t.Fatalf("events query missing SQL LIMIT:\n%s", query)
+	}
+	if len(args) != 4 {
+		t.Fatalf("args len = %d, want 4 (target, start, end, limit)", len(args))
+	}
+	if args[3] != 20 {
+		t.Fatalf("limit arg = %v, want 20", args[3])
+	}
+
+	unlimited, unlimitedArgs := eventsQuery("app", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), "", 0)
+	if strings.Contains(unlimited, "LIMIT") {
+		t.Fatalf("unlimited events query should omit LIMIT:\n%s", unlimited)
+	}
+	if len(unlimitedArgs) != 3 {
+		t.Fatalf("unlimited args len = %d, want 3", len(unlimitedArgs))
+	}
+
+	const restartType = "restart_detected"
+	typed, typedArgs := eventsQuery("app", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), restartType, 1)
+	if !strings.Contains(typed, "e.event_type = ?") {
+		t.Fatalf("typed events query missing event_type filter:\n%s", typed)
+	}
+	if len(typedArgs) != 5 {
+		t.Fatalf("typed args len = %d, want 5", len(typedArgs))
+	}
+	if typedArgs[3] != restartType {
+		t.Fatalf("event type arg = %v, want %s", typedArgs[3], restartType)
+	}
+}
+
+func TestLatestEventByTypeFindsRestartOutsideRecentWindow(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	base := time.Date(2026, 7, 7, 10, 0, 0, 0, time.UTC)
+	const eventLimit = 20
+	const restartType = "restart_detected"
+	// One restart, then many newer noise events so a plain LIMIT 20 would hide it.
+	if _, err := store.SaveCollectionResult(ctx, &collector.CollectionResult{
+		TargetName:     "app",
+		PollStartedAt:  base,
+		PollFinishedAt: base.Add(time.Second),
+		HealthStatus:   "UP",
+		Events: []collector.CollectorEvent{
+			{Severity: collector.EventSeverityWarning, Type: restartType, Message: "process start changed"},
+		},
+	}); err != nil {
+		t.Fatalf("save restart: %v", err)
+	}
+	for i := 1; i <= 25; i++ {
+		at := base.Add(time.Duration(i) * time.Minute)
+		if _, err := store.SaveCollectionResult(ctx, &collector.CollectionResult{
+			TargetName:     "app",
+			PollStartedAt:  at,
+			PollFinishedAt: at.Add(time.Second),
+			HealthStatus:   "UP",
+			Events: []collector.CollectorEvent{
+				{Severity: collector.EventSeverityWarning, Type: "metric_fetch_failed", Message: fmt.Sprintf("noise-%02d", i)},
+			},
+		}); err != nil {
+			t.Fatalf("save noise %d: %v", i, err)
+		}
+	}
+
+	rangeStart, rangeEnd := base.Add(-time.Hour), base.Add(time.Hour)
+	recent, err := store.Events(ctx, "app", rangeStart, rangeEnd, eventLimit)
+	if err != nil {
+		t.Fatalf("Events() error = %v", err)
+	}
+	if len(recent) != eventLimit {
+		t.Fatalf("recent len = %d, want %d", len(recent), eventLimit)
+	}
+	for _, event := range recent {
+		if event.Type == restartType {
+			t.Fatal("limited Events unexpectedly included early restart_detected")
+		}
+	}
+
+	restart, err := store.LatestEventByType(ctx, "app", restartType, rangeStart, rangeEnd)
+	if err != nil {
+		t.Fatalf("LatestEventByType() error = %v", err)
+	}
+	if restart == nil {
+		t.Fatal("LatestEventByType() = nil, want restart")
+	}
+	if restart.Message != "process start changed" {
+		t.Fatalf("restart message = %q", restart.Message)
+	}
+	if !restart.Timestamp.Equal(base) {
+		t.Fatalf("restart timestamp = %v, want %v", restart.Timestamp, base)
 	}
 }
 

@@ -129,10 +129,6 @@ func (m *Manager) Series(ctx context.Context, name string, start, end time.Time)
 	return m.ResolveTarget(name).Monitor.Series(ctx, start, end)
 }
 
-func (m *Manager) Events(ctx context.Context, name string, start, end time.Time) ([]storage.Event, error) {
-	return m.ResolveTarget(name).Monitor.Events(ctx, start, end)
-}
-
 func snapshotUnhealthy(snapshot *storage.Snapshot) bool {
 	if snapshot == nil {
 		return false

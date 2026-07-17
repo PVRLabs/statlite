@@ -12,12 +12,24 @@ import (
 	"github.com/pvrlabs/statlite/internal/storage"
 )
 
+const (
+	restartStatusFound        = "found"
+	restartStatusNone         = "none"
+	restartStatusInvalidRange = "invalid_range"
+	restartStatusUnavailable  = "unavailable"
+)
+
 type SummaryResponse struct {
 	Targets        []monitor.TargetSummary `json:"targets"`
 	SelectedTarget monitor.TargetMetadata  `json:"selected_target"`
 	Monitor        monitor.Status          `json:"monitor"`
 	Latest         interface{}             `json:"latest,omitempty"`
-	Now            time.Time               `json:"now"`
+	// LatestRestart is the newest restart_detected timestamp in the selected
+	// dashboard range (same range query params as series/events). Kept separate
+	// from /api/events so the Recent events LIMIT does not hide restarts.
+	LatestRestart       *time.Time `json:"latest_restart,omitempty"`
+	LatestRestartStatus string     `json:"latest_restart_status"`
+	Now                 time.Time  `json:"now"`
 }
 
 func (s *Server) handleDebugPollNow(w http.ResponseWriter, r *http.Request) {
@@ -85,13 +97,33 @@ func (s *Server) handleSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	target := s.selectedTarget(r)
-	writeJSON(w, http.StatusOK, SummaryResponse{
-		Targets:        s.manager.Summaries(),
-		SelectedTarget: target.Metadata,
-		Monitor:        target.Monitor.Status(),
-		Latest:         target.Monitor.LatestSnapshot(),
-		Now:            time.Now().UTC(),
-	})
+	resp := SummaryResponse{
+		Targets:             s.manager.Summaries(),
+		SelectedTarget:      target.Metadata,
+		Monitor:             target.Monitor.Status(),
+		Latest:              target.Monitor.LatestSnapshot(),
+		LatestRestartStatus: restartStatusNone,
+		Now:                 time.Now().UTC(),
+	}
+	// Restart history is optional enrichment. Preserve the core in-memory
+	// summary when range parsing or its storage lookup fails, and report why the
+	// timestamp is absent so callers can distinguish failures from no restart.
+	if start, end, _, err := parseRange(r); err != nil {
+		resp.LatestRestartStatus = restartStatusInvalidRange
+	} else {
+		start, _, _ = s.clampToRetention(start)
+		if start.Before(end) {
+			restart, err := target.Monitor.LatestEventByType(r.Context(), monitor.EventTypeRestartDetected, start, end)
+			if err != nil {
+				resp.LatestRestartStatus = restartStatusUnavailable
+			} else if restart != nil {
+				ts := restart.Timestamp.UTC()
+				resp.LatestRestart = &ts
+				resp.LatestRestartStatus = restartStatusFound
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleLatest(w http.ResponseWriter, r *http.Request) {
@@ -124,7 +156,7 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	start, end, err := parseRange(r)
+	start, end, dashRange, err := parseRange(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -143,6 +175,9 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 	if clamped {
 		clearCutoffCounterBaseline(series, cutoff)
 	}
+	// Aggregate after restart-aware deltas using the explicit dashboard scale.
+	// Sparse series (at most one point per bucket) stay at native resolution.
+	series = storage.AggregateSeries(series, dashboardBucketDuration(dashRange))
 	writeJSON(w, http.StatusOK, series)
 }
 
@@ -157,7 +192,12 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	start, end, err := parseRange(r)
+	start, end, _, err := parseRange(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	limit, err := parseOptionalLimit(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -168,7 +208,9 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	target := s.selectedTarget(r)
-	events, err := target.Monitor.Events(r.Context(), start, end)
+	// The endpoint remains unlimited by default. Dashboard callers request their
+	// own bounded Recent events result through the optional SQL-backed limit.
+	events, err := target.Monitor.Events(r.Context(), start, end, limit)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("target %q: %v", target.Metadata.Name, err), http.StatusInternalServerError)
 		return

@@ -73,8 +73,8 @@ func TestPollNowDetectsRestartWhenProcessStartTimeChanges(t *testing.T) {
 	if *first.AppRunID == *second.AppRunID {
 		t.Fatalf("app run id did not change after process start changed: %d", *first.AppRunID)
 	}
-	if !hasEvent(second.Result.Events, "restart_detected") {
-		t.Fatalf("events = %#v, want restart_detected", second.Result.Events)
+	if !hasEvent(second.Result.Events, EventTypeRestartDetected) {
+		t.Fatalf("events = %#v, want %s", second.Result.Events, EventTypeRestartDetected)
 	}
 }
 
@@ -102,8 +102,8 @@ func TestPollNowDoesNotRestartOnOneCoreCounterDecreaseWithoutFailure(t *testing.
 	if *first.AppRunID != *second.AppRunID {
 		t.Fatalf("app run id changed on one counter decrease: %d -> %d", *first.AppRunID, *second.AppRunID)
 	}
-	if hasEvent(second.Result.Events, "restart_detected") {
-		t.Fatalf("events = %#v, did not want restart_detected", second.Result.Events)
+	if hasEvent(second.Result.Events, EventTypeRestartDetected) {
+		t.Fatalf("events = %#v, did not want %s", second.Result.Events, EventTypeRestartDetected)
 	}
 }
 

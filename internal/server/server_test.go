@@ -49,6 +49,8 @@ func TestRootServesDashboardPage(t *testing.T) {
 		"Average latency",
 		"Recent events",
 		`fetchJSON("/api/series" + query)`,
+		`fetchJSON("/api/events" + query + "&limit=20")`,
+		`case "unavailable":`,
 	} {
 		if !strings.Contains(content, want) {
 			t.Fatalf("root page missing %q", want)
@@ -901,6 +903,408 @@ func TestHandleEventsReturns500WithoutMonitor(t *testing.T) {
 	}
 }
 
+func TestHandleSummaryIgnoresInvalidRange(t *testing.T) {
+	store, err := storage.Open(t.Context(), t.TempDir()+"/statlite.sqlite")
+	if err != nil {
+		t.Fatalf("storage.Open() error = %v", err)
+	}
+	defer store.Close()
+	mon := newServerTestMonitor(t, "app", store, &noopCollector{})
+	statlite := New("127.0.0.1:0", mon)
+	server := httptest.NewServer(statlite.httpServer.Handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/summary?range=bad")
+	if err != nil {
+		t.Fatalf("summary request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("summary status = %d, want 200", resp.StatusCode)
+	}
+	var summary SummaryResponse
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+		t.Fatalf("decode summary: %v", err)
+	}
+	if summary.LatestRestartStatus != restartStatusInvalidRange {
+		t.Fatalf("latest_restart_status = %q, want %q", summary.LatestRestartStatus, restartStatusInvalidRange)
+	}
+}
+
+func TestHandleSummarySurvivesRestartLookupFailure(t *testing.T) {
+	store, err := storage.Open(t.Context(), t.TempDir()+"/statlite.sqlite")
+	if err != nil {
+		t.Fatalf("storage.Open() error = %v", err)
+	}
+	mon := newServerTestMonitor(t, "app", store, &noopCollector{})
+	statlite := New("127.0.0.1:0", mon)
+	server := httptest.NewServer(statlite.httpServer.Handler)
+	defer server.Close()
+
+	if err := store.Close(); err != nil {
+		t.Fatalf("store.Close() error = %v", err)
+	}
+	resp, err := http.Get(server.URL + "/api/summary?range=1h")
+	if err != nil {
+		t.Fatalf("summary request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("summary status = %d, want 200 despite restart lookup failure", resp.StatusCode)
+	}
+	var summary SummaryResponse
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+		t.Fatalf("decode summary: %v", err)
+	}
+	if summary.SelectedTarget.Name != "app" {
+		t.Fatalf("selected target = %q, want app", summary.SelectedTarget.Name)
+	}
+	if summary.LatestRestartStatus != restartStatusUnavailable {
+		t.Fatalf("latest_restart_status = %q, want %q", summary.LatestRestartStatus, restartStatusUnavailable)
+	}
+}
+
+func TestDashboardBucketDurationPolicy(t *testing.T) {
+	cases := []struct {
+		r    DashboardRange
+		want time.Duration
+	}{
+		{DashboardRange1H, 0},
+		{DashboardRangeToday, 5 * time.Minute},
+		{DashboardRange7D, 30 * time.Minute},
+		{DashboardRange30D, 2 * time.Hour},
+		{DashboardRangeCustom, 0},
+	}
+	for _, tc := range cases {
+		if got := dashboardBucketDuration(tc.r); got != tc.want {
+			t.Fatalf("dashboardBucketDuration(%q) = %v, want %v", tc.r, got, tc.want)
+		}
+	}
+}
+
+func TestHandleSeriesAggregatesDense7dWithScale(t *testing.T) {
+	// Dense 7d history with 1-minute samples → 30-minute buckets, ~≤336 points.
+	store, err := storage.Open(t.Context(), t.TempDir()+"/statlite.sqlite")
+	if err != nil {
+		t.Fatalf("storage.Open() error = %v", err)
+	}
+	defer store.Close()
+
+	// Align poll times to "now" so range=7d includes them.
+	end := time.Now().UTC().Truncate(time.Minute)
+	start := end.Add(-7 * 24 * time.Hour)
+	appRunID, err := store.EnsureAppRun(t.Context(), "app", nil, start)
+	if err != nil {
+		t.Fatalf("EnsureAppRun() error = %v", err)
+	}
+	// Every 5 minutes for 7d ≈ 2016 raw points (fast enough for tests).
+	step := 5 * time.Minute
+	raw := 0
+	for at := start; !at.After(end); at = at.Add(step) {
+		saveServerRetentionPoll(t, store, appRunID, at, float64(raw+1), nil)
+		raw++
+	}
+
+	mon := newServerTestMonitor(t, "app", store, &noopCollector{})
+	statlite := New("127.0.0.1:0", mon)
+	server := httptest.NewServer(statlite.httpServer.Handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/series?range=7d")
+	if err != nil {
+		t.Fatalf("series request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("series status = %d, want 200", resp.StatusCode)
+	}
+	var series storage.Series
+	if err := json.NewDecoder(resp.Body).Decode(&series); err != nil {
+		t.Fatalf("decode series: %v", err)
+	}
+	if len(series.Points) == 0 {
+		t.Fatal("series points empty")
+	}
+	// 7d / 30m = 336 buckets (natural scale ceiling, not hard truncation).
+	const max7dBuckets = 336 + 2 // small slack for range edge alignment
+	if len(series.Points) > max7dBuckets {
+		t.Fatalf("series points = %d, want <= ~336 for 7d/30m scale", len(series.Points))
+	}
+	if len(series.Points) >= raw {
+		t.Fatalf("series points = %d, want aggregated below raw %d", len(series.Points), raw)
+	}
+	for i, point := range series.Points {
+		if point.Timestamp.Before(series.Start) {
+			t.Fatalf("series point %d timestamp %v precedes range start %v", i, point.Timestamp, series.Start)
+		}
+	}
+}
+
+func TestHandleSeriesKeepsSparse1hResolution(t *testing.T) {
+	// 12 points at 5-minute spacing with 1h range (1-minute buckets) → no shared buckets.
+	store, err := storage.Open(t.Context(), t.TempDir()+"/statlite.sqlite")
+	if err != nil {
+		t.Fatalf("storage.Open() error = %v", err)
+	}
+	defer store.Close()
+
+	// Stay safely inside the live 1h window (not pinned to a stale "start" edge).
+	base := time.Now().UTC().Add(-55 * time.Minute).Truncate(time.Minute)
+	appRunID, err := store.EnsureAppRun(t.Context(), "app", nil, base)
+	if err != nil {
+		t.Fatalf("EnsureAppRun() error = %v", err)
+	}
+	const n = 12
+	for i := 0; i < n; i++ {
+		saveServerRetentionPoll(t, store, appRunID, base.Add(time.Duration(i)*5*time.Minute), float64(i+1), nil)
+	}
+
+	mon := newServerTestMonitor(t, "app", store, &noopCollector{})
+	statlite := New("127.0.0.1:0", mon)
+	server := httptest.NewServer(statlite.httpServer.Handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/series?range=1h")
+	if err != nil {
+		t.Fatalf("series request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("series status = %d, want 200", resp.StatusCode)
+	}
+	var series storage.Series
+	if err := json.NewDecoder(resp.Body).Decode(&series); err != nil {
+		t.Fatalf("decode series: %v", err)
+	}
+	if len(series.Points) != n {
+		t.Fatalf("series points = %d, want full sparse resolution %d", len(series.Points), n)
+	}
+}
+
+func TestHandleSeriesKeepsDense1hResolution(t *testing.T) {
+	store, err := storage.Open(t.Context(), t.TempDir()+"/statlite.sqlite")
+	if err != nil {
+		t.Fatalf("storage.Open() error = %v", err)
+	}
+	defer store.Close()
+
+	end := time.Now().UTC().Truncate(time.Minute)
+	start := end.Add(-time.Hour)
+	appRunID, err := store.EnsureAppRun(t.Context(), "app", nil, start)
+	if err != nil {
+		t.Fatalf("EnsureAppRun() error = %v", err)
+	}
+	// Multiple samples per minute.
+	raw := 0
+	for at := start; !at.After(end); at = at.Add(15 * time.Second) {
+		saveServerRetentionPoll(t, store, appRunID, at, float64(raw+1), nil)
+		raw++
+	}
+
+	mon := newServerTestMonitor(t, "app", store, &noopCollector{})
+	statlite := New("127.0.0.1:0", mon)
+	server := httptest.NewServer(statlite.httpServer.Handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/series?range=1h")
+	if err != nil {
+		t.Fatalf("series request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("series status = %d, want 200", resp.StatusCode)
+	}
+	var series storage.Series
+	if err := json.NewDecoder(resp.Body).Decode(&series); err != nil {
+		t.Fatalf("decode series: %v", err)
+	}
+	if len(series.Points) == 0 {
+		t.Fatal("series points empty")
+	}
+	// Native 15-second resolution should remain, apart from samples that fall
+	// just before the rolling request boundary.
+	if len(series.Points) <= 62 {
+		t.Fatalf("series points = %d, want native dense resolution above minute buckets", len(series.Points))
+	}
+	if len(series.Points) > raw {
+		t.Fatalf("series points = %d, want no more than stored raw points %d", len(series.Points), raw)
+	}
+	for i, point := range series.Points {
+		if point.PollID == 0 {
+			t.Fatalf("series point %d omitted poll identity, indicating unexpected aggregation", i)
+		}
+	}
+}
+
+func TestHandleEventsHonorsCallerLimitAndDefaultsToAll(t *testing.T) {
+	store, err := storage.Open(t.Context(), t.TempDir()+"/statlite.sqlite")
+	if err != nil {
+		t.Fatalf("storage.Open() error = %v", err)
+	}
+	defer store.Close()
+	const eventLimit = 20
+
+	base := time.Date(2026, 7, 7, 10, 0, 0, 0, time.UTC)
+	appRunID, err := store.EnsureAppRun(t.Context(), "app", nil, base)
+	if err != nil {
+		t.Fatalf("EnsureAppRun() error = %v", err)
+	}
+	const total = 30
+	for i := 0; i < total; i++ {
+		at := base.Add(time.Duration(i) * time.Minute)
+		saveServerRetentionPoll(t, store, appRunID, at, float64(i+1), []collector.CollectorEvent{
+			{Severity: collector.EventSeverityWarning, Type: "metric_fetch_failed", Message: fmt.Sprintf("event-%02d", i)},
+		})
+	}
+
+	mon := newServerTestMonitor(t, "app", store, &noopCollector{})
+	statlite := New("127.0.0.1:0", mon)
+	server := httptest.NewServer(statlite.httpServer.Handler)
+	defer server.Close()
+
+	startQ := url.QueryEscape(base.Add(-time.Hour).Format(time.RFC3339))
+	endQ := url.QueryEscape(base.Add(time.Hour).Format(time.RFC3339))
+	requestURL := server.URL + "/api/events?start=" + startQ + "&end=" + endQ
+	resp, err := http.Get(requestURL + "&limit=20")
+	if err != nil {
+		t.Fatalf("events request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("events status = %d, want 200", resp.StatusCode)
+	}
+	var events []storage.Event
+	if err := json.NewDecoder(resp.Body).Decode(&events); err != nil {
+		t.Fatalf("decode events: %v", err)
+	}
+	if len(events) != eventLimit {
+		t.Fatalf("events len = %d, want %d", len(events), eventLimit)
+	}
+	if events[0].Message != "event-29" {
+		t.Fatalf("newest event = %q, want event-29", events[0].Message)
+	}
+	for i := 1; i < len(events); i++ {
+		if events[i].Timestamp.After(events[i-1].Timestamp) {
+			t.Fatalf("events not newest-first at %d", i)
+		}
+	}
+
+	allResp, err := http.Get(requestURL)
+	if err != nil {
+		t.Fatalf("unlimited events request: %v", err)
+	}
+	defer allResp.Body.Close()
+	if allResp.StatusCode != http.StatusOK {
+		t.Fatalf("unlimited events status = %d, want 200", allResp.StatusCode)
+	}
+	var allEvents []storage.Event
+	if err := json.NewDecoder(allResp.Body).Decode(&allEvents); err != nil {
+		t.Fatalf("decode unlimited events: %v", err)
+	}
+	if len(allEvents) != total {
+		t.Fatalf("unlimited events len = %d, want complete range of %d", len(allEvents), total)
+	}
+}
+
+func TestHandleEventsRejectsInvalidLimit(t *testing.T) {
+	store, err := storage.Open(t.Context(), t.TempDir()+"/statlite.sqlite")
+	if err != nil {
+		t.Fatalf("storage.Open() error = %v", err)
+	}
+	defer store.Close()
+	mon := newServerTestMonitor(t, "app", store, &noopCollector{})
+	statlite := New("127.0.0.1:0", mon)
+	server := httptest.NewServer(statlite.httpServer.Handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/events?range=1h&limit=bad")
+	if err != nil {
+		t.Fatalf("events request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("events status = %d, want 400", resp.StatusCode)
+	}
+}
+
+func TestSummaryLatestRestartIndependentOfEventsLimit(t *testing.T) {
+	// Regression: early restart + >20 later warnings → events show only newest 20,
+	// but summary.latest_restart still reports the earlier restart.
+	store, err := storage.Open(t.Context(), t.TempDir()+"/statlite.sqlite")
+	if err != nil {
+		t.Fatalf("storage.Open() error = %v", err)
+	}
+	defer store.Close()
+
+	base := time.Date(2026, 7, 7, 10, 0, 0, 0, time.UTC)
+	appRunID, err := store.EnsureAppRun(t.Context(), "app", nil, base)
+	if err != nil {
+		t.Fatalf("EnsureAppRun() error = %v", err)
+	}
+	restartAt := base
+	saveServerRetentionPoll(t, store, appRunID, restartAt, 1, []collector.CollectorEvent{
+		{Severity: collector.EventSeverityWarning, Type: monitor.EventTypeRestartDetected, Message: "process start changed"},
+	})
+	for i := 1; i <= 25; i++ {
+		saveServerRetentionPoll(t, store, appRunID, base.Add(time.Duration(i)*time.Minute), float64(i+1), []collector.CollectorEvent{
+			{Severity: collector.EventSeverityWarning, Type: "metric_fetch_failed", Message: fmt.Sprintf("noise-%02d", i)},
+		})
+	}
+
+	mon := newServerTestMonitor(t, "app", store, &noopCollector{})
+	statlite := New("127.0.0.1:0", mon)
+	server := httptest.NewServer(statlite.httpServer.Handler)
+	defer server.Close()
+
+	startQ := url.QueryEscape(base.Add(-time.Hour).Format(time.RFC3339))
+	endQ := url.QueryEscape(base.Add(2 * time.Hour).Format(time.RFC3339))
+	rangeQuery := "start=" + startQ + "&end=" + endQ
+	const eventLimit = 20
+
+	eventsResp, err := http.Get(server.URL + "/api/events?" + rangeQuery + "&limit=20")
+	if err != nil {
+		t.Fatalf("events request: %v", err)
+	}
+	defer eventsResp.Body.Close()
+	if eventsResp.StatusCode != http.StatusOK {
+		t.Fatalf("events status = %d, want 200", eventsResp.StatusCode)
+	}
+	var events []storage.Event
+	if err := json.NewDecoder(eventsResp.Body).Decode(&events); err != nil {
+		t.Fatalf("decode events: %v", err)
+	}
+	if len(events) != eventLimit {
+		t.Fatalf("events len = %d, want %d", len(events), eventLimit)
+	}
+	for _, event := range events {
+		if event.Type == monitor.EventTypeRestartDetected {
+			t.Fatal("limited /api/events should not need to carry early restart_detected")
+		}
+	}
+
+	summaryResp, err := http.Get(server.URL + "/api/summary?" + rangeQuery)
+	if err != nil {
+		t.Fatalf("summary request: %v", err)
+	}
+	defer summaryResp.Body.Close()
+	if summaryResp.StatusCode != http.StatusOK {
+		t.Fatalf("summary status = %d, want 200", summaryResp.StatusCode)
+	}
+	var summary SummaryResponse
+	if err := json.NewDecoder(summaryResp.Body).Decode(&summary); err != nil {
+		t.Fatalf("decode summary: %v", err)
+	}
+	if summary.LatestRestart == nil {
+		t.Fatal("summary.latest_restart = nil, want earlier restart timestamp")
+	}
+	if !summary.LatestRestart.Equal(restartAt) {
+		t.Fatalf("summary.latest_restart = %v, want %v", summary.LatestRestart, restartAt)
+	}
+	if summary.LatestRestartStatus != restartStatusFound {
+		t.Fatalf("latest_restart_status = %q, want %q", summary.LatestRestartStatus, restartStatusFound)
+	}
+}
+
 func TestHandleLatestReturns404WhenNoData(t *testing.T) {
 	store, err := storage.Open(t.Context(), t.TempDir()+"/statlite.sqlite")
 	if err != nil {
@@ -1139,18 +1543,21 @@ func TestHandleMonitorStatusReturns500WithoutMonitor(t *testing.T) {
 
 func TestParseRangeDefaultsToOneHour(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/series", nil)
-	start, end, err := parseRange(req)
+	start, end, dashRange, err := parseRange(req)
 	if err != nil {
 		t.Fatalf("parseRange() error = %v", err)
 	}
 	if end.Sub(start) != time.Hour {
 		t.Fatalf("range = %v, want 1h", end.Sub(start))
 	}
+	if dashRange != DashboardRange1H {
+		t.Fatalf("DashboardRange = %q, want %q", dashRange, DashboardRange1H)
+	}
 }
 
 func TestParseRangeSupportsToday(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/series?range=today", nil)
-	start, end, err := parseRange(req)
+	start, end, dashRange, err := parseRange(req)
 	if err != nil {
 		t.Fatalf("parseRange(today) error = %v", err)
 	}
@@ -1164,24 +1571,36 @@ func TestParseRangeSupportsToday(t *testing.T) {
 	if !end.After(start) {
 		t.Fatalf("end %v is not after start %v", end, start)
 	}
+	if dashRange != DashboardRangeToday {
+		t.Fatalf("DashboardRange = %q, want %q", dashRange, DashboardRangeToday)
+	}
 }
 
 func TestParseRangeSupports7dAnd30d(t *testing.T) {
-	for _, r := range []string{"7d", "30d"} {
-		req := httptest.NewRequest(http.MethodGet, "/api/series?range="+r, nil)
-		start, end, err := parseRange(req)
+	for _, tc := range []struct {
+		name string
+		want DashboardRange
+	}{
+		{"7d", DashboardRange7D},
+		{"30d", DashboardRange30D},
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/api/series?range="+tc.name, nil)
+		start, end, dashRange, err := parseRange(req)
 		if err != nil {
-			t.Fatalf("parseRange(%s) error = %v", r, err)
+			t.Fatalf("parseRange(%s) error = %v", tc.name, err)
 		}
 		if !start.Before(end) {
-			t.Fatalf("%s: start %v not before end %v", r, start, end)
+			t.Fatalf("%s: start %v not before end %v", tc.name, start, end)
+		}
+		if dashRange != tc.want {
+			t.Fatalf("DashboardRange = %q, want %q", dashRange, tc.want)
 		}
 	}
 }
 
 func TestParseRangeErrorsOnInvalid(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/series?range=bad", nil)
-	_, _, err := parseRange(req)
+	_, _, _, err := parseRange(req)
 	if err == nil {
 		t.Fatal("parseRange(bad) error = nil, want error")
 	}
@@ -1189,7 +1608,7 @@ func TestParseRangeErrorsOnInvalid(t *testing.T) {
 
 func TestParseRangeSupportsCustomStartEnd(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/series?start=2026-07-07T00:00:00Z&end=2026-07-07T12:00:00Z", nil)
-	start, end, err := parseRange(req)
+	start, end, dashRange, err := parseRange(req)
 	if err != nil {
 		t.Fatalf("parseRange(custom) error = %v", err)
 	}
@@ -1198,6 +1617,9 @@ func TestParseRangeSupportsCustomStartEnd(t *testing.T) {
 	}
 	if !end.Equal(time.Date(2026, 7, 7, 12, 0, 0, 0, time.UTC)) {
 		t.Fatalf("end = %v, want 2026-07-07T12:00:00Z", end)
+	}
+	if dashRange != DashboardRangeCustom {
+		t.Fatalf("DashboardRange = %q, want %q", dashRange, DashboardRangeCustom)
 	}
 }
 
@@ -1239,7 +1661,7 @@ func TestClearCutoffCounterBaselineClearsEarliestRetainedPoint(t *testing.T) {
 
 func TestParseRangeCustomStartOnlyDefaultsEndToNow(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/series?start=2026-07-07T00:00:00Z", nil)
-	start, end, err := parseRange(req)
+	start, end, dashRange, err := parseRange(req)
 	if err != nil {
 		t.Fatalf("parseRange(start only) error = %v", err)
 	}
@@ -1250,11 +1672,14 @@ func TestParseRangeCustomStartOnlyDefaultsEndToNow(t *testing.T) {
 	if d := now.Sub(end); d < 0 || d > time.Second {
 		t.Fatalf("end = %v, want ~now (%v), diff=%v", end, now, d)
 	}
+	if dashRange != DashboardRangeCustom {
+		t.Fatalf("DashboardRange = %q, want %q", dashRange, DashboardRangeCustom)
+	}
 }
 
 func TestParseRangeErrorsOnStartAfterEnd(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/series?start=2026-07-07T12:00:00Z&end=2026-07-07T00:00:00Z", nil)
-	_, _, err := parseRange(req)
+	_, _, _, err := parseRange(req)
 	if err == nil {
 		t.Fatal("parseRange(start>end) error = nil, want error")
 	}

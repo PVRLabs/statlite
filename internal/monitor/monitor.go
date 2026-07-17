@@ -33,6 +33,10 @@ type Monitor struct {
 	previous *storage.Snapshot
 }
 
+// EventTypeRestartDetected is recorded when detectAppRun observes a new app run.
+// Storage treats event types as opaque strings; this constant lives with the producer.
+const EventTypeRestartDetected = "restart_detected"
+
 type Status struct {
 	LastPollAt                 *time.Time `json:"last_poll_at,omitempty"`
 	LastSuccessfulPollAt       *time.Time `json:"last_successful_poll_at,omitempty"`
@@ -108,7 +112,7 @@ func (m *Monitor) PollNow(ctx context.Context) (*storage.Snapshot, error) {
 		if restartDetected {
 			result.Events = append(result.Events, collector.CollectorEvent{
 				Severity: collector.EventSeverityWarning,
-				Type:     "restart_detected",
+				Type:     EventTypeRestartDetected,
 				Message:  reason,
 			})
 		}
@@ -159,8 +163,12 @@ func (m *Monitor) Series(ctx context.Context, start, end time.Time) (*storage.Se
 	return m.store.Series(ctx, m.targetName, start, end)
 }
 
-func (m *Monitor) Events(ctx context.Context, start, end time.Time) ([]storage.Event, error) {
-	return m.store.Events(ctx, m.targetName, start, end)
+func (m *Monitor) Events(ctx context.Context, start, end time.Time, limit int) ([]storage.Event, error) {
+	return m.store.Events(ctx, m.targetName, start, end, limit)
+}
+
+func (m *Monitor) LatestEventByType(ctx context.Context, eventType string, start, end time.Time) (*storage.Event, error) {
+	return m.store.LatestEventByType(ctx, m.targetName, eventType, start, end)
 }
 
 func (m *Monitor) loop(ctx context.Context) {
