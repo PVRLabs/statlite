@@ -8,6 +8,8 @@ StatLite starts with an opinionated Spring Boot Actuator backend for small self-
 
 **StatLite is not a Prometheus/Grafana replacement.** It is a small production-support tool for one-person / small-team self-hosted apps where Spring Boot Actuator already exposes enough useful data, but raw metric endpoints are too awkward to inspect manually.
 
+Learn how to set up [lightweight Spring Boot monitoring without Prometheus and Grafana](https://pvrlabs.xyz/articles/lightweight-spring-boot-monitoring.html).
+
 ## Quick Start
 
 From a clone:
