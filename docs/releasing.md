@@ -101,6 +101,8 @@ The workflow is triggered by pushes of `v*` tags.
 
 - The GitHub Release page exists for the new tag.
 - The release has four `.tar.gz` assets and four `.tar.gz.sha256` assets.
+- The release tag contains `scripts/systemd.sh`, and the tagged raw GitHub URL
+  is accessible.
 - Each archive contains a single `statlite` binary.
 - `statlite --version` reports the release tag.
 - `/healthz` reports the same version.

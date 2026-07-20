@@ -6,6 +6,9 @@ Installers and package managers install only the `statlite` binary. They do not
 create config files, initialize SQLite storage, install systemd units, create
 users, or start services.
 
+For a server-wide Linux systemd installation, including service user,
+configuration, data-directory, and unit provisioning, see [systemd.md](systemd.md).
+
 ## Curl Installer
 
 Install the latest release:

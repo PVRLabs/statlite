@@ -60,7 +60,7 @@ Details (targets, Basic Auth, storage, polling, self-monitoring, retention): [do
 
 ## Deployment
 
-The binary is self-contained. See [docs/install.md](docs/install.md) for install options and [docs/statlite.service.example](docs/statlite.service.example) for a starter systemd unit. Installers and package managers install **only the binary** — they do not create config, initialize storage, install units, or start services.
+The binary is self-contained. See [docs/install.md](docs/install.md) for user-level installation and [docs/systemd.md](docs/systemd.md) for systemd server provisioning. Installers and package managers install **only the binary** — they do not create config, initialize storage, install units, or start services.
 
 ### Dashboard access
 
