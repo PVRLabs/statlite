@@ -54,7 +54,7 @@ Default config path is `statlite.yaml` in the current working directory when `--
 ./statlite --config examples/actuator.yaml
 ```
 
-The config may contain Actuator credentials — restrict the file with `chmod 600` on a server. Credentials are never rendered in the dashboard or API responses.
+Prefer environment variables for Actuator credentials, for example `username: "${STATLITE_ACTUATOR_USERNAME}"` and `password: "${STATLITE_ACTUATOR_PASSWORD}"`. StatLite expands `$VAR` and `${VAR}` across the entire config once at startup; restart it after changing a value. Plaintext credentials still work, but restrict that config file with `chmod 600` on a server. Credentials are never rendered in the dashboard or API responses. See [docs/configuration.md](docs/configuration.md) for escaping literal `${` syntax and other expansion details.
 
 Details (targets, Basic Auth, storage, polling, self-monitoring, retention): [docs/configuration.md](docs/configuration.md).
 
@@ -100,7 +100,7 @@ StatLite is early and intentionally limited:
 * **No alerts** — dashboard-only. No alert manager, no notifications.
 * **No dashboard auth** — see [Dashboard access](#dashboard-access) for safe deployment options.
 * **Spring Boot Actuator-first** — other metric backends (Prometheus, custom endpoints) are not supported in the MVP.
-* **Credentials in config** — Actuator credentials live in the YAML file. Restrict with `chmod 600`.
+* **Credential handling** — use environment variables where possible; plaintext YAML credentials remain supported and should be restricted with `chmod 600`.
 * **Dashboard CDN assets** — Chart.js and fonts may load from external CDNs. The backend is a single binary; full dashboard rendering still depends on those external frontend assets for now. Vendoring them into the binary is a post-MVP item.
 
 ## License

@@ -59,6 +59,7 @@ func Load(path string) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading config: %w", err)
 	}
+	data = []byte(expandEnvironmentVariables(string(data)))
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
@@ -70,6 +71,14 @@ func Load(path string) (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+func expandEnvironmentVariables(config string) string {
+	// os.ExpandEnv treats "$$" as an environment variable named "$". Preserve
+	// the documented "$${" escape sequence until after expansion instead.
+	const literalVariablePrefix = "\x00statlite-literal-variable-prefix\x00"
+	config = strings.ReplaceAll(config, "$${", literalVariablePrefix)
+	return strings.ReplaceAll(os.ExpandEnv(config), literalVariablePrefix, "${")
 }
 
 func (s *StorageConfig) UnmarshalYAML(value *yaml.Node) error {

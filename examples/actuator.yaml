@@ -16,5 +16,6 @@ targets:
     actuator_base_url: "https://example.com/actuator"
     auth:
       type: "basic"
-      username: "admin"
-      password: "change-me"
+      # Prefer environment variables so credentials are not stored in this file.
+      username: "${STATLITE_ACTUATOR_USERNAME}"
+      password: "${STATLITE_ACTUATOR_PASSWORD}"

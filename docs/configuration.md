@@ -73,11 +73,21 @@ Missing optional metrics are handled gracefully: values may appear as `null` or 
 ```yaml
 auth:
   type: "basic"
-  username: "admin"
-  password: "change-me"
+  username: "${STATLITE_ACTUATOR_USERNAME}"
+  password: "${STATLITE_ACTUATOR_PASSWORD}"
 ```
 
-Only `basic` is supported in the MVP. Restrict config file permissions when credentials are present:
+Only `basic` is supported in the MVP. Prefer environment variables for credentials, so they are not stored in plaintext YAML. Export them before starting StatLite (or set them with your service manager):
+
+```bash
+export STATLITE_ACTUATOR_USERNAME="admin"
+export STATLITE_ACTUATOR_PASSWORD="replace-with-a-secret"
+statlite --config /etc/statlite/config.yaml
+```
+
+StatLite expands environment variables across the entire YAML file once at startup, before it parses the config. Both `$VAR` and `${VAR}` work; unset variables expand to an empty string. Shell-style defaults such as `${VAR:-default}` are not supported. Use `$${` for a literal `${` in the config. Restart StatLite after changing an environment variable.
+
+Plaintext credentials still work as a fallback. Restrict config file permissions when they are present:
 
 ```bash
 chmod 600 /etc/statlite/config.yaml

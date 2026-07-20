@@ -35,6 +35,66 @@ targets:
 	}
 }
 
+func TestLoadExpandsEnvironmentVariablesAcrossConfig(t *testing.T) {
+	t.Setenv("STATLITE_LISTEN", "127.0.0.1:9191")
+	t.Setenv("STATLITE_DB_PATH", "./from-env.sqlite")
+	t.Setenv("STATLITE_INTERVAL", "30s")
+	t.Setenv("STATLITE_TARGET", "from-env")
+	t.Setenv("STATLITE_ACTUATOR_URL", "https://example.com/actuator")
+	t.Setenv("STATLITE_USERNAME", "admin")
+	t.Setenv("STATLITE_PASSWORD", "secret")
+
+	path := writeConfig(t, `
+server:
+  listen: "${STATLITE_LISTEN}"
+storage:
+  sqlite_path: "$STATLITE_DB_PATH"
+polling:
+  interval: "$STATLITE_INTERVAL"
+targets:
+  - name: "${STATLITE_TARGET}"
+    actuator_base_url: "$STATLITE_ACTUATOR_URL"
+    auth:
+      type: "basic"
+      username: "$STATLITE_USERNAME"
+      password: "${STATLITE_PASSWORD}"
+`)
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Server.Listen != "127.0.0.1:9191" || cfg.Storage.SQLitePath != "./from-env.sqlite" || cfg.Polling.Interval != "30s" {
+		t.Fatalf("expanded general config = %#v, want environment values", cfg)
+	}
+	target := cfg.Targets[0]
+	if target.Name != "from-env" || target.ActuatorBaseURL != "https://example.com/actuator" || target.Auth.Username != "admin" || target.Auth.Password != "secret" {
+		t.Fatalf("expanded target = %#v, want environment values", target)
+	}
+}
+
+func TestLoadPreservesEscapedEnvironmentVariableSyntax(t *testing.T) {
+	path := writeConfig(t, `
+server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "./$${LITERAL_PATH}.sqlite"
+polling:
+  interval: "5m"
+targets:
+  - name: "app"
+    actuator_base_url: "http://example.com/actuator"
+`)
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Storage.SQLitePath != "./${LITERAL_PATH}.sqlite" {
+		t.Fatalf("Storage.SQLitePath = %q, want literal variable syntax", cfg.Storage.SQLitePath)
+	}
+}
+
 func TestLoadAcceptsStorageRetentionDays(t *testing.T) {
 	path := writeConfig(t, `
 server:
