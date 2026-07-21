@@ -94,7 +94,7 @@ put_binary(){
 }
 preflight_unit(){
   generated="$tmp_dir/$service_name.service"; unit > "$generated"; target="$(unit_path)"
-  [ -e "$target" ] || return
+  [ -e "$target" ] || return 0
   cmp -s "$generated" "$target" && return
   grep -Fqx '# Managed by StatLite scripts/systemd.sh' "$target" || fail "service name $service_name belongs to an unrelated unit: $target"
   managed_unit="$target"; ob="$(value Binary-Path)"; oc="$(value Config-Path)"; od="$(value Data-Dir)"; ou="$(value User)"; og="$(value Group)"
