@@ -22,6 +22,14 @@ func TestPrintVersion(t *testing.T) {
 	}
 }
 
+func TestStartupMessage(t *testing.T) {
+	got := startupMessage("0.0.0.0:9090", 3)
+	want := "StatLite starting: version=" + version.Version + " listen=0.0.0.0:9090 targets=3"
+	if got != want {
+		t.Fatalf("startupMessage() = %q, want %q", got, want)
+	}
+}
+
 func TestPrintHelp(t *testing.T) {
 	var out bytes.Buffer
 	printHelp(&out)

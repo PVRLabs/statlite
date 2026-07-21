@@ -72,7 +72,7 @@ func main() {
 	manager.Start(ctx)
 
 	srv := server.NewWithManagerRetentionCutoff(cfg.Server.Listen, manager, cfg.Storage.RetentionDays, retentionCutoff.Current)
-	log.Printf("StatLite starting on %s with %d target(s)", cfg.Server.Listen, len(manager.Names()))
+	log.Print(startupMessage(cfg.Server.Listen, len(manager.Names())))
 
 	go func() {
 		<-ctx.Done()
@@ -90,6 +90,10 @@ func main() {
 
 func printVersion(w io.Writer) {
 	fmt.Fprintf(w, "statlite %s\n", version.Version)
+}
+
+func startupMessage(listen string, targets int) string {
+	return fmt.Sprintf("StatLite starting: version=%s listen=%s targets=%d", version.Version, listen, targets)
 }
 
 func printHelp(w io.Writer) {
