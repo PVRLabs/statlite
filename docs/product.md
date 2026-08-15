@@ -37,6 +37,13 @@ defaults should favor a small steady-state footprint; faster local-demo
 settings must be clearly labeled. Monitoring should not materially change the
 workload being observed.
 
+StatLite should also keep its total normalized metric vocabulary small. New
+integrations should reuse existing concepts wherever possible and should not
+add source-specific metrics merely because an upstream ecosystem exposes
+them. Every proposal for a new normalized metric requires explicit product
+and architecture review covering its operational value, storage and retention
+cost, dashboard behavior, and long-term compatibility.
+
 ## Supported integration boundaries
 
 StatLite has two supported target types:
@@ -204,3 +211,9 @@ Future extensions may include additional focused application integrations,
 optional alerting, or rebuildable query acceleration if real usage justifies
 them. Such possibilities are non-binding; concrete work belongs in GitHub
 issues and must preserve the product’s small, understandable core.
+
+A Go application target is under consideration as a possible focused
+integration. It may eventually consume recognized Go Prometheus/OpenMetrics
+endpoints while mapping only into StatLite's existing normalized concepts. Go
+is not a currently supported target, and this direction does not imply
+generic Prometheus compatibility.
