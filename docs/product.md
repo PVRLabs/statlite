@@ -77,10 +77,11 @@ host fields, or another StatLite instance must run on that host.
 
 ## Resource profile
 
-StatLite is designed for resource-constrained VPS deployments. Measured idle
-RSS is approximately 10-15 MiB for the standalone StatLite process. This is an
-observed idle baseline, not a maximum-memory guarantee or SLA. Memory usage
-can increase temporarily during intensive historical queries.
+StatLite is designed for resource-constrained deployments, including small VPS
+instances. Current macOS and Linux measurements show about 15 MiB of idle RSS
+for the standalone StatLite process. This is an observed idle baseline, not a
+maximum-memory guarantee or SLA. Memory usage can increase temporarily during
+intensive historical queries.
 
 ## Normalized collection model
 
