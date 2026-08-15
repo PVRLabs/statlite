@@ -75,6 +75,13 @@ A central StatLite instance cannot infer host resources for a remote
 application. For remote host visibility, the application must emit optional
 host fields, or another StatLite instance must run on that host.
 
+## Resource profile
+
+StatLite is designed for resource-constrained VPS deployments. Measured idle
+RSS is approximately 10-15 MiB for the standalone StatLite process. This is an
+observed idle baseline, not a maximum-memory guarantee or SLA. Memory usage
+can increase temporarily during intensive historical queries.
+
 ## Normalized collection model
 
 Collectors keep source-specific response formats inside their adapters. The
