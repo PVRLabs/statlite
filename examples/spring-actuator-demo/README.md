@@ -38,7 +38,11 @@ curl -s http://127.0.0.1:8080/actuator/metrics/process.start.time
 ./generate-traffic.sh
 ```
 
-The script generates successful requests, database requests, slow requests, HTTP 400 responses, HTTP 404 responses, and HTTP 500 responses so the standard `http.server.requests` metric changes visibly.
+The script is the canonical traffic recipe for exercising the demo: it
+generates 40 requests with successful requests, database requests, slow
+requests, HTTP 400 responses, HTTP 404 responses, and HTTP 500 responses. It
+prints the observed counts and exits nonzero if any request returns an
+unexpected status or fails.
 
 ## Dashboard preview
 
