@@ -273,8 +273,8 @@ func TestSeriesResolvesRuntimeMemoryPerPoll(t *testing.T) {
 		{Key: "process_cpu_usage", Kind: collector.MetricKindGauge, Value: 0.1, Unit: "ratio"},
 	})
 	saveSeriesPollSamples(t, store, appRunID, firstPoll.Add(4*time.Minute), []collector.MetricSample{
-		// These rows represent historical samples from before the metrics were
-		// removed from collection. Series projection must continue to ignore them.
+		// Historical stored-only metrics must remain readable but ignored by
+		// series projection.
 		{Key: "jvm_heap_max_bytes", Kind: collector.MetricKindGauge, Value: 500, Unit: "bytes"},
 		{Key: "http_request_time_max_seconds", Kind: collector.MetricKindGauge, Value: 0.9, Unit: "seconds"},
 		{Key: "process_cpu_usage", Kind: collector.MetricKindGauge, Value: 0.1, Unit: "ratio"},
