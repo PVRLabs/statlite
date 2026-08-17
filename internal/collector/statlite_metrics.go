@@ -39,15 +39,15 @@ type StatliteMetricsValues struct {
 	RequestDurationSecondsTotal StatliteMetricsField `json:"request_duration_seconds_total,omitempty"`
 	// RequestDurationSecondsMax remains parseable for v1 producer compatibility;
 	// the normalized collector intentionally ignores it.
-	RequestDurationSecondsMax   StatliteMetricsField `json:"request_duration_seconds_max,omitempty"`
-	ProcessCPUUsage             StatliteMetricsField `json:"process_cpu_usage,omitempty"`
-	RuntimeHeapUsedBytes        StatliteMetricsField `json:"runtime_heap_used_bytes,omitempty"`
-	UptimeSeconds               StatliteMetricsField `json:"uptime_seconds,omitempty"`
-	HostCPUUsage                StatliteMetricsField `json:"host_cpu_usage,omitempty"`
-	HostMemoryUsedBytes         StatliteMetricsField `json:"host_memory_used_bytes,omitempty"`
-	HostMemoryTotalBytes        StatliteMetricsField `json:"host_memory_total_bytes,omitempty"`
-	HostDiskUsedBytes           StatliteMetricsField `json:"host_disk_used_bytes,omitempty"`
-	HostDiskTotalBytes          StatliteMetricsField `json:"host_disk_total_bytes,omitempty"`
+	RequestDurationSecondsMax StatliteMetricsField `json:"request_duration_seconds_max,omitempty"`
+	ProcessCPUUsage           StatliteMetricsField `json:"process_cpu_usage,omitempty"`
+	RuntimeHeapUsedBytes      StatliteMetricsField `json:"runtime_heap_used_bytes,omitempty"`
+	UptimeSeconds             StatliteMetricsField `json:"uptime_seconds,omitempty"`
+	HostCPUUsage              StatliteMetricsField `json:"host_cpu_usage,omitempty"`
+	HostMemoryUsedBytes       StatliteMetricsField `json:"host_memory_used_bytes,omitempty"`
+	HostMemoryTotalBytes      StatliteMetricsField `json:"host_memory_total_bytes,omitempty"`
+	HostDiskUsedBytes         StatliteMetricsField `json:"host_disk_used_bytes,omitempty"`
+	HostDiskTotalBytes        StatliteMetricsField `json:"host_disk_total_bytes,omitempty"`
 }
 
 // StatliteMetricsField preserves the JSON representation of an optional field.
