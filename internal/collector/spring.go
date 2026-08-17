@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"net/url"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +17,50 @@ type SpringActuatorCollector struct {
 	targetName         string
 	client             *ActuatorClient
 	collectHostMetrics bool
+}
+
+type springPollSession struct {
+	client     *ActuatorClient
+	rawResults map[string]actuatorRawResult
+}
+
+func newSpringPollSession(client *ActuatorClient) *springPollSession {
+	return &springPollSession{
+		client:     client,
+		rawResults: make(map[string]actuatorRawResult),
+	}
+}
+
+func (s *springPollSession) fetchRaw(ctx context.Context, endpointPath string, query url.Values) actuatorRawResult {
+	key := s.client.effectiveURL(endpointPath, query)
+	if raw, ok := s.rawResults[key]; ok {
+		return raw
+	}
+	if err := ctx.Err(); err != nil {
+		raw := actuatorRawResult{err: fmt.Errorf(
+			"fetching actuator %s: %w",
+			endpointPath,
+			&url.Error{Op: "Get", URL: key, Err: err},
+		)}
+		s.rawResults[key] = raw
+		return raw
+	}
+	raw := s.client.fetchRaw(ctx, endpointPath, query)
+	s.rawResults[key] = raw
+	return raw
+}
+
+func (s *springPollSession) FetchHealth(ctx context.Context) (*HealthResponse, error) {
+	return s.client.decodeHealth(s.fetchRaw(ctx, "health", nil))
+}
+
+func (s *springPollSession) FetchMetric(ctx context.Context, name string, tags []string) (*MetricResponse, error) {
+	query, err := metricQuery(name, tags)
+	if err != nil {
+		return nil, err
+	}
+	endpointPath := path.Join("metrics", name)
+	return s.client.decodeMetric(endpointPath, s.fetchRaw(ctx, endpointPath, query))
 }
 
 func NewSpringActuatorCollector(targetName string, client *ActuatorClient, collectHostMetrics bool) *SpringActuatorCollector {
@@ -41,7 +87,8 @@ func (c *SpringActuatorCollector) Collect(ctx context.Context) (*CollectionResul
 		return result, err
 	}
 
-	health, err := c.client.FetchHealth(ctx)
+	session := newSpringPollSession(c.client)
+	health, err := session.FetchHealth(ctx)
 	if err != nil {
 		result.addEvent(EventSeverityError, "health_fetch_failed", "", err.Error())
 		return result, fmt.Errorf("fetching health: %w", err)
@@ -49,19 +96,19 @@ func (c *SpringActuatorCollector) Collect(ctx context.Context) (*CollectionResul
 	result.HealthStatus = health.Status
 	result.DBHealthStatus = health.DBStatus()
 
-	c.collectHTTP(ctx, result)
-	c.collectGauge(ctx, result, "jvm_heap_used_bytes", "jvm.memory.used", []string{"area:heap"}, "VALUE", "bytes")
-	c.collectGauge(ctx, result, "process_cpu_usage", "process.cpu.usage", nil, "VALUE", "ratio")
+	c.collectHTTP(ctx, session, result)
+	c.collectGauge(ctx, session, result, "jvm_heap_used_bytes", "jvm.memory.used", []string{"area:heap"}, "VALUE", "bytes")
+	c.collectGauge(ctx, session, result, "process_cpu_usage", "process.cpu.usage", nil, "VALUE", "ratio")
 	if c.collectHostMetrics {
-		c.collectHostResources(ctx, result)
+		c.collectHostResources(ctx, session, result)
 	}
-	c.collectProcessStartTime(ctx, result)
+	c.collectProcessStartTime(ctx, session, result)
 
 	return result, nil
 }
 
-func (c *SpringActuatorCollector) collectHostResources(ctx context.Context, result *CollectionResult) {
-	if cpu, ok := c.fetchGauge(ctx, result, "host_cpu_usage", "system.cpu.usage"); ok {
+func (c *SpringActuatorCollector) collectHostResources(ctx context.Context, session *springPollSession, result *CollectionResult) {
+	if cpu, ok := c.fetchGauge(ctx, session, result, "host_cpu_usage", "system.cpu.usage"); ok {
 		if !finiteInRange(cpu, 0, 1) {
 			result.addEvent(EventSeverityWarning, "metric_invalid", "host_cpu_usage", fmt.Sprintf("system.cpu.usage value %v must be between 0 and 1", cpu))
 		} else {
@@ -69,8 +116,8 @@ func (c *SpringActuatorCollector) collectHostResources(ctx context.Context, resu
 		}
 	}
 
-	free, freeOK := c.fetchGauge(ctx, result, "host_disk_used_bytes", "disk.free")
-	total, totalOK := c.fetchGauge(ctx, result, "host_disk_total_bytes", "disk.total")
+	free, freeOK := c.fetchGauge(ctx, session, result, "host_disk_used_bytes", "disk.free")
+	total, totalOK := c.fetchGauge(ctx, session, result, "host_disk_total_bytes", "disk.total")
 	if !freeOK || !totalOK {
 		return
 	}
@@ -83,8 +130,8 @@ func (c *SpringActuatorCollector) collectHostResources(ctx context.Context, resu
 	result.addSample("host_disk_total_bytes", MetricKindGauge, total, "bytes")
 }
 
-func (c *SpringActuatorCollector) fetchGauge(ctx context.Context, result *CollectionResult, key, actuatorName string) (float64, bool) {
-	metric, err := c.client.FetchMetric(ctx, actuatorName, nil)
+func (c *SpringActuatorCollector) fetchGauge(ctx context.Context, session *springPollSession, result *CollectionResult, key, actuatorName string) (float64, bool) {
+	metric, err := session.FetchMetric(ctx, actuatorName, nil)
 	if err != nil {
 		result.addEvent(EventSeverityWarning, "metric_fetch_failed", key, err.Error())
 		return 0, false
@@ -101,8 +148,8 @@ func finiteInRange(value, min, max float64) bool {
 	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= min && value <= max
 }
 
-func (c *SpringActuatorCollector) collectHTTP(ctx context.Context, result *CollectionResult) {
-	metric, err := c.client.FetchMetric(ctx, "http.server.requests", nil)
+func (c *SpringActuatorCollector) collectHTTP(ctx context.Context, session *springPollSession, result *CollectionResult) {
+	metric, err := session.FetchMetric(ctx, "http.server.requests", nil)
 	if err != nil {
 		result.addEvent(EventSeverityWarning, "metric_fetch_failed", "http_requests_total", err.Error())
 		return
@@ -124,17 +171,17 @@ func (c *SpringActuatorCollector) collectHTTP(ctx context.Context, result *Colle
 		return
 	}
 
-	c.collectHTTPStatusTotal(ctx, result, "http_404_total", filterStatusExact(statuses, "404"))
-	c.collectHTTPStatusTotal(ctx, result, "http_4xx_total", filterStatusRange(statuses, 400, 499))
-	c.collectHTTPStatusTotal(ctx, result, "http_5xx_total", filterStatusRange(statuses, 500, 599))
+	c.collectHTTPStatusTotal(ctx, session, result, "http_404_total", filterStatusExact(statuses, "404"))
+	c.collectHTTPStatusTotal(ctx, session, result, "http_4xx_total", filterStatusRange(statuses, 400, 499))
+	c.collectHTTPStatusTotal(ctx, session, result, "http_5xx_total", filterStatusRange(statuses, 500, 599))
 }
 
-func (c *SpringActuatorCollector) collectHTTPStatusTotal(ctx context.Context, result *CollectionResult, key string, statuses []string) {
+func (c *SpringActuatorCollector) collectHTTPStatusTotal(ctx context.Context, session *springPollSession, result *CollectionResult, key string, statuses []string) {
 	var total float64
 	var sawStatus bool
 
 	for _, status := range statuses {
-		metric, err := c.client.FetchMetric(ctx, "http.server.requests", []string{"status:" + status})
+		metric, err := session.FetchMetric(ctx, "http.server.requests", []string{"status:" + status})
 		if err != nil {
 			result.addEvent(EventSeverityWarning, "metric_fetch_failed", key, fmt.Sprintf("http.server.requests status %s: %v", status, err))
 			continue
@@ -157,8 +204,8 @@ func (c *SpringActuatorCollector) collectHTTPStatusTotal(ctx context.Context, re
 	}
 }
 
-func (c *SpringActuatorCollector) collectGauge(ctx context.Context, result *CollectionResult, key, actuatorName string, tags []string, statistic, unit string) {
-	metric, err := c.client.FetchMetric(ctx, actuatorName, tags)
+func (c *SpringActuatorCollector) collectGauge(ctx context.Context, session *springPollSession, result *CollectionResult, key, actuatorName string, tags []string, statistic, unit string) {
+	metric, err := session.FetchMetric(ctx, actuatorName, tags)
 	if err != nil {
 		result.addEvent(EventSeverityWarning, "metric_fetch_failed", key, err.Error())
 		return
@@ -172,8 +219,8 @@ func (c *SpringActuatorCollector) collectGauge(ctx context.Context, result *Coll
 	result.addSample(key, MetricKindGauge, value, unit)
 }
 
-func (c *SpringActuatorCollector) collectProcessStartTime(ctx context.Context, result *CollectionResult) {
-	metric, err := c.client.FetchMetric(ctx, "process.start.time", nil)
+func (c *SpringActuatorCollector) collectProcessStartTime(ctx context.Context, session *springPollSession, result *CollectionResult) {
+	metric, err := session.FetchMetric(ctx, "process.start.time", nil)
 	if err != nil {
 		result.addEvent(EventSeverityWarning, "metric_fetch_failed", "process_start_time", err.Error())
 		return

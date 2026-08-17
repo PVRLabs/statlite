@@ -27,6 +27,12 @@ type ActuatorClient struct {
 	auth       *BasicAuth
 }
 
+type actuatorRawResult struct {
+	body       []byte
+	statusCode int
+	err        error
+}
+
 type HealthResponse struct {
 	Status     string                     `json:"status"`
 	Components map[string]HealthComponent `json:"components,omitempty"`
@@ -83,11 +89,7 @@ func NewActuatorClient(baseURL string, timeout time.Duration, auth *BasicAuth) (
 }
 
 func (c *ActuatorClient) FetchHealth(ctx context.Context) (*HealthResponse, error) {
-	var health HealthResponse
-	if err := c.getHealthJSON(ctx, &health); err != nil {
-		return nil, err
-	}
-	return &health, nil
+	return c.decodeHealth(c.fetchRaw(ctx, "health", nil))
 }
 
 // getHealthJSON accepts a valid Spring Boot health payload even when its HTTP
@@ -96,23 +98,44 @@ func (c *ActuatorClient) FetchHealth(ctx context.Context) (*HealthResponse, erro
 // than a failure to poll it.
 func (c *ActuatorClient) getHealthJSON(ctx context.Context, health *HealthResponse) error {
 	endpointPath := "health"
-	body, statusCode, err := c.fetch(ctx, endpointPath, nil)
+	decoded, err := c.decodeHealth(c.fetchRaw(ctx, endpointPath, nil))
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(body, health); err != nil {
-		return fmt.Errorf("parsing actuator %s response: %w", endpointPath, err)
-	}
-	if strings.TrimSpace(health.Status) == "" {
-		if statusCode < 200 || statusCode >= 300 {
-			return fmt.Errorf("actuator %s returned HTTP %d: %s", endpointPath, statusCode, strings.TrimSpace(string(body)))
-		}
-	}
-	setRaw(health, body)
+	*health = *decoded
 	return nil
 }
 
+func (c *ActuatorClient) decodeHealth(raw actuatorRawResult) (*HealthResponse, error) {
+	endpointPath := "health"
+	if raw.err != nil {
+		return nil, raw.err
+	}
+	body, statusCode := raw.body, raw.statusCode
+	var health HealthResponse
+	if err := json.Unmarshal(body, &health); err != nil {
+		return nil, fmt.Errorf("parsing actuator %s response: %w", endpointPath, err)
+	}
+	if strings.TrimSpace(health.Status) == "" {
+		if statusCode < 200 || statusCode >= 300 {
+			return nil, fmt.Errorf("actuator %s returned HTTP %d: %s", endpointPath, statusCode, strings.TrimSpace(string(body)))
+		}
+	}
+	setRaw(&health, body)
+	return &health, nil
+}
+
 func (c *ActuatorClient) FetchMetric(ctx context.Context, name string, tags []string) (*MetricResponse, error) {
+	query, err := metricQuery(name, tags)
+	if err != nil {
+		return nil, err
+	}
+
+	endpointPath := path.Join("metrics", name)
+	return c.decodeMetric(endpointPath, c.fetchRaw(ctx, endpointPath, query))
+}
+
+func metricQuery(name string, tags []string) (url.Values, error) {
 	if strings.TrimSpace(name) == "" {
 		return nil, fmt.Errorf("metric name is required")
 	}
@@ -128,12 +151,7 @@ func (c *ActuatorClient) FetchMetric(ctx context.Context, name string, tags []st
 		}
 		query.Add("tag", tag)
 	}
-
-	var metric MetricResponse
-	if err := c.getJSON(ctx, path.Join("metrics", name), query, &metric); err != nil {
-		return nil, err
-	}
-	return &metric, nil
+	return query, nil
 }
 
 func (h *HealthResponse) DBStatus() string {
@@ -144,10 +162,11 @@ func (h *HealthResponse) DBStatus() string {
 }
 
 func (c *ActuatorClient) getJSON(ctx context.Context, endpointPath string, query url.Values, dest interface{}) error {
-	body, statusCode, err := c.fetch(ctx, endpointPath, query)
-	if err != nil {
-		return err
+	raw := c.fetchRaw(ctx, endpointPath, query)
+	if raw.err != nil {
+		return raw.err
 	}
+	body, statusCode := raw.body, raw.statusCode
 	if statusCode < 200 || statusCode >= 300 {
 		return fmt.Errorf("actuator %s returned HTTP %d: %s", endpointPath, statusCode, strings.TrimSpace(string(body)))
 	}
@@ -157,6 +176,27 @@ func (c *ActuatorClient) getJSON(ctx context.Context, endpointPath string, query
 	}
 	setRaw(dest, body)
 	return nil
+}
+
+func (c *ActuatorClient) decodeMetric(endpointPath string, raw actuatorRawResult) (*MetricResponse, error) {
+	if raw.err != nil {
+		return nil, raw.err
+	}
+	if raw.statusCode < 200 || raw.statusCode >= 300 {
+		return nil, fmt.Errorf("actuator %s returned HTTP %d: %s", endpointPath, raw.statusCode, strings.TrimSpace(string(raw.body)))
+	}
+
+	var metric MetricResponse
+	if err := json.Unmarshal(raw.body, &metric); err != nil {
+		return nil, fmt.Errorf("parsing actuator %s response: %w", endpointPath, err)
+	}
+	setRaw(&metric, raw.body)
+	return &metric, nil
+}
+
+func (c *ActuatorClient) fetchRaw(ctx context.Context, endpointPath string, query url.Values) actuatorRawResult {
+	body, statusCode, err := c.fetch(ctx, endpointPath, query)
+	return actuatorRawResult{body: body, statusCode: statusCode, err: err}
 }
 
 func (c *ActuatorClient) fetch(ctx context.Context, endpointPath string, query url.Values) ([]byte, int, error) {

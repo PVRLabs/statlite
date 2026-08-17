@@ -80,6 +80,86 @@ func TestSpringCollectorPost22ContractMatrix(t *testing.T) {
 	}
 }
 
+func TestSpringCollectorStartsFreshPollSession(t *testing.T) {
+	fixture := springPost22ContractFixtures()[0]
+	transport := &springRecordingTransport{responses: fixture.responses}
+	client, err := NewActuatorClient("http://spring.test/actuator", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewActuatorClient() error = %v", err)
+	}
+	client.httpClient.Transport = transport
+	collector := NewSpringActuatorCollector("spring-contract", client, fixture.collectHostMetrics)
+
+	first, err := collector.Collect(context.Background())
+	if err != nil {
+		t.Fatalf("first Collect() error = %v", err)
+	}
+	firstRequests := len(transport.requests)
+	if firstRequests != len(fixture.baselineRequests) {
+		t.Fatalf("first poll request count = %d, want one request per effective URL (%d); requests=%v", firstRequests, len(fixture.baselineRequests), transport.requests)
+	}
+	assertSpringRequestsWithinBaseline(t, transport.requests, fixture.baselineRequests)
+
+	second, err := collector.Collect(context.Background())
+	if err != nil {
+		t.Fatalf("second Collect() error = %v", err)
+	}
+	if !reflect.DeepEqual(snapshotSpringNormalized(first), fixture.wantNormalized) || !reflect.DeepEqual(snapshotSpringNormalized(second), fixture.wantNormalized) {
+		t.Fatalf("normalized output changed across fresh polls: first=%#v second=%#v want=%#v", snapshotSpringNormalized(first), snapshotSpringNormalized(second), fixture.wantNormalized)
+	}
+	counts := springRequestCounts(transport.requests...)
+	for request, count := range counts {
+		if count != 2 {
+			t.Fatalf("effective request %q count after two polls = %d, want 2; counts=%v", request, count, counts)
+		}
+	}
+}
+
+func TestSpringPollSessionReusesCompletedResultAfterCancellation(t *testing.T) {
+	transport := &springRecordingTransport{responses: map[string]springScriptedResponse{
+		"/actuator/metrics/http.server.requests?tag=status%3A404": springOK(`{"name":"http.server.requests","measurements":[{"statistic":"COUNT","value":3}]}`),
+	}}
+	client, err := NewActuatorClient("http://spring.test/actuator", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewActuatorClient() error = %v", err)
+	}
+	client.httpClient.Transport = transport
+	session := newSpringPollSession(client)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	first, err := session.FetchMetric(ctx, "http.server.requests", []string{"status:404"})
+	if err != nil {
+		t.Fatalf("first FetchMetric() error = %v", err)
+	}
+	cancel()
+	second, err := session.FetchMetric(ctx, "http.server.requests", []string{"status:404"})
+	if err != nil {
+		t.Fatalf("cached FetchMetric() error = %v", err)
+	}
+	if first == second {
+		t.Fatal("cached FetchMetric() returned the same decoded response pointer")
+	}
+	first.Measurements[0].Value = 99
+	if got := second.Measurements[0].Value; got != 3 {
+		t.Fatalf("cached response value = %v after mutating first decode, want 3", got)
+	}
+	if len(transport.requests) != 1 {
+		t.Fatalf("cached effective request count = %d, want 1; requests=%v", len(transport.requests), transport.requests)
+	}
+
+	_, err = session.FetchMetric(ctx, "process.cpu.usage", nil)
+	if err == nil {
+		t.Fatal("new FetchMetric() after cancellation returned nil error")
+	}
+	wantError := `fetching actuator metrics/process.cpu.usage: Get "http://spring.test/actuator/metrics/process.cpu.usage": context canceled`
+	if err.Error() != wantError {
+		t.Fatalf("canceled new FetchMetric() error = %q, want %q", err, wantError)
+	}
+	if len(transport.requests) != 1 {
+		t.Fatalf("canceled new request count = %d, want 1; requests=%v", len(transport.requests), transport.requests)
+	}
+}
+
 func (t *springRecordingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	key := req.URL.EscapedPath()
 	if req.URL.RawQuery != "" {
@@ -362,6 +442,9 @@ func assertSpringRequestsWithinBaseline(t *testing.T, requests []string, baselin
 	t.Helper()
 	got := springRequestCounts(requests...)
 	for request, count := range got {
+		if count > 1 {
+			t.Fatalf("effective request %q count = %d, want at most 1 per poll; baseline=%v", request, count, baseline)
+		}
 		baselineCount, ok := baseline[request]
 		if !ok {
 			t.Fatalf("new effective request %q made %d time(s); baseline=%v", request, count, baseline)
