@@ -120,8 +120,14 @@ func TestSaveSpringContractResultRowDeltas(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Collect() error = %v", err)
 	}
-	if len(result.Samples) != 6 || len(result.Events) != 2 {
-		t.Fatalf("Spring contract result has %d samples/%d events, want 6/2: %#v", len(result.Samples), len(result.Events), result)
+	if len(result.Samples) != 6 || len(result.Events) != 1 {
+		t.Fatalf("Spring contract result has %d samples/%d events, want 6/1: %#v", len(result.Samples), len(result.Events), result)
+	}
+	if event := result.Events[0]; event.MetricKey != "" ||
+		!strings.Contains(event.Message, "http_404_total, http_4xx_total") ||
+		!strings.Contains(event.Message, "/actuator/metrics/http.server.requests?tag=status%3A404") ||
+		!strings.Contains(event.Message, "HTTP 404: missing status") {
+		t.Fatalf("Spring contract event = %#v, want complete shared-failure diagnostic", event)
 	}
 	if result.ProcessStartTime == nil {
 		t.Fatal("Spring contract ProcessStartTime = nil, want populated")

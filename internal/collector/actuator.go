@@ -28,9 +28,38 @@ type ActuatorClient struct {
 }
 
 type actuatorRawResult struct {
-	body       []byte
-	statusCode int
-	err        error
+	body         []byte
+	statusCode   int
+	effectiveURL string
+	err          error
+}
+
+type actuatorFailureClass string
+
+const (
+	actuatorFailureAuthentication actuatorFailureClass = "authentication"
+	actuatorFailureNotFound       actuatorFailureClass = "not_found"
+	actuatorFailureHTTP           actuatorFailureClass = "http"
+	actuatorFailureMalformed      actuatorFailureClass = "malformed_json"
+	actuatorFailureTransport      actuatorFailureClass = "transport"
+	actuatorFailureResponse       actuatorFailureClass = "response"
+)
+
+type actuatorFailure struct {
+	class        actuatorFailureClass
+	endpoint     string
+	statusCode   int
+	cause        string
+	displayError string
+	underlying   error
+}
+
+func (e *actuatorFailure) Error() string {
+	return e.displayError
+}
+
+func (e *actuatorFailure) Unwrap() error {
+	return e.underlying
 }
 
 type HealthResponse struct {
@@ -114,11 +143,11 @@ func (c *ActuatorClient) decodeHealth(raw actuatorRawResult) (*HealthResponse, e
 	body, statusCode := raw.body, raw.statusCode
 	var health HealthResponse
 	if err := json.Unmarshal(body, &health); err != nil {
-		return nil, fmt.Errorf("parsing actuator %s response: %w", endpointPath, err)
+		return nil, newActuatorFailure(actuatorFailureMalformed, raw.effectiveURL, 0, err.Error(), fmt.Sprintf("parsing actuator %s response: %v", endpointPath, err), err)
 	}
 	if strings.TrimSpace(health.Status) == "" {
 		if statusCode < 200 || statusCode >= 300 {
-			return nil, fmt.Errorf("actuator %s returned HTTP %d: %s", endpointPath, statusCode, strings.TrimSpace(string(body)))
+			return nil, newActuatorHTTPFailure(raw.effectiveURL, endpointPath, statusCode, body)
 		}
 	}
 	setRaw(&health, body)
@@ -168,11 +197,11 @@ func (c *ActuatorClient) getJSON(ctx context.Context, endpointPath string, query
 	}
 	body, statusCode := raw.body, raw.statusCode
 	if statusCode < 200 || statusCode >= 300 {
-		return fmt.Errorf("actuator %s returned HTTP %d: %s", endpointPath, statusCode, strings.TrimSpace(string(body)))
+		return newActuatorHTTPFailure(raw.effectiveURL, endpointPath, statusCode, body)
 	}
 
 	if err := json.Unmarshal(body, dest); err != nil {
-		return fmt.Errorf("parsing actuator %s response: %w", endpointPath, err)
+		return newActuatorFailure(actuatorFailureMalformed, raw.effectiveURL, 0, err.Error(), fmt.Sprintf("parsing actuator %s response: %v", endpointPath, err), err)
 	}
 	setRaw(dest, body)
 	return nil
@@ -183,20 +212,21 @@ func (c *ActuatorClient) decodeMetric(endpointPath string, raw actuatorRawResult
 		return nil, raw.err
 	}
 	if raw.statusCode < 200 || raw.statusCode >= 300 {
-		return nil, fmt.Errorf("actuator %s returned HTTP %d: %s", endpointPath, raw.statusCode, strings.TrimSpace(string(raw.body)))
+		return nil, newActuatorHTTPFailure(raw.effectiveURL, endpointPath, raw.statusCode, raw.body)
 	}
 
 	var metric MetricResponse
 	if err := json.Unmarshal(raw.body, &metric); err != nil {
-		return nil, fmt.Errorf("parsing actuator %s response: %w", endpointPath, err)
+		return nil, newActuatorFailure(actuatorFailureMalformed, raw.effectiveURL, 0, err.Error(), fmt.Sprintf("parsing actuator %s response: %v", endpointPath, err), err)
 	}
 	setRaw(&metric, raw.body)
 	return &metric, nil
 }
 
 func (c *ActuatorClient) fetchRaw(ctx context.Context, endpointPath string, query url.Values) actuatorRawResult {
+	effectiveURL := c.effectiveURL(endpointPath, query)
 	body, statusCode, err := c.fetch(ctx, endpointPath, query)
-	return actuatorRawResult{body: body, statusCode: statusCode, err: err}
+	return actuatorRawResult{body: body, statusCode: statusCode, effectiveURL: effectiveURL, err: err}
 }
 
 func (c *ActuatorClient) fetch(ctx context.Context, endpointPath string, query url.Values) ([]byte, int, error) {
@@ -204,7 +234,8 @@ func (c *ActuatorClient) fetch(ctx context.Context, endpointPath string, query u
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpointURL, nil)
 	if err != nil {
-		return nil, 0, fmt.Errorf("creating actuator request: %w", err)
+		message := fmt.Sprintf("creating actuator request: %v", err)
+		return nil, 0, newActuatorFailure(actuatorFailureTransport, endpointURL, 0, err.Error(), message, err)
 	}
 	req.Header.Set("Accept", "application/json")
 	if c.auth != nil {
@@ -213,18 +244,60 @@ func (c *ActuatorClient) fetch(ctx context.Context, endpointPath string, query u
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, 0, fmt.Errorf("fetching actuator %s: %w", endpointPath, err)
+		message := fmt.Sprintf("fetching actuator %s: %v", endpointPath, err)
+		return nil, 0, newActuatorFailure(actuatorFailureTransport, endpointURL, 0, err.Error(), message, err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, actuatorMaxResponseBytes+1))
 	if err != nil {
-		return nil, 0, fmt.Errorf("reading actuator %s response: %w", endpointPath, err)
+		message := fmt.Sprintf("reading actuator %s response: %v", endpointPath, err)
+		return nil, 0, newActuatorFailure(actuatorFailureResponse, endpointURL, 0, err.Error(), message, err)
 	}
 	if len(body) > actuatorMaxResponseBytes {
-		return nil, 0, fmt.Errorf("actuator %s response exceeds %d byte limit", endpointPath, actuatorMaxResponseBytes)
+		cause := fmt.Sprintf("response exceeds %d byte limit", actuatorMaxResponseBytes)
+		message := fmt.Sprintf("actuator %s %s", endpointPath, cause)
+		return nil, 0, newActuatorFailure(actuatorFailureResponse, endpointURL, 0, cause, message, nil)
 	}
 	return body, resp.StatusCode, nil
+}
+
+func newActuatorHTTPFailure(effectiveURL, endpointPath string, statusCode int, body []byte) error {
+	class := actuatorFailureHTTP
+	switch statusCode {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		class = actuatorFailureAuthentication
+	case http.StatusNotFound:
+		class = actuatorFailureNotFound
+	}
+	cause := strings.TrimSpace(string(body))
+	if cause == "" {
+		cause = http.StatusText(statusCode)
+		if cause == "" {
+			cause = "empty response body"
+		}
+	}
+	message := fmt.Sprintf("actuator %s returned HTTP %d: %s", endpointPath, statusCode, cause)
+	return newActuatorFailure(class, effectiveURL, statusCode, cause, message, nil)
+}
+
+func newActuatorFailure(class actuatorFailureClass, effectiveURL string, statusCode int, cause, displayError string, underlying error) error {
+	return &actuatorFailure{
+		class:        class,
+		endpoint:     effectiveEndpoint(effectiveURL),
+		statusCode:   statusCode,
+		cause:        cause,
+		displayError: displayError,
+		underlying:   underlying,
+	}
+}
+
+func effectiveEndpoint(effectiveURL string) string {
+	parsed, err := url.Parse(effectiveURL)
+	if err != nil {
+		return effectiveURL
+	}
+	return parsed.RequestURI()
 }
 
 func (c *ActuatorClient) effectiveURL(endpointPath string, query url.Values) string {

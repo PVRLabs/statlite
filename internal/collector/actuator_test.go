@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -147,6 +148,62 @@ func TestActuatorClientReturnsClearHTTPError(t *testing.T) {
 	}
 }
 
+func TestActuatorClientClassifiesFailures(t *testing.T) {
+	tests := []struct {
+		name       string
+		response   springScriptedResponse
+		transport  error
+		wantClass  actuatorFailureClass
+		wantStatus int
+		wantCause  string
+	}{
+		{name: "authentication", response: springScriptedResponse{status: http.StatusUnauthorized, body: `{"error":"Unauthorized"}`}, wantClass: actuatorFailureAuthentication, wantStatus: http.StatusUnauthorized},
+		{name: "missing endpoint", response: springScriptedResponse{status: http.StatusNotFound, body: "not found\n"}, wantClass: actuatorFailureNotFound, wantStatus: http.StatusNotFound},
+		{name: "empty HTTP body", response: springScriptedResponse{status: http.StatusNotFound}, wantClass: actuatorFailureNotFound, wantStatus: http.StatusNotFound, wantCause: "Not Found"},
+		{name: "other HTTP status", response: springScriptedResponse{status: http.StatusBadGateway, body: "upstream unavailable\n"}, wantClass: actuatorFailureHTTP, wantStatus: http.StatusBadGateway},
+		{name: "malformed JSON", response: springOK(`{"name":`), wantClass: actuatorFailureMalformed},
+		{name: "transport", transport: errors.New("network unavailable"), wantClass: actuatorFailureTransport},
+		{name: "response size", response: springOK(strings.Repeat("x", actuatorMaxResponseBytes+1)), wantClass: actuatorFailureResponse},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := &springRecordingTransport{
+				responses: map[string]springScriptedResponse{
+					"/actuator/metrics/example.metric": tt.response,
+				},
+				transportError: tt.transport,
+			}
+			client, err := NewActuatorClient("http://spring.test/actuator", time.Second, nil)
+			if err != nil {
+				t.Fatalf("NewActuatorClient() error = %v", err)
+			}
+			client.httpClient.Transport = transport
+
+			_, err = client.FetchMetric(context.Background(), "example.metric", nil)
+			if err == nil {
+				t.Fatal("FetchMetric() error = nil, want structured failure")
+			}
+			var failure *actuatorFailure
+			if !errors.As(err, &failure) {
+				t.Fatalf("FetchMetric() error type = %T, want *actuatorFailure", err)
+			}
+			if failure.class != tt.wantClass || failure.statusCode != tt.wantStatus {
+				t.Fatalf("failure identity = %q/HTTP %d, want %q/HTTP %d", failure.class, failure.statusCode, tt.wantClass, tt.wantStatus)
+			}
+			if failure.endpoint != "/actuator/metrics/example.metric" {
+				t.Fatalf("failure endpoint = %q, want /actuator/metrics/example.metric", failure.endpoint)
+			}
+			if failure.cause == "" {
+				t.Fatal("failure cause is empty")
+			}
+			if tt.wantCause != "" && failure.cause != tt.wantCause {
+				t.Fatalf("failure cause = %q, want %q", failure.cause, tt.wantCause)
+			}
+		})
+	}
+}
+
 func TestActuatorClientPropagatesContextCancellation(t *testing.T) {
 	requestStarted := make(chan struct{})
 	requestCanceled := make(chan struct{})
@@ -182,6 +239,9 @@ func TestActuatorClientPropagatesContextCancellation(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "context canceled") {
 		t.Fatalf("FetchHealth() error = %q, want context canceled", err)
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("FetchHealth() error = %v, want errors.Is(context.Canceled)", err)
 	}
 
 	select {

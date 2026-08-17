@@ -16,6 +16,7 @@ StatLite is a small, self-hosted, SQLite-backed metrics dashboard focused on Spr
 * Keep Actuator details in collector-facing code and use normalized internal data elsewhere.
 * Make the smallest useful change and do not expand product scope without explicit approval.
 * Add tests where logic can regress, make errors descriptive, and keep docs in sync when behavior changes.
+* Do not create commits unless the user explicitly approves committing after reviewing the changes.
 * When the active implementation plan specifies an issue number, include it (for example, `#14`) in every related commit message.
 
 ## MVP Guardrails

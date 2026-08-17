@@ -115,6 +115,86 @@ func TestSpringCollectorStartsFreshPollSession(t *testing.T) {
 	}
 }
 
+func TestSpringCollectorReportsSharedFailureOnEachPoll(t *testing.T) {
+	fixture := springPost22ContractFixtures()[4]
+	transport := &springRecordingTransport{responses: fixture.responses}
+	client, err := NewActuatorClient("http://spring.test/actuator", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewActuatorClient() error = %v", err)
+	}
+	client.httpClient.Transport = transport
+	collector := NewSpringActuatorCollector("spring-contract", client, fixture.collectHostMetrics)
+
+	first, err := collector.Collect(context.Background())
+	if err != nil {
+		t.Fatalf("first Collect() error = %v", err)
+	}
+	second, err := collector.Collect(context.Background())
+	if err != nil {
+		t.Fatalf("second Collect() error = %v", err)
+	}
+	wantEvent := CollectorEvent{
+		Severity: EventSeverityWarning,
+		Type:     "metric_fetch_failed",
+		Message:  "effective endpoint /actuator/metrics/http.server.requests?tag=status%3A404 returned HTTP 404: missing status; affected metrics: http_404_total, http_4xx_total",
+	}
+	for poll, result := range []*CollectionResult{first, second} {
+		if !reflect.DeepEqual(result.Events, []CollectorEvent{wantEvent}) {
+			t.Fatalf("poll %d events = %#v, want independent shared failure %#v", poll+1, result.Events, wantEvent)
+		}
+	}
+}
+
+func TestSpringPollSessionDoesNotMergeDistinctFailureIdentities(t *testing.T) {
+	session := newSpringPollSession(&ActuatorClient{})
+	result := &CollectionResult{}
+	failures := []struct {
+		metricKey string
+		failure   error
+	}{
+		{metricKey: "shared_a", failure: newActuatorFailure(actuatorFailureNotFound, "http://spring.test/actuator/metrics/shared", http.StatusNotFound, "missing", "missing", nil)},
+		{metricKey: "shared_b", failure: newActuatorFailure(actuatorFailureNotFound, "http://spring.test/actuator/metrics/shared", http.StatusNotFound, "missing", "missing", nil)},
+		{metricKey: "different_class", failure: newActuatorFailure(actuatorFailureMalformed, "http://spring.test/actuator/metrics/shared", 0, "invalid JSON", "invalid JSON", nil)},
+		{metricKey: "different_endpoint", failure: newActuatorFailure(actuatorFailureNotFound, "http://spring.test/actuator/metrics/other", http.StatusNotFound, "missing", "missing", nil)},
+		{metricKey: "http_500", failure: newActuatorFailure(actuatorFailureHTTP, "http://spring.test/actuator/metrics/shared", http.StatusInternalServerError, "failed", "failed", nil)},
+		{metricKey: "http_503", failure: newActuatorFailure(actuatorFailureHTTP, "http://spring.test/actuator/metrics/shared", http.StatusServiceUnavailable, "failed", "failed", nil)},
+	}
+	for _, failure := range failures {
+		session.addMetricFetchFailure(result, failure.metricKey, failure.failure, failure.failure.Error())
+	}
+
+	if len(result.Events) != 5 {
+		t.Fatalf("event count = %d, want one shared event and four distinct events: %#v", len(result.Events), result.Events)
+	}
+	if result.Events[0].MetricKey != "" || !strings.Contains(result.Events[0].Message, "affected metrics: shared_a, shared_b") {
+		t.Fatalf("shared event = %#v, want sorted aggregate", result.Events[0])
+	}
+	wantSingletonKeys := []string{"different_class", "different_endpoint", "http_500", "http_503"}
+	for i, wantKey := range wantSingletonKeys {
+		if got := result.Events[i+1].MetricKey; got != wantKey {
+			t.Fatalf("event %d metric key = %q, want %q; events=%#v", i+1, got, wantKey, result.Events)
+		}
+	}
+}
+
+func TestSpringPollSessionUsesActionableCauseForEmptyHTTPBody(t *testing.T) {
+	failure := newActuatorHTTPFailure(
+		"http://spring.test/actuator/metrics/http.server.requests?tag=status%3A404",
+		"metrics/http.server.requests",
+		http.StatusNotFound,
+		nil,
+	)
+	session := newSpringPollSession(&ActuatorClient{})
+	result := &CollectionResult{}
+	session.addMetricFetchFailure(result, "http_404_total", failure, failure.Error())
+	session.addMetricFetchFailure(result, "http_4xx_total", failure, failure.Error())
+
+	wantMessage := "effective endpoint /actuator/metrics/http.server.requests?tag=status%3A404 returned HTTP 404: Not Found; affected metrics: http_404_total, http_4xx_total"
+	if len(result.Events) != 1 || result.Events[0].Message != wantMessage {
+		t.Fatalf("events = %#v, want one actionable shared failure %q", result.Events, wantMessage)
+	}
+}
+
 func TestSpringPollSessionReusesCompletedResultAfterCancellation(t *testing.T) {
 	transport := &springRecordingTransport{responses: map[string]springScriptedResponse{
 		"/actuator/metrics/http.server.requests?tag=status%3A404": springOK(`{"name":"http.server.requests","measurements":[{"statistic":"COUNT","value":3}]}`),
