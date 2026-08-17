@@ -36,10 +36,7 @@ func TestSpringActuatorCollectorCollectsNormalizedBatch(t *testing.T) {
 			}
 			writeActuatorJSON(t, w, metricBody("jvm.memory.used", "bytes", map[string]float64{"VALUE": 1024}, nil))
 		case r.URL.Path == "/actuator/metrics/jvm.memory.max":
-			if r.URL.Query().Get("tag") != "area:heap" {
-				t.Fatalf("jvm.memory.max tag = %q, want area:heap", r.URL.Query().Get("tag"))
-			}
-			writeActuatorJSON(t, w, metricBody("jvm.memory.max", "bytes", map[string]float64{"VALUE": 4096}, nil))
+			t.Fatalf("unexpected jvm.memory.max request")
 		case r.URL.Path == "/actuator/metrics/process.cpu.usage":
 			writeActuatorJSON(t, w, metricBody("process.cpu.usage", nil, map[string]float64{"VALUE": 0.12}, nil))
 		case r.URL.Path == "/actuator/metrics/system.cpu.usage":
@@ -81,9 +78,7 @@ func TestSpringActuatorCollectorCollectsNormalizedBatch(t *testing.T) {
 	assertSample(t, result, "http_4xx_total", MetricKindCounter, 3, "requests")
 	assertSample(t, result, "http_5xx_total", MetricKindCounter, 2, "requests")
 	assertSample(t, result, "http_request_time_total_seconds", MetricKindCounter, 4.2, "seconds")
-	assertSample(t, result, "http_request_time_max_seconds", MetricKindGauge, 0.9, "seconds")
 	assertSample(t, result, "jvm_heap_used_bytes", MetricKindGauge, 1024, "bytes")
-	assertSample(t, result, "jvm_heap_max_bytes", MetricKindGauge, 4096, "bytes")
 	assertSample(t, result, "process_cpu_usage", MetricKindGauge, 0.12, "ratio")
 	assertSample(t, result, "host_cpu_usage", MetricKindGauge, 0.34, "ratio")
 	assertSample(t, result, "host_disk_used_bytes", MetricKindGauge, 400, "bytes")
@@ -95,9 +90,7 @@ func TestSpringActuatorCollectorCollectsNormalizedBatch(t *testing.T) {
 		"http_4xx_total",
 		"http_5xx_total",
 		"http_request_time_total_seconds",
-		"http_request_time_max_seconds",
 		"jvm_heap_used_bytes",
-		"jvm_heap_max_bytes",
 		"process_cpu_usage",
 		"host_cpu_usage",
 		"host_disk_used_bytes",
@@ -168,8 +161,8 @@ func TestSpringActuatorCollectorReportsMissingOptionalMetricsAsWarnings(t *testi
 	if len(result.Samples) != 0 {
 		t.Fatalf("Samples length = %d, want 0", len(result.Samples))
 	}
-	if countEvents(result, EventSeverityWarning, "metric_fetch_failed") != 5 {
-		t.Fatalf("warnings = %#v, want five application metric fetch warnings and no disabled host metric requests", result.Events)
+	if countEvents(result, EventSeverityWarning, "metric_fetch_failed") != 4 {
+		t.Fatalf("warnings = %#v, want four application metric fetch warnings and no disabled host metric requests", result.Events)
 	}
 }
 
@@ -224,8 +217,6 @@ func TestSpringActuatorCollectorKeepsSamplesOnPartialMetricFailures(t *testing.T
 			writeActuatorJSON(t, w, metricBody("http.server.requests", "seconds", map[string]float64{"COUNT": 1}, nil))
 		case r.URL.Path == "/actuator/metrics/http.server.requests" && r.URL.Query().Get("tag") == "status:500":
 			http.Error(w, "backend timeout", http.StatusGatewayTimeout)
-		case r.URL.Path == "/actuator/metrics/jvm.memory.max":
-			writeActuatorJSON(t, w, metricBody("jvm.memory.max", "bytes", map[string]float64{"VALUE": 2048}, nil))
 		case r.URL.Path == "/actuator/metrics/process.cpu.usage":
 			writeActuatorJSON(t, w, metricBody("process.cpu.usage", nil, map[string]float64{"VALUE": 0.5}, nil))
 		default:
@@ -248,9 +239,8 @@ func TestSpringActuatorCollectorKeepsSamplesOnPartialMetricFailures(t *testing.T
 	assertSample(t, result, "http_requests_total", MetricKindCounter, 10, "requests")
 	assertSample(t, result, "http_404_total", MetricKindCounter, 1, "requests")
 	assertSample(t, result, "http_4xx_total", MetricKindCounter, 1, "requests")
-	assertSample(t, result, "jvm_heap_max_bytes", MetricKindGauge, 2048, "bytes")
 	assertSample(t, result, "process_cpu_usage", MetricKindGauge, 0.5, "ratio")
-	if countEvents(result, EventSeverityWarning, "metric_fetch_failed") < 3 {
+	if countEvents(result, EventSeverityWarning, "metric_fetch_failed") != 3 {
 		t.Fatalf("events = %#v, want fetch warnings for failed optional metrics", result.Events)
 	}
 }

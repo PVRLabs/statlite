@@ -157,13 +157,6 @@ func collectStatliteMetricsSamples(result *CollectionResult, metrics *StatliteMe
 			field:          metrics.RequestDurationSecondsTotal,
 		},
 		{
-			sourceKey:     "request_duration_seconds_max",
-			normalizedKey: "http_request_time_max_seconds",
-			kind:          MetricKindGauge,
-			unit:          "seconds",
-			field:         metrics.RequestDurationSecondsMax,
-		},
-		{
 			sourceKey:     "process_cpu_usage",
 			normalizedKey: "process_cpu_usage",
 			kind:          MetricKindGauge,

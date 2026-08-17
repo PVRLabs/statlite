@@ -273,14 +273,18 @@ func TestSeriesResolvesRuntimeMemoryPerPoll(t *testing.T) {
 		{Key: "process_cpu_usage", Kind: collector.MetricKindGauge, Value: 0.1, Unit: "ratio"},
 	})
 	saveSeriesPollSamples(t, store, appRunID, firstPoll.Add(4*time.Minute), []collector.MetricSample{
+		// These rows represent historical samples from before the metrics were
+		// removed from collection. Series projection must continue to ignore them.
 		{Key: "jvm_heap_max_bytes", Kind: collector.MetricKindGauge, Value: 500, Unit: "bytes"},
+		{Key: "http_request_time_max_seconds", Kind: collector.MetricKindGauge, Value: 0.9, Unit: "seconds"},
 		{Key: "process_cpu_usage", Kind: collector.MetricKindGauge, Value: 0.1, Unit: "ratio"},
 	})
 
 	wantStoredMemoryRows := map[string]int{
-		"runtime_heap_used_bytes": 3,
-		"jvm_heap_used_bytes":     3,
-		"jvm_heap_max_bytes":      1,
+		"runtime_heap_used_bytes":       3,
+		"jvm_heap_used_bytes":           3,
+		"jvm_heap_max_bytes":            1,
+		"http_request_time_max_seconds": 1,
 	}
 	assertStoredMetricKeyCounts(t, store, wantStoredMemoryRows)
 
@@ -300,7 +304,7 @@ func TestSeriesResolvesRuntimeMemoryPerPoll(t *testing.T) {
 	}
 
 	// Series reads raw rows only; querying mixed history must not rewrite or
-	// migrate either the neutral or historical JVM samples.
+	// migrate either the neutral or historical samples.
 	assertStoredMetricKeyCounts(t, store, wantStoredMemoryRows)
 }
 
@@ -750,7 +754,7 @@ func saveSeriesPoll(t *testing.T, store *Store, appRunID int64, startedAt time.T
 		switch key {
 		case "http_request_time_total_seconds":
 			unit = "seconds"
-		case "runtime_heap_used_bytes", "jvm_heap_used_bytes", "jvm_heap_max_bytes", "host_memory_used_bytes", "host_memory_total_bytes", "host_disk_used_bytes", "host_disk_total_bytes":
+		case "runtime_heap_used_bytes", "jvm_heap_used_bytes", "host_memory_used_bytes", "host_memory_total_bytes", "host_disk_used_bytes", "host_disk_total_bytes":
 			kind = collector.MetricKindGauge
 			unit = "bytes"
 		case "process_cpu_usage":

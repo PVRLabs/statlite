@@ -29,7 +29,6 @@ A complete response looks like this:
     "responses_4xx_total": 31,
     "responses_5xx_total": 4,
     "request_duration_seconds_total": 84.31,
-    "request_duration_seconds_max": 1.42,
     "process_cpu_usage": 0.031,
     "runtime_heap_used_bytes": 25165824,
     "uptime_seconds": 1820,
@@ -78,10 +77,10 @@ individual metrics are optional.
 | `metrics.responses_4xx_total` | number | requests | Yes | Monotonic counter of HTTP 4xx responses, including 404 responses. |
 | `metrics.responses_5xx_total` | number | requests | Yes | Monotonic counter of HTTP 5xx responses. |
 | `metrics.request_duration_seconds_total` | number | seconds | Yes | Monotonic total request duration. |
-| `metrics.request_duration_seconds_max` | number | seconds | Yes | Maximum observed request duration in the application’s current observation window. The observation window is integration-defined in v1 and should be documented by the helper or application. |
+| `metrics.request_duration_seconds_max` | number | seconds | Yes | Compatibility field. StatLite accepts and ignores this value; it is not normalized, persisted, displayed, or used for dashboard calculations. Producers may continue sending it during v1. |
 | `metrics.process_cpu_usage` | number | CPU cores | Yes | Process CPU consumption expressed as CPU cores; it may exceed `1.0`. |
 | `metrics.runtime_heap_used_bytes` | number | bytes | Yes | Memory currently managed by the language runtime, not total process RSS and not a maximum-memory value. |
-| `metrics.uptime_seconds` | number | seconds | Yes | Process uptime. |
+| `metrics.uptime_seconds` | number | seconds | Yes | Process uptime. StatLite persists this as the internal `process_uptime` restart-detection signal; it is not a dashboard time-series metric. |
 | `metrics.host_cpu_usage` | number | ratio | Yes | Current host CPU use as a fraction of visible capacity in `[0.0, 1.0]`. |
 | `metrics.host_memory_used_bytes` | number | bytes | Yes | Used memory visible to the producer. Must not exceed `host_memory_total_bytes` when both are present. |
 | `metrics.host_memory_total_bytes` | number | bytes | Yes | Total memory visible to the producer. |
@@ -97,10 +96,15 @@ counter deltas when querying history and does not display negative deltas.
 
 ### Gauges
 
-`request_duration_seconds_max`, `process_cpu_usage`, `runtime_heap_used_bytes`,
-`uptime_seconds`, and all host fields are gauges. Their values describe the
-current observation of the process or execution environment rather than a
-cumulative total.
+`process_cpu_usage`, `runtime_heap_used_bytes`, `uptime_seconds`, and all host
+fields are gauges. Their values describe the current observation of the
+process or execution environment rather than a cumulative total.
+
+StatLite accepts `request_duration_seconds_max` for v1 producer compatibility,
+but currently ignores it. It is not part of StatLite's normalized or dashboard
+metric set. Average latency is derived from request-duration-total and
+request-count counter deltas; percentile and maximum-latency analysis are
+outside the lightweight core.
 
 ## Host resource guidance
 

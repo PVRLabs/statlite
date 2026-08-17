@@ -115,6 +115,39 @@ func TestPollNowDetectsRestartAfterMonitorRecreation(t *testing.T) {
 	}
 }
 
+func TestPollNowDetectsUptimeRestartAfterMonitorRecreation(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	firstAt := time.Date(2026, 7, 7, 10, 0, 0, 0, time.UTC)
+	secondAt := firstAt.Add(time.Minute)
+	first := newTestMonitor(t, store, &sequenceCollector{results: []collectResult{
+		{result: uptimeResult(firstAt, 3600)},
+	}})
+	firstSnapshot, err := first.PollNow(context.Background())
+	if err != nil {
+		t.Fatalf("first PollNow() error = %v", err)
+	}
+
+	recreated := newTestMonitor(t, store, &sequenceCollector{results: []collectResult{
+		{result: uptimeResult(secondAt, 30)},
+	}})
+	secondSnapshot, err := recreated.PollNow(context.Background())
+	if err != nil {
+		t.Fatalf("recreated PollNow() error = %v", err)
+	}
+
+	if firstSnapshot.AppRunID == nil || secondSnapshot.AppRunID == nil {
+		t.Fatalf("app run ids = %v, %v; want both set", firstSnapshot.AppRunID, secondSnapshot.AppRunID)
+	}
+	if *firstSnapshot.AppRunID == *secondSnapshot.AppRunID {
+		t.Fatalf("recreated monitor kept app run %d after uptime decreased", *secondSnapshot.AppRunID)
+	}
+	if !hasEvent(secondSnapshot.Result.Events, EventTypeRestartDetected) {
+		t.Fatalf("events = %#v, want %s", secondSnapshot.Result.Events, EventTypeRestartDetected)
+	}
+}
+
 func TestPollNowRejectsNilCollectorResult(t *testing.T) {
 	store := openTestStore(t)
 	defer store.Close()
@@ -337,6 +370,18 @@ func successfulResult(processStart time.Time, requests, requestSeconds float64) 
 		Samples: []collector.MetricSample{
 			{Key: "http_requests_total", Kind: collector.MetricKindCounter, Value: requests, Unit: "requests"},
 			{Key: "http_request_time_total_seconds", Kind: collector.MetricKindCounter, Value: requestSeconds, Unit: "seconds"},
+		},
+	}
+}
+
+func uptimeResult(at time.Time, uptime float64) *collector.CollectionResult {
+	return &collector.CollectionResult{
+		TargetName:     "app",
+		PollStartedAt:  at,
+		PollFinishedAt: at.Add(time.Second),
+		HealthStatus:   "UP",
+		Samples: []collector.MetricSample{
+			{Key: "process_uptime", Kind: collector.MetricKindGauge, Value: uptime, Unit: "seconds"},
 		},
 	}
 }

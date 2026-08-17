@@ -68,7 +68,6 @@ func TestStatliteMetricsCollectorMapsCompleteResponse(t *testing.T) {
 	assertSample(t, result, "http_4xx_total", MetricKindCounter, 31, "requests")
 	assertSample(t, result, "http_5xx_total", MetricKindCounter, 4, "requests")
 	assertSample(t, result, "http_request_time_total_seconds", MetricKindCounter, 84.31, "seconds")
-	assertSample(t, result, "http_request_time_max_seconds", MetricKindGauge, 1.42, "seconds")
 	assertSample(t, result, "process_cpu_usage", MetricKindGauge, 0.031, "cores")
 	assertSample(t, result, "host_cpu_usage", MetricKindGauge, 0.4, "ratio")
 	assertSample(t, result, "host_memory_used_bytes", MetricKindGauge, 30, "bytes")
@@ -82,7 +81,6 @@ func TestStatliteMetricsCollectorMapsCompleteResponse(t *testing.T) {
 		"http_404_total",
 		"http_4xx_total",
 		"http_5xx_total",
-		"http_request_time_max_seconds",
 		"http_request_time_total_seconds",
 		"http_requests_total",
 		"host_cpu_usage",
@@ -273,7 +271,6 @@ func TestStatliteMetricsCollectorKeepsValidSamplesWhenOptionalMetricsAreInvalid(
 	assertSampleKeys(t, result, []string{
 		"http_404_total",
 		"http_4xx_total",
-		"http_request_time_max_seconds",
 		"process_start_time",
 		"process_uptime",
 	})

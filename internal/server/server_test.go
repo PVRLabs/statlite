@@ -668,7 +668,7 @@ func TestDebugEndpointsAllowConcurrentPollAndLatestAccess(t *testing.T) {
 					{"tag": "status", "values": []string{"200"}},
 				},
 			})
-		case "/actuator/metrics/jvm.memory.used", "/actuator/metrics/jvm.memory.max", "/actuator/metrics/process.cpu.usage", "/actuator/metrics/process.start.time":
+		case "/actuator/metrics/jvm.memory.used", "/actuator/metrics/process.cpu.usage", "/actuator/metrics/process.start.time":
 			writeJSONForTest(t, w, map[string]interface{}{
 				"name": r.URL.Path,
 				"measurements": []map[string]interface{}{

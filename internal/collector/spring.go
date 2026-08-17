@@ -51,7 +51,6 @@ func (c *SpringActuatorCollector) Collect(ctx context.Context) (*CollectionResul
 
 	c.collectHTTP(ctx, result)
 	c.collectGauge(ctx, result, "jvm_heap_used_bytes", "jvm.memory.used", []string{"area:heap"}, "VALUE", "bytes")
-	c.collectGauge(ctx, result, "jvm_heap_max_bytes", "jvm.memory.max", []string{"area:heap"}, "VALUE", "bytes")
 	c.collectGauge(ctx, result, "process_cpu_usage", "process.cpu.usage", nil, "VALUE", "ratio")
 	if c.collectHostMetrics {
 		c.collectHostResources(ctx, result)
@@ -119,10 +118,6 @@ func (c *SpringActuatorCollector) collectHTTP(ctx context.Context, result *Colle
 	} else {
 		result.addEvent(EventSeverityWarning, "metric_measurement_missing", "http_request_time_total_seconds", "http.server.requests missing TOTAL_TIME measurement")
 	}
-	if value, ok := metricMeasurement(metric, "MAX"); ok {
-		result.addSample("http_request_time_max_seconds", MetricKindGauge, value, "seconds")
-	}
-
 	statuses := metricTagValues(metric, "status")
 	if len(statuses) == 0 {
 		result.addEvent(EventSeverityWarning, "metric_tag_missing", "http_4xx_total", "http.server.requests does not expose status tags")

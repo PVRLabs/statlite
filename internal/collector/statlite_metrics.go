@@ -37,6 +37,8 @@ type StatliteMetricsValues struct {
 	Responses4xxTotal           StatliteMetricsField `json:"responses_4xx_total,omitempty"`
 	Responses5xxTotal           StatliteMetricsField `json:"responses_5xx_total,omitempty"`
 	RequestDurationSecondsTotal StatliteMetricsField `json:"request_duration_seconds_total,omitempty"`
+	// RequestDurationSecondsMax remains parseable for v1 producer compatibility;
+	// the normalized collector intentionally ignores it.
 	RequestDurationSecondsMax   StatliteMetricsField `json:"request_duration_seconds_max,omitempty"`
 	ProcessCPUUsage             StatliteMetricsField `json:"process_cpu_usage,omitempty"`
 	RuntimeHeapUsedBytes        StatliteMetricsField `json:"runtime_heap_used_bytes,omitempty"`
