@@ -39,10 +39,17 @@ workload being observed.
 
 StatLite should also keep its total normalized metric vocabulary small. New
 integrations should reuse existing concepts wherever possible and should not
-add source-specific metrics merely because an upstream ecosystem exposes
-them. Every proposal for a new normalized metric requires explicit product
-and architecture review covering its operational value, storage and retention
-cost, dashboard behavior, and long-term compatibility.
+add or retain metrics merely because an upstream ecosystem exposes them. Every
+normalized metric must have a concrete dashboard, health, diagnostic, or
+internal operational purpose. The core product favors low overhead, simple
+semantics, and actionable defaults over comprehensive observability. Analytical
+capabilities such as latency distributions and percentiles, high-cardinality
+dimensions, arbitrary metrics or queries, richer aggregation, and deeper
+historical analysis are outside the lightweight core and should be introduced
+only in response to a clear product need, potentially using a more capable
+architecture or tier. Proposals for new normalized metrics still require
+explicit product and architecture review covering operational value, storage
+and retention cost, dashboard behavior, and long-term compatibility.
 
 ## Supported integration boundaries
 
@@ -93,7 +100,7 @@ rest of the system operates on normalized concepts such as:
 * process start time and uptime;
 * restart signals;
 * request, `404`, `4xx`, and `5xx` counters;
-* accumulated and maximum request time;
+* accumulated request time for deriving average latency;
 * runtime memory;
 * CPU usage;
 * poll status; and
