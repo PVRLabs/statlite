@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -81,6 +83,70 @@ func TestSaveCollectionResultAndLatestSnapshot(t *testing.T) {
 	}
 	if snapshot.Result.Events[0].Severity != collector.EventSeverityWarning || snapshot.Result.Events[0].MetricKey != "jvm_heap_used_bytes" {
 		t.Fatalf("event = %#v, want warning for jvm_heap_used_bytes", snapshot.Result.Events[0])
+	}
+}
+
+func TestSaveSpringContractResultRowDeltas(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.URL.Path == "/actuator/health":
+			_, _ = w.Write([]byte(`{"status":"UP"}`))
+		case r.URL.Path == "/actuator/metrics/http.server.requests" && r.URL.Query().Get("tag") == "":
+			_, _ = w.Write([]byte(`{"name":"http.server.requests","measurements":[{"statistic":"COUNT","value":10},{"statistic":"TOTAL_TIME","value":2}],"availableTags":[{"tag":"status","values":["404"]}]}`))
+		case r.URL.Path == "/actuator/metrics/http.server.requests" && r.URL.Query().Get("tag") == "status:404":
+			http.Error(w, "missing status", http.StatusNotFound)
+		case r.URL.Path == "/actuator/metrics/jvm.memory.used" && r.URL.Query().Get("tag") == "area:heap":
+			_, _ = w.Write([]byte(`{"name":"jvm.memory.used","measurements":[{"statistic":"VALUE","value":1024}]}`))
+		case r.URL.Path == "/actuator/metrics/process.cpu.usage":
+			_, _ = w.Write([]byte(`{"name":"process.cpu.usage","measurements":[{"statistic":"VALUE","value":0.12}]}`))
+		case r.URL.Path == "/actuator/metrics/process.start.time":
+			_, _ = w.Write([]byte(`{"name":"process.start.time","measurements":[{"statistic":"VALUE","value":1700000000}]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client, err := collector.NewActuatorClient(server.URL+"/actuator", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewActuatorClient() error = %v", err)
+	}
+	result, err := collector.NewSpringActuatorCollector("spring-contract", client, false).Collect(ctx)
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if len(result.Samples) != 6 || len(result.Events) != 2 {
+		t.Fatalf("Spring contract result has %d samples/%d events, want 6/2: %#v", len(result.Samples), len(result.Events), result)
+	}
+	if result.ProcessStartTime == nil {
+		t.Fatal("Spring contract ProcessStartTime = nil, want populated")
+	}
+	if _, err := store.EnsureAppRun(ctx, result.TargetName, result.ProcessStartTime, result.PollStartedAt.Add(-time.Second)); err != nil {
+		t.Fatalf("EnsureAppRun() error = %v", err)
+	}
+
+	tables := []string{"targets", "app_runs", "polls", "metric_samples", "collector_events"}
+	before := tableCounts(t, store, tables)
+	if _, err := store.SaveCollectionResult(ctx, result); err != nil {
+		t.Fatalf("SaveCollectionResult() error = %v", err)
+	}
+	after := tableCounts(t, store, tables)
+	wantDeltas := map[string]int{
+		"targets":          0,
+		"app_runs":         0,
+		"polls":            1,
+		"metric_samples":   len(result.Samples),
+		"collector_events": len(result.Events),
+	}
+	for _, table := range tables {
+		if delta := after[table] - before[table]; delta != wantDeltas[table] {
+			t.Fatalf("%s row delta = %d, want %d; before=%d after=%d", table, delta, wantDeltas[table], before[table], after[table])
+		}
 	}
 }
 
@@ -720,6 +786,19 @@ func assertTableCount(t *testing.T, store *Store, table string, want int) {
 	if got != want {
 		t.Fatalf("%s count = %d, want %d", table, got, want)
 	}
+}
+
+func tableCounts(t *testing.T, store *Store, tables []string) map[string]int {
+	t.Helper()
+	counts := make(map[string]int, len(tables))
+	for _, table := range tables {
+		var count int
+		if err := store.db.QueryRow("SELECT COUNT(*) FROM " + table).Scan(&count); err != nil {
+			t.Fatalf("count %s: %v", table, err)
+		}
+		counts[table] = count
+	}
+	return counts
 }
 
 func openTestStore(t *testing.T) *Store {

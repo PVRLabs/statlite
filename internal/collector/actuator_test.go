@@ -5,10 +5,27 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestActuatorClientEffectiveURLCanonicalizesRepeatedTags(t *testing.T) {
+	client, err := NewActuatorClient("https://example.com/base/actuator", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewActuatorClient() error = %v", err)
+	}
+
+	query := url.Values{}
+	query.Add("tag", "area:heap")
+	query.Add("tag", "id:alpha beta")
+	got := client.effectiveURL("metrics/jvm.memory.used", query)
+	want := "https://example.com/base/actuator/metrics/jvm.memory.used?tag=area%3Aheap&tag=id%3Aalpha+beta"
+	if got != want {
+		t.Fatalf("effectiveURL() = %q, want %q", got, want)
+	}
+}
 
 func TestActuatorClientFetchesHealthWithBasicAuth(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -160,11 +160,9 @@ func (c *ActuatorClient) getJSON(ctx context.Context, endpointPath string, query
 }
 
 func (c *ActuatorClient) fetch(ctx context.Context, endpointPath string, query url.Values) ([]byte, int, error) {
-	endpoint := *c.baseURL
-	endpoint.Path = joinURLPath(c.baseURL.Path, endpointPath)
-	endpoint.RawQuery = query.Encode()
+	endpointURL := c.effectiveURL(endpointPath, query)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpointURL, nil)
 	if err != nil {
 		return nil, 0, fmt.Errorf("creating actuator request: %w", err)
 	}
@@ -187,6 +185,13 @@ func (c *ActuatorClient) fetch(ctx context.Context, endpointPath string, query u
 		return nil, 0, fmt.Errorf("actuator %s response exceeds %d byte limit", endpointPath, actuatorMaxResponseBytes)
 	}
 	return body, resp.StatusCode, nil
+}
+
+func (c *ActuatorClient) effectiveURL(endpointPath string, query url.Values) string {
+	endpoint := *c.baseURL
+	endpoint.Path = joinURLPath(c.baseURL.Path, endpointPath)
+	endpoint.RawQuery = query.Encode()
+	return endpoint.String()
 }
 
 func joinURLPath(basePath, endpointPath string) string {
