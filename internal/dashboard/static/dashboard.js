@@ -6,8 +6,14 @@ const state = {
   charts: {},
   refreshID: 0,
   refreshController: null,
+  refreshTimer: null,
+  startupRefreshStartedAtByTarget: Object.create(null),
   renderedSeriesQuery: ""
 };
+
+const NORMAL_REFRESH_INTERVAL = 30000;
+const STARTUP_REFRESH_INTERVAL = 1500;
+const STARTUP_REFRESH_WINDOW = 10000;
 
 const palette = {
   requests: "#60a5fa",
@@ -171,6 +177,10 @@ function resourceOptions() {
 }
 
 async function refresh() {
+  if (state.refreshTimer !== null) {
+    clearTimeout(state.refreshTimer);
+    state.refreshTimer = null;
+  }
   if (state.refreshController) state.refreshController.abort();
   const controller = typeof AbortController === "undefined" ? null : new AbortController();
   state.refreshController = controller;
@@ -192,10 +202,35 @@ async function refresh() {
     }
     renderEvents(events);
     document.getElementById("latest-json").textContent = JSON.stringify(summary.latest || {}, null, 2);
+    scheduleNextRefresh(summary);
   } catch (error) {
     if (refreshID !== state.refreshID) return;
     renderError(error);
+    scheduleNextRefresh(null);
   }
+}
+
+function nextRefreshDelay(summary, now = Date.now()) {
+  const successfulPoll = summary && summary.monitor && summary.monitor.last_successful_poll_at;
+  if (!successfulPoll) {
+    const target = (summary && summary.selected_target && summary.selected_target.name) || state.target || "";
+    let startedAt = state.startupRefreshStartedAtByTarget[target];
+    if (startedAt == null) {
+      startedAt = now;
+      state.startupRefreshStartedAtByTarget[target] = startedAt;
+    }
+    const remaining = STARTUP_REFRESH_WINDOW - (now - startedAt);
+    if (remaining > 0) return Math.min(STARTUP_REFRESH_INTERVAL, remaining);
+  }
+  return NORMAL_REFRESH_INTERVAL;
+}
+
+function scheduleNextRefresh(summary) {
+  if (state.refreshTimer !== null) clearTimeout(state.refreshTimer);
+  state.refreshTimer = setTimeout(() => {
+    state.refreshTimer = null;
+    refreshWhenVisible();
+  }, nextRefreshDelay(summary));
 }
 
 function selectedQuery() {
@@ -556,9 +591,8 @@ function initDashboard() {
   buildCharts();
   document.addEventListener("visibilitychange", refreshWhenVisible);
   refreshWhenVisible();
-  setInterval(refreshWhenVisible, 30000);
 }
 
-const dashboardTestHooks = { detectCapabilities, formatBytes, formatCurrentResource, formatValue, initDashboard, refresh, refreshWhenVisible, renderPollStatus, renderRangeSelection, renderSeries, shouldRenderSeries, state, targetTypeHelp, validDiskPoint };
+const dashboardTestHooks = { detectCapabilities, formatBytes, formatCurrentResource, formatValue, initDashboard, nextRefreshDelay, refresh, refreshWhenVisible, renderPollStatus, renderRangeSelection, renderSeries, shouldRenderSeries, state, targetTypeHelp, validDiskPoint };
 if (typeof module !== "undefined" && module.exports) module.exports = dashboardTestHooks;
 if (typeof document !== "undefined") initDashboard();

@@ -47,6 +47,27 @@ test("hidden dashboards skip periodic refresh work", () => {
   }
 });
 
+test("startup refresh retries quickly until a successful poll appears", () => {
+  dashboard.state.target = "alpha";
+
+  assert.equal(dashboard.nextRefreshDelay({ selected_target: { name: "alpha" }, monitor: {} }, 1001), 1500);
+  assert.equal(dashboard.nextRefreshDelay({ selected_target: { name: "alpha" }, monitor: { last_successful_poll_at: "2026-08-18T12:00:00Z" } }, 1001), 30000);
+});
+
+test("startup refresh falls back to the normal cadence after its bounded window", () => {
+  dashboard.state.target = "alpha";
+  dashboard.state.startupRefreshStartedAtByTarget.alpha = 1000;
+
+  assert.equal(dashboard.nextRefreshDelay({ selected_target: { name: "alpha" }, monitor: {} }, 11000), 30000);
+});
+
+test("a newly selected target gets its own startup retry window", () => {
+  dashboard.state.target = "beta";
+  dashboard.state.startupRefreshStartedAtByTarget.alpha = 1000;
+
+  assert.equal(dashboard.nextRefreshDelay({ selected_target: { name: "beta" }, monitor: {} }, 11000), 1500);
+});
+
 test("detectCapabilities keeps sparse memory but requires a valid disk pair", () => {
   const sparseMemory = dashboard.detectCapabilities([{ host_memory_used_bytes: 10 }]);
   assert.equal(sparseMemory.host, true);
@@ -232,10 +253,13 @@ function resolveRefresh(requests, target) {
 }
 
 function resetDashboardState() {
+  if (dashboard.state.refreshTimer !== null) clearTimeout(dashboard.state.refreshTimer);
   dashboard.state.range = "1h";
   dashboard.state.target = "";
   dashboard.state.charts = {};
   dashboard.state.refreshID = 0;
   dashboard.state.refreshController = null;
+  dashboard.state.refreshTimer = null;
+  dashboard.state.startupRefreshStartedAtByTarget = Object.create(null);
   dashboard.state.renderedSeriesQuery = "";
 }

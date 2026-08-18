@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -20,6 +21,48 @@ import (
 	"github.com/pvrlabs/statlite/internal/storage"
 	"github.com/pvrlabs/statlite/internal/version"
 )
+
+func TestListenBindsConfiguredAddressBeforeServe(t *testing.T) {
+	statlite := New("127.0.0.1:0", nil)
+	listener, err := statlite.Listen()
+	if err != nil {
+		t.Fatalf("Listen() error = %v", err)
+	}
+	defer listener.Close()
+
+	probe, err := net.Listen("tcp", listener.Addr().String())
+	if err == nil {
+		probe.Close()
+		t.Fatal("Listen() left the configured address available for another listener")
+	}
+}
+
+func TestServeUsesPreboundListener(t *testing.T) {
+	statlite := New("127.0.0.1:0", nil)
+	listener, err := statlite.Listen()
+	if err != nil {
+		t.Fatalf("Listen() error = %v", err)
+	}
+
+	serveErr := make(chan error, 1)
+	go func() { serveErr <- statlite.Serve(listener) }()
+
+	resp, err := http.Get("http://" + listener.Addr().String() + "/healthz")
+	if err != nil {
+		t.Fatalf("healthz request: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("healthz status = %d, want 200", resp.StatusCode)
+	}
+
+	if err := statlite.Shutdown(t.Context()); err != nil {
+		t.Fatalf("Shutdown() error = %v", err)
+	}
+	if err := <-serveErr; err != http.ErrServerClosed {
+		t.Fatalf("Serve() error = %v, want %v", err, http.ErrServerClosed)
+	}
+}
 
 func TestRootServesDashboardPage(t *testing.T) {
 	statlite := New("127.0.0.1:0", nil)

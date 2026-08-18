@@ -70,12 +70,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("monitor manager: %v", err)
 	}
-	// Prune before starting monitor goroutines so the first poll only sees retained history.
-	storage.StartRetentionCleanup(ctx, store, cfg.Storage.RetentionDays, retentionCutoff.Set)
-	manager.Start(ctx)
 
 	srv := server.NewWithManagerRetentionCutoffAndFilesystem(cfg.Server.Listen, manager, cfg.Storage.RetentionDays, retentionCutoff.Current, cfg.Storage.SQLitePath)
+	listener, err := srv.Listen()
+	if err != nil {
+		log.Fatalf("server: %v", err)
+	}
 	log.Print(startupMessage(cfg.Server.Listen, len(manager.Names())))
+
+	// The listener is bound before starting monitor goroutines so the first
+	// poll can reach StatLite's own metrics endpoint. Keep cleanup ahead of
+	// serving HTTP so requests cannot observe partial startup initialization.
+	// Prune before starting monitor goroutines so the first poll only sees retained history.
+	storage.StartRetentionCleanup(ctx, store, cfg.Storage.RetentionDays, retentionCutoff.Set)
 
 	go func() {
 		<-ctx.Done()
@@ -86,7 +93,18 @@ func main() {
 		}
 	}()
 
-	if err := srv.Start(); err != nil && err != http.ErrServerClosed {
+	serveErr := make(chan error, 1)
+	go func() {
+		if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
+			serveErr <- err
+			return
+		}
+		serveErr <- nil
+	}()
+
+	manager.Start(ctx)
+
+	if err := <-serveErr; err != nil {
 		log.Fatalf("server: %v", err)
 	}
 }

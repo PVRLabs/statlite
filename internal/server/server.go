@@ -4,6 +4,8 @@ package server
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -139,8 +141,27 @@ func monitorManagerForSingleTarget(mon *monitor.Monitor) (*monitor.Manager, erro
 }
 
 func (s *Server) Start() error {
+	listener, err := s.Listen()
+	if err != nil {
+		return err
+	}
+	return s.Serve(listener)
+}
+
+// Listen binds the configured address without starting monitor or HTTP
+// serving work. Callers that need startup ordering can bind the listener,
+// start Serve, and only then launch dependent background work.
+func (s *Server) Listen() (net.Listener, error) {
+	return net.Listen("tcp", s.httpServer.Addr)
+}
+
+// Serve runs the HTTP server on a listener previously returned by Listen.
+func (s *Server) Serve(listener net.Listener) error {
+	if listener == nil {
+		return fmt.Errorf("server listener is nil")
+	}
 	s.startStorageHealthChecks()
-	err := s.httpServer.ListenAndServe()
+	err := s.httpServer.Serve(listener)
 	s.stopStorageHealthChecks()
 	return err
 }
