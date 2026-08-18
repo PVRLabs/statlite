@@ -56,8 +56,9 @@ When changing `internal/dashboard/static/index.html`, `dashboard.js`, or
 npm-lite node --test internal/dashboard/static/dashboard.test.js
 ```
 
-`go test ./...` intentionally does not run Node tests; it remains the Go-only
-verification command for unrelated changes.
+`go-lite test ./...` intentionally does not run Node tests; it is the preferred
+Go-only verification command for unrelated changes. Use `go-lite --full test
+./...` when complete live output is needed.
 
 For large or ambiguous changes, propose the smallest independently testable slice first.
 
