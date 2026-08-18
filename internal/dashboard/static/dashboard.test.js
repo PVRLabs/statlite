@@ -47,25 +47,81 @@ test("hidden dashboards skip periodic refresh work", () => {
   }
 });
 
-test("startup refresh retries quickly until a successful poll appears", () => {
+test("startup refresh retries quickly until a successful poll and usable series appear", () => {
   dashboard.state.target = "alpha";
+  const successful = { selected_target: { name: "alpha" }, monitor: { last_successful_poll_at: "2026-08-18T12:00:00Z" } };
 
-  assert.equal(dashboard.nextRefreshDelay({ selected_target: { name: "alpha" }, monitor: {} }, 1001), 1500);
-  assert.equal(dashboard.nextRefreshDelay({ selected_target: { name: "alpha" }, monitor: { last_successful_poll_at: "2026-08-18T12:00:00Z" } }, 1001), 30000);
+  assert.equal(dashboard.nextRefreshDelay({ selected_target: { name: "alpha" }, monitor: {} }, { points: [] }, 1001), 1500);
+  assert.equal(dashboard.nextRefreshDelay(successful, { points: [] }, 1001), 1500);
+  assert.equal(dashboard.nextRefreshDelay(successful, { points: [{ requests: 1 }] }, 1001), 30000);
+});
+
+test("process gauges do not end fast refresh for an HTTP counter baseline", () => {
+  const summary = {
+    selected_target: { name: "alpha" },
+    monitor: { last_successful_poll_at: "2026-08-18T12:00:00Z" },
+    latest: { result: { samples: [
+      { key: "http_requests_total", kind: "counter", value: 10 },
+      { key: "process_cpu_usage", kind: "gauge", value: 0.1 }
+    ] } }
+  };
+  const baseline = { points: [{ requests: null, process_cpu_usage: 0.1 }] };
+  const delta = { points: [{ requests: 2, process_cpu_usage: 0.1 }] };
+
+  assert.equal(dashboard.hasUsableSeries(summary, baseline), false);
+  assert.equal(dashboard.nextRefreshDelay(summary, baseline, 1001), 1500);
+  assert.equal(dashboard.hasUsableSeries(summary, delta), true);
+  assert.equal(dashboard.nextRefreshDelay(summary, delta, 1001), 30000);
+});
+
+test("latest raw point determines readiness when aggregated points omit run identity", () => {
+  const summary = {
+    selected_target: { name: "alpha" },
+    monitor: { last_successful_poll_at: "2026-08-18T12:00:00Z" },
+    latest: {
+      app_run_id: 2,
+      result: { samples: [
+        { key: "http_requests_total", kind: "counter", value: 10 },
+        { key: "process_cpu_usage", kind: "gauge", value: 0.1 }
+      ] }
+    }
+  };
+  const aggregatedPoints = [{ requests: 5, process_cpu_usage: 0.1 }];
+  const baseline = {
+    points: aggregatedPoints,
+    latest_point: { app_run_id: 2, requests: null, process_cpu_usage: 0.1 }
+  };
+  const followUp = {
+    points: aggregatedPoints,
+    latest_point: { app_run_id: 2, requests: 3, process_cpu_usage: 0.1 }
+  };
+
+  assert.equal(dashboard.hasUsableSeries(summary, baseline), false);
+  assert.equal(dashboard.nextRefreshDelay(summary, baseline, 1001), 1500);
+  assert.equal(dashboard.hasUsableSeries(summary, followUp), true);
+  assert.equal(dashboard.nextRefreshDelay(summary, followUp, 1001), 30000);
+});
+
+test("gauge-only targets are ready when their series appears", () => {
+  const summary = { latest: { result: { samples: [
+    { key: "process_cpu_usage", kind: "gauge", value: 0.1 }
+  ] } } };
+
+  assert.equal(dashboard.hasUsableSeries(summary, { points: [{ process_cpu_usage: 0.1 }] }), true);
 });
 
 test("startup refresh falls back to the normal cadence after its bounded window", () => {
   dashboard.state.target = "alpha";
   dashboard.state.startupRefreshStartedAtByTarget.alpha = 1000;
 
-  assert.equal(dashboard.nextRefreshDelay({ selected_target: { name: "alpha" }, monitor: {} }, 11000), 30000);
+  assert.equal(dashboard.nextRefreshDelay({ selected_target: { name: "alpha" }, monitor: {} }, { points: [] }, 11000), 30000);
 });
 
 test("a newly selected target gets its own startup retry window", () => {
   dashboard.state.target = "beta";
   dashboard.state.startupRefreshStartedAtByTarget.alpha = 1000;
 
-  assert.equal(dashboard.nextRefreshDelay({ selected_target: { name: "beta" }, monitor: {} }, 11000), 1500);
+  assert.equal(dashboard.nextRefreshDelay({ selected_target: { name: "beta" }, monitor: {} }, { points: [] }, 11000), 1500);
 });
 
 test("detectCapabilities keeps sparse memory but requires a valid disk pair", () => {

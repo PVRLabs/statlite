@@ -59,6 +59,12 @@ Use `30s` or longer for production deployments. Shorter intervals increase
 HTTP requests, SQLite writes, and database growth, and are best reserved for
 explicitly labeled local demos.
 
+Each target is polled immediately on startup. If that first poll succeeds and
+needs a new counter baseline because the target has no stored history or starts
+a new application run, StatLite makes one follow-up poll after three seconds,
+or after the configured interval when it is shorter. Gauge-only targets and
+targets with a compatible stored baseline use the configured interval normally.
+
 ## Targets
 
 At least one target is required. Names must be unique.
@@ -160,7 +166,7 @@ Applications using `type: statlite-metrics` expose the fixed
 for the complete response format, field semantics, and implementation guidance.
 StatLite performs one bounded JSON GET per poll; Basic Auth is not part of v1.
 
-Root `statlite.yaml` uses this pattern so Quick Start works with no extra config. The first poll may fail until the HTTP server is listening; later polls should succeed.
+Root `statlite.yaml` uses this pattern so Quick Start works with no extra config.
 
 ### Host resources
 

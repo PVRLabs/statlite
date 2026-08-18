@@ -25,6 +25,7 @@ func AggregateSeries(series *Series, bucketDuration time.Duration) *Series {
 		Start:           series.Start,
 		End:             series.End,
 		Points:          make([]SeriesPoint, 0, len(series.Points)),
+		LatestPoint:     series.LatestPoint,
 		CurrentHostDisk: series.CurrentHostDisk,
 	}
 

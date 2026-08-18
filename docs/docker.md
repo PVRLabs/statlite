@@ -21,7 +21,10 @@ required.
 > [!NOTE]
 > The bundled configuration polls every 30 seconds, a production-sensible
 > default that limits HTTP requests, SQLite writes, and database growth. The
-> first metrics sample may take up to one polling interval to appear.
+> first poll runs immediately. When it establishes a new counter baseline,
+> either for a new database or a new application run, StatLite makes one
+> follow-up poll after three seconds so charts can establish their first delta,
+> then returns to the configured interval.
 
 The container stores SQLite data at `/data/statlite.sqlite`. Data is ephemeral
 unless `/data` is mounted to persistent storage.

@@ -325,6 +325,221 @@ func TestPollNowDoesNotRestartOnOneCoreCounterDecreaseWithoutFailure(t *testing.
 	}
 }
 
+func TestStartAddsOneFollowUpPollForTargetWithoutHistory(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	processStart := time.Date(2026, 8, 18, 9, 0, 0, 0, time.UTC)
+	targetCollector := newNotifyingSequenceCollector([]collectResult{
+		{result: successfulResult(processStart, 100, 10)},
+		{result: successfulResult(processStart, 105, 11)},
+	})
+	mon := newTestMonitor(t, store, targetCollector)
+	mon.startupFollowUpDelay = 5 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	mon.Start(ctx)
+	waitForCollection(t, targetCollector.calls)
+	waitForCollection(t, targetCollector.calls)
+	waitForStoredPolls(t, mon, 2)
+
+	series, err := mon.Series(context.Background(), processStart, processStart.Add(2*time.Hour))
+	if err != nil {
+		t.Fatalf("Series() error = %v", err)
+	}
+	if len(series.Points) != 2 {
+		t.Fatalf("series points = %d, want baseline and follow-up", len(series.Points))
+	}
+	assertMonitorFloatPointer(t, "follow-up requests", series.Points[1].Requests, 5)
+
+	select {
+	case <-targetCollector.calls:
+		t.Fatal("Start() collected more than one startup follow-up")
+	case <-time.After(25 * time.Millisecond):
+	}
+}
+
+func TestStartDoesNotAddFollowUpPollForTargetWithHistory(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	processStart := time.Date(2026, 8, 18, 9, 0, 0, 0, time.UTC)
+	seed := newTestMonitor(t, store, &sequenceCollector{results: []collectResult{
+		{result: successfulResult(processStart, 100, 10)},
+	}})
+	if _, err := seed.PollNow(context.Background()); err != nil {
+		t.Fatalf("seed PollNow() error = %v", err)
+	}
+
+	targetCollector := newNotifyingSequenceCollector([]collectResult{
+		{result: successfulResult(processStart, 105, 11)},
+	})
+	mon := newTestMonitor(t, store, targetCollector)
+	mon.startupFollowUpDelay = 5 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	mon.Start(ctx)
+	waitForCollection(t, targetCollector.calls)
+
+	select {
+	case <-targetCollector.calls:
+		t.Fatal("Start() added a startup follow-up despite stored history")
+	case <-time.After(25 * time.Millisecond):
+	}
+}
+
+func TestStartAddsFollowUpWhenFirstPollStartsNewAppRun(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	previousStart := time.Date(2026, 8, 18, 9, 0, 0, 0, time.UTC)
+	seed := newTestMonitor(t, store, &sequenceCollector{results: []collectResult{
+		{result: successfulResult(previousStart, 100, 10)},
+	}})
+	previous, err := seed.PollNow(context.Background())
+	if err != nil {
+		t.Fatalf("seed PollNow() error = %v", err)
+	}
+
+	currentStart := previousStart.Add(time.Hour)
+	targetCollector := newNotifyingSequenceCollector([]collectResult{
+		{result: successfulResult(currentStart, 5, 0.5)},
+		{result: successfulResult(currentStart, 8, 0.8)},
+	})
+	mon := newTestMonitor(t, store, targetCollector)
+	mon.startupFollowUpDelay = 5 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	mon.Start(ctx)
+	waitForCollection(t, targetCollector.calls)
+	waitForCollection(t, targetCollector.calls)
+	waitForStoredPolls(t, mon, 3)
+
+	current := mon.LatestSnapshot()
+	if previous.AppRunID == nil || current == nil || current.AppRunID == nil || *previous.AppRunID == *current.AppRunID {
+		t.Fatalf("app run ids = %v -> %v, want a new run", previous.AppRunID, current)
+	}
+	series, err := mon.Series(context.Background(), previousStart, currentStart.Add(2*time.Hour))
+	if err != nil {
+		t.Fatalf("Series() error = %v", err)
+	}
+	if len(series.Points) != 3 {
+		t.Fatalf("series points = %d, want persisted baseline, restart baseline, and follow-up", len(series.Points))
+	}
+	if series.Points[1].Requests != nil {
+		t.Fatalf("restart baseline requests = %v, want nil", *series.Points[1].Requests)
+	}
+	assertMonitorFloatPointer(t, "new-run follow-up requests", series.Points[2].Requests, 3)
+}
+
+func TestStartAddsFollowUpWhenSameRunHistoryLacksCurrentCounter(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	processStart := time.Date(2026, 8, 18, 9, 0, 0, 0, time.UTC)
+	previousResult := successfulResult(processStart, 0, 0)
+	previousResult.Samples = []collector.MetricSample{
+		{Key: "process_cpu_usage", Kind: collector.MetricKindGauge, Value: 0.1, Unit: "ratio"},
+	}
+	seed := newTestMonitor(t, store, &sequenceCollector{results: []collectResult{{result: previousResult}}})
+	previous, err := seed.PollNow(context.Background())
+	if err != nil {
+		t.Fatalf("seed PollNow() error = %v", err)
+	}
+
+	targetCollector := newNotifyingSequenceCollector([]collectResult{
+		{result: successfulResult(processStart, 5, 0.5)},
+		{result: successfulResult(processStart, 8, 0.8)},
+	})
+	mon := newTestMonitor(t, store, targetCollector)
+	mon.startupFollowUpDelay = 5 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	mon.Start(ctx)
+	waitForCollection(t, targetCollector.calls)
+	waitForCollection(t, targetCollector.calls)
+	waitForStoredPolls(t, mon, 3)
+
+	current := mon.LatestSnapshot()
+	if previous.AppRunID == nil || current == nil || current.AppRunID == nil || *previous.AppRunID != *current.AppRunID {
+		t.Fatalf("app run ids = %v -> %v, want the same run", previous.AppRunID, current)
+	}
+	series, err := mon.Series(context.Background(), processStart, processStart.Add(2*time.Hour))
+	if err != nil {
+		t.Fatalf("Series() error = %v", err)
+	}
+	if len(series.Points) != 3 {
+		t.Fatalf("series points = %d, want gauge history, counter baseline, and follow-up", len(series.Points))
+	}
+	if series.Points[1].Requests != nil {
+		t.Fatalf("first counter sample requests = %v, want nil", *series.Points[1].Requests)
+	}
+	assertMonitorFloatPointer(t, "same-run follow-up requests", series.Points[2].Requests, 3)
+}
+
+func TestStartDoesNotAddFollowUpPollAfterFailedFirstPoll(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	processStart := time.Date(2026, 8, 18, 9, 0, 0, 0, time.UTC)
+	failed := successfulResult(processStart, 100, 10)
+	failed.Events = []collector.CollectorEvent{{
+		Severity: collector.EventSeverityError,
+		Type:     "required_metric_failed",
+		Message:  "required metric unavailable",
+	}}
+	targetCollector := newNotifyingSequenceCollector([]collectResult{{result: failed}})
+	mon := newTestMonitor(t, store, targetCollector)
+	mon.startupFollowUpDelay = 5 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	mon.Start(ctx)
+	waitForCollection(t, targetCollector.calls)
+	waitForPollFailures(t, mon, 1)
+
+	select {
+	case <-targetCollector.calls:
+		t.Fatal("Start() added a startup follow-up after a failed poll")
+	case <-time.After(25 * time.Millisecond):
+	}
+}
+
+func TestStartupFollowUpDoesNotExceedConfiguredInterval(t *testing.T) {
+	if got := startupFollowUpWait(time.Second, defaultStartupFollowUpDelay); got != time.Second {
+		t.Fatalf("startupFollowUpWait() = %v, want 1s configured interval", got)
+	}
+	if got := startupFollowUpWait(time.Minute, defaultStartupFollowUpDelay); got != defaultStartupFollowUpDelay {
+		t.Fatalf("startupFollowUpWait() = %v, want %v preferred delay", got, defaultStartupFollowUpDelay)
+	}
+}
+
+func TestStartDoesNotAddFollowUpPollForGaugeOnlyTarget(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	pollAt := time.Date(2026, 8, 18, 10, 0, 0, 0, time.UTC)
+	targetCollector := newNotifyingSequenceCollector([]collectResult{{result: uptimeResult(pollAt, 60)}})
+	mon := newTestMonitor(t, store, targetCollector)
+	mon.startupFollowUpDelay = 5 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	mon.Start(ctx)
+	waitForCollection(t, targetCollector.calls)
+	waitForStoredPolls(t, mon, 1)
+
+	select {
+	case <-targetCollector.calls:
+		t.Fatal("Start() added a startup follow-up for a gauge-only target")
+	case <-time.After(25 * time.Millisecond):
+	}
+}
+
 type collectResult struct {
 	result *collector.CollectionResult
 	err    error
@@ -333,6 +548,62 @@ type collectResult struct {
 type sequenceCollector struct {
 	results []collectResult
 	index   int
+}
+
+type notifyingSequenceCollector struct {
+	mu      sync.Mutex
+	results []collectResult
+	index   int
+	calls   chan struct{}
+}
+
+func newNotifyingSequenceCollector(results []collectResult) *notifyingSequenceCollector {
+	return &notifyingSequenceCollector{results: results, calls: make(chan struct{}, len(results)+1)}
+}
+
+func (c *notifyingSequenceCollector) Collect(context.Context) (*collector.CollectionResult, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.calls <- struct{}{}
+	if c.index >= len(c.results) {
+		return nil, errors.New("unexpected collection")
+	}
+	result := c.results[c.index]
+	c.index++
+	return result.result, result.err
+}
+
+func waitForCollection(t *testing.T, calls <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-calls:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for collection")
+	}
+}
+
+func waitForStoredPolls(t *testing.T, mon *Monitor, count int64) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if mon.Status().LastSuccessfulStoredPollID >= count {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %d stored polls", count)
+}
+
+func waitForPollFailures(t *testing.T, mon *Monitor, count int) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if mon.Status().ConsecutivePollFailures >= count {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %d poll failures", count)
 }
 
 func (c *sequenceCollector) Collect(context.Context) (*collector.CollectionResult, error) {

@@ -18,9 +18,12 @@ type Snapshot struct {
 }
 
 type Series struct {
-	Start           time.Time        `json:"start"`
-	End             time.Time        `json:"end"`
-	Points          []SeriesPoint    `json:"points"`
+	Start  time.Time     `json:"start"`
+	End    time.Time     `json:"end"`
+	Points []SeriesPoint `json:"points"`
+	// LatestPoint preserves the newest raw point when Points are aggregated so
+	// dashboard readiness does not depend on lossy bucket identity.
+	LatestPoint     *SeriesPoint     `json:"latest_point,omitempty"`
 	CurrentHostDisk *HostDiskCurrent `json:"current_host_disk,omitempty"`
 }
 

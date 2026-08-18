@@ -53,7 +53,7 @@ When changing `internal/dashboard/static/index.html`, `dashboard.js`, or
 `dashboard.test.js`, run the dashboard unit tests locally:
 
 ```bash
-node --test internal/dashboard/static/dashboard.test.js
+npm-lite node --test internal/dashboard/static/dashboard.test.js
 ```
 
 `go test ./...` intentionally does not run Node tests; it remains the Go-only

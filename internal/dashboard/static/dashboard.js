@@ -202,35 +202,58 @@ async function refresh() {
     }
     renderEvents(events);
     document.getElementById("latest-json").textContent = JSON.stringify(summary.latest || {}, null, 2);
-    scheduleNextRefresh(summary);
+    scheduleNextRefresh(summary, series);
   } catch (error) {
     if (refreshID !== state.refreshID) return;
     renderError(error);
-    scheduleNextRefresh(null);
+    scheduleNextRefresh(null, null);
   }
 }
 
-function nextRefreshDelay(summary, now = Date.now()) {
+function nextRefreshDelay(summary, series, now = Date.now()) {
+  const target = (summary && summary.selected_target && summary.selected_target.name) || state.target || "";
+  let startedAt = state.startupRefreshStartedAtByTarget[target];
+  if (startedAt == null) {
+    startedAt = now;
+    state.startupRefreshStartedAtByTarget[target] = startedAt;
+  }
   const successfulPoll = summary && summary.monitor && summary.monitor.last_successful_poll_at;
-  if (!successfulPoll) {
-    const target = (summary && summary.selected_target && summary.selected_target.name) || state.target || "";
-    let startedAt = state.startupRefreshStartedAtByTarget[target];
-    if (startedAt == null) {
-      startedAt = now;
-      state.startupRefreshStartedAtByTarget[target] = startedAt;
-    }
+  if (!successfulPoll || !hasUsableSeries(summary, series)) {
     const remaining = STARTUP_REFRESH_WINDOW - (now - startedAt);
     if (remaining > 0) return Math.min(STARTUP_REFRESH_INTERVAL, remaining);
   }
   return NORMAL_REFRESH_INTERVAL;
 }
 
-function scheduleNextRefresh(summary) {
+function hasUsableSeries(summary, series) {
+  const points = (series && series.points) || [];
+  const capabilities = detectCapabilities(points);
+  const latest = (summary && summary.latest) || {};
+  const samples = ((latest.result || {}).samples) || [];
+  const expectsCounterSeries = samples.some((sample) => sample.kind === "counter" && [
+    "http_requests_total",
+    "http_404_total",
+    "http_4xx_total",
+    "http_5xx_total"
+  ].includes(sample.key));
+  if (expectsCounterSeries) {
+    const latestAppRunID = latest.app_run_id == null ? null : latest.app_run_id;
+    const readinessPoints = series && series.latest_point ? [series.latest_point] : points;
+    const currentRunPoints = readinessPoints.filter((point) => {
+      const pointAppRunID = point.app_run_id == null ? null : point.app_run_id;
+      return pointAppRunID === latestAppRunID;
+    });
+    return detectCapabilities(currentRunPoints).application;
+  }
+  return capabilities.application || capabilities.process || capabilities.host;
+}
+
+function scheduleNextRefresh(summary, series) {
   if (state.refreshTimer !== null) clearTimeout(state.refreshTimer);
   state.refreshTimer = setTimeout(() => {
     state.refreshTimer = null;
     refreshWhenVisible();
-  }, nextRefreshDelay(summary));
+  }, nextRefreshDelay(summary, series));
 }
 
 function selectedQuery() {
@@ -593,6 +616,6 @@ function initDashboard() {
   refreshWhenVisible();
 }
 
-const dashboardTestHooks = { detectCapabilities, formatBytes, formatCurrentResource, formatValue, initDashboard, nextRefreshDelay, refresh, refreshWhenVisible, renderPollStatus, renderRangeSelection, renderSeries, shouldRenderSeries, state, targetTypeHelp, validDiskPoint };
+const dashboardTestHooks = { detectCapabilities, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, refresh, refreshWhenVisible, renderPollStatus, renderRangeSelection, renderSeries, shouldRenderSeries, state, targetTypeHelp, validDiskPoint };
 if (typeof module !== "undefined" && module.exports) module.exports = dashboardTestHooks;
 if (typeof document !== "undefined") initDashboard();

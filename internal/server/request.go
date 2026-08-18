@@ -46,11 +46,19 @@ func clearCutoffCounterBaseline(series *storage.Series, cutoff time.Time) {
 	if cutoffIndex == -1 {
 		return
 	}
-	series.Points[cutoffIndex].Requests = nil
-	series.Points[cutoffIndex].HTTP404 = nil
-	series.Points[cutoffIndex].HTTP4xx = nil
-	series.Points[cutoffIndex].HTTP5xx = nil
-	series.Points[cutoffIndex].AverageLatencySeconds = nil
+	cutoffPoint := &series.Points[cutoffIndex]
+	clearSeriesCounterFields(cutoffPoint)
+	if series.LatestPoint != nil && series.LatestPoint.PollID == cutoffPoint.PollID {
+		clearSeriesCounterFields(series.LatestPoint)
+	}
+}
+
+func clearSeriesCounterFields(point *storage.SeriesPoint) {
+	point.Requests = nil
+	point.HTTP404 = nil
+	point.HTTP4xx = nil
+	point.HTTP5xx = nil
+	point.AverageLatencySeconds = nil
 }
 
 func parseRange(r *http.Request) (time.Time, time.Time, DashboardRange, error) {

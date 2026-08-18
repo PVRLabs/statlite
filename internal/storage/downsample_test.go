@@ -39,8 +39,9 @@ func TestAggregateSeriesAggregatesSharedBuckets(t *testing.T) {
 	appRunID1 := int64(10)
 	appRunID2 := int64(11)
 	series := &Series{
-		Start: start,
-		End:   end,
+		Start:       start,
+		End:         end,
+		LatestPoint: &SeriesPoint{PollID: 3, Timestamp: start.Add(time.Minute), AppRunID: &appRunID1, Requests: f64(9)},
 		Points: []SeriesPoint{
 			{
 				PollID:                1,
@@ -82,6 +83,9 @@ func TestAggregateSeriesAggregatesSharedBuckets(t *testing.T) {
 	}
 	if len(out.Points) != 2 {
 		t.Fatalf("points = %d, want 2 (one shared bucket + one alone)", len(out.Points))
+	}
+	if out.LatestPoint != series.LatestPoint {
+		t.Fatal("latest raw point was not preserved across aggregation")
 	}
 	first := out.Points[0]
 	if !first.Timestamp.Equal(start) {

@@ -259,6 +259,9 @@ func TestSeriesComputesCounterDeltasAndAverageLatency(t *testing.T) {
 		t.Fatalf("series points len = %d, want 1", len(series.Points))
 	}
 	point := series.Points[0]
+	if series.LatestPoint == nil || series.LatestPoint.PollID != point.PollID {
+		t.Fatalf("latest point = %#v, want raw poll %d", series.LatestPoint, point.PollID)
+	}
 	assertFloatPointer(t, "Requests", point.Requests, 25)
 	assertFloatPointer(t, "HTTP404", point.HTTP404, 1)
 	assertFloatPointer(t, "HTTP4xx", point.HTTP4xx, 2)

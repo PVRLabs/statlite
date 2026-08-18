@@ -109,6 +109,10 @@ ORDER BY p.started_at ASC, p.id ASC, ms.metric_key ASC
 	if err := flush(); err != nil {
 		return nil, err
 	}
+	if len(series.Points) > 0 {
+		latest := series.Points[len(series.Points)-1]
+		series.LatestPoint = &latest
+	}
 	setCurrentHostDisk(series)
 
 	return series, nil

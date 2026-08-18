@@ -2141,11 +2141,14 @@ func TestClearCutoffCounterBaselineClearsEarliestRetainedPoint(t *testing.T) {
 	oldRequests := 1.0
 	firstRetainedRequests := 2.0
 	laterRequests := 3.0
-	series := &storage.Series{Points: []storage.SeriesPoint{
-		{Timestamp: cutoff.Add(time.Hour), Requests: &laterRequests},
-		{Timestamp: cutoff.Add(-time.Hour), Requests: &oldRequests},
-		{Timestamp: cutoff.Add(time.Minute), Requests: &firstRetainedRequests},
-	}}
+	series := &storage.Series{
+		LatestPoint: &storage.SeriesPoint{PollID: 1, Timestamp: cutoff.Add(time.Hour), Requests: &laterRequests},
+		Points: []storage.SeriesPoint{
+			{PollID: 1, Timestamp: cutoff.Add(time.Hour), Requests: &laterRequests},
+			{PollID: 2, Timestamp: cutoff.Add(-time.Hour), Requests: &oldRequests},
+			{PollID: 3, Timestamp: cutoff.Add(time.Minute), Requests: &firstRetainedRequests},
+		},
+	}
 
 	clearCutoffCounterBaseline(series, cutoff)
 
@@ -2157,6 +2160,24 @@ func TestClearCutoffCounterBaselineClearsEarliestRetainedPoint(t *testing.T) {
 	}
 	if series.Points[2].Requests != nil {
 		t.Fatalf("earliest retained requests = %v, want nil", *series.Points[2].Requests)
+	}
+	if series.LatestPoint.Requests == nil || *series.LatestPoint.Requests != laterRequests {
+		t.Fatalf("latest raw point requests = %v, want preserved", series.LatestPoint.Requests)
+	}
+}
+
+func TestClearCutoffCounterBaselineClearsMatchingLatestRawPoint(t *testing.T) {
+	cutoff := time.Date(2026, 7, 7, 10, 0, 0, 0, time.UTC)
+	requests := 2.0
+	series := &storage.Series{
+		LatestPoint: &storage.SeriesPoint{PollID: 3, Timestamp: cutoff, Requests: &requests},
+		Points:      []storage.SeriesPoint{{PollID: 3, Timestamp: cutoff, Requests: &requests}},
+	}
+
+	clearCutoffCounterBaseline(series, cutoff)
+
+	if series.LatestPoint.Requests != nil {
+		t.Fatalf("latest raw point requests = %v, want nil", *series.LatestPoint.Requests)
 	}
 }
 

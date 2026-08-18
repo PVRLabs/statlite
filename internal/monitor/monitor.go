@@ -20,10 +20,11 @@ type Collector interface {
 }
 
 type Monitor struct {
-	targetName string
-	collector  Collector
-	store      *storage.Store
-	interval   time.Duration
+	targetName           string
+	collector            Collector
+	store                *storage.Store
+	interval             time.Duration
+	startupFollowUpDelay time.Duration
 
 	pollMu sync.Mutex
 
@@ -32,6 +33,8 @@ type Monitor struct {
 	latest   *storage.Snapshot
 	previous *storage.Snapshot
 }
+
+const defaultStartupFollowUpDelay = 3 * time.Second
 
 // EventTypeRestartDetected is recorded when detectAppRun observes a new app run.
 // Storage treats event types as opaque strings; this constant lives with the producer.
@@ -61,10 +64,11 @@ func New(targetName string, collector Collector, store *storage.Store, interval 
 		return nil, fmt.Errorf("polling interval must be positive")
 	}
 	return &Monitor{
-		targetName: targetName,
-		collector:  collector,
-		store:      store,
-		interval:   interval,
+		targetName:           targetName,
+		collector:            collector,
+		store:                store,
+		interval:             interval,
+		startupFollowUpDelay: defaultStartupFollowUpDelay,
 	}, nil
 }
 
@@ -179,7 +183,17 @@ func (m *Monitor) LatestEventByType(ctx context.Context, eventType string, start
 }
 
 func (m *Monitor) loop(ctx context.Context) {
-	m.PollNow(ctx)
+	previous, historyLoaded := m.loadSuccessfulHistory(ctx)
+	if snapshot, err := m.PollNow(ctx); historyLoaded && needsStartupFollowUp(previous, snapshot, err) {
+		timer := time.NewTimer(startupFollowUpWait(m.interval, m.startupFollowUpDelay))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+			m.PollNow(ctx)
+		}
+	}
 
 	ticker := time.NewTicker(m.interval)
 	defer ticker.Stop()
@@ -192,6 +206,77 @@ func (m *Monitor) loop(ctx context.Context) {
 			m.PollNow(ctx)
 		}
 	}
+}
+
+func needsStartupFollowUp(previous, current *storage.Snapshot, pollErr error) bool {
+	if pollErr != nil || current == nil || current.Status != "ok" || !hasCounterSamples(current.Result.Samples) {
+		return false
+	}
+	if previous == nil || appRunChanged(previous.AppRunID, current.AppRunID) {
+		return true
+	}
+	return hasCounterWithoutBaseline(previous.Result.Samples, current.Result.Samples)
+}
+
+func appRunChanged(previous, current *int64) bool {
+	if previous == nil || current == nil {
+		return previous != current
+	}
+	return *previous != *current
+}
+
+func startupFollowUpWait(interval, preferred time.Duration) time.Duration {
+	if interval < preferred {
+		return interval
+	}
+	return preferred
+}
+
+func hasCounterSamples(samples []collector.MetricSample) bool {
+	for _, sample := range samples {
+		if sample.Kind == collector.MetricKindCounter {
+			return true
+		}
+	}
+	return false
+}
+
+func hasCounterWithoutBaseline(previous, current []collector.MetricSample) bool {
+	previousCounters := make(map[string]struct{})
+	for _, sample := range previous {
+		if sample.Kind == collector.MetricKindCounter {
+			previousCounters[sample.Key] = struct{}{}
+		}
+	}
+	for _, sample := range current {
+		if sample.Kind != collector.MetricKindCounter {
+			continue
+		}
+		if _, ok := previousCounters[sample.Key]; !ok {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *Monitor) loadSuccessfulHistory(ctx context.Context) (*storage.Snapshot, bool) {
+	m.pollMu.Lock()
+	defer m.pollMu.Unlock()
+
+	if m.previous != nil {
+		return m.previous, true
+	}
+	previous, err := m.store.LatestSuccessfulSnapshot(ctx, m.targetName)
+	if err == nil {
+		m.previous = previous
+		return previous, true
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, true
+	}
+	// A storage error is handled by PollNow. Avoid adding a follow-up poll when
+	// StatLite cannot determine whether this target already has history.
+	return nil, false
 }
 
 func (m *Monitor) detectAppRun(ctx context.Context, result *collector.CollectionResult) (int64, bool, string, error) {
