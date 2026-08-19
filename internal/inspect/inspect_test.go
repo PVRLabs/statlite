@@ -286,6 +286,51 @@ func TestInspectorEnforcesOverallTimeout(t *testing.T) {
 	}
 }
 
+func TestInspectorReturnsSpringWhenMetricsCapabilityProbeTimesOut(t *testing.T) {
+	i := &inspector{
+		client: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/actuator/health":
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     make(http.Header),
+					Body:       io.NopCloser(strings.NewReader(`{"status":"UP"}`)),
+					Request:    req,
+				}, nil
+			case "/statlite/metrics":
+				return &http.Response{
+					StatusCode: http.StatusNotFound,
+					Header:     make(http.Header),
+					Body:       io.NopCloser(strings.NewReader("missing")),
+					Request:    req,
+				}, nil
+			case "/actuator/metrics":
+				<-req.Context().Done()
+				return nil, req.Context().Err()
+			default:
+				t.Fatalf("unexpected path %q", req.URL.Path)
+				return nil, nil
+			}
+		})},
+		timeout: 40 * time.Millisecond,
+	}
+	base, err := parseApplicationURL("http://app.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := i.application(context.Background(), base)
+	if err != nil {
+		t.Fatalf("application() error = %v", err)
+	}
+	if result.TargetType != TargetSpring || len(result.Capabilities) != 1 || result.Capabilities[0] != "health" {
+		t.Fatalf("result = %#v, want partial Spring result", result)
+	}
+	if len(result.Warnings) != 1 || result.Warnings[0] != "metrics are unavailable" {
+		t.Fatalf("warnings = %#v", result.Warnings)
+	}
+}
+
 func TestInspectorRejectsUnknownStatliteSchema(t *testing.T) {
 	var paths []string
 	i := testInspector(func(req *http.Request) (int, string) {
