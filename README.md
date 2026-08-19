@@ -12,14 +12,13 @@ endpoint](docs/statlite-metrics-v1.md), without requiring Prometheus or Grafana.
 It stores focused health, traffic, latency, CPU, memory, and optional host metrics
 in SQLite.
 
-StatLite is designed for
-[monitoring on resource-constrained servers](docs/low-resource-monitoring.md),
-with low memory, CPU, disk, and operational overhead treated as product
-constraints.
-
 **Website:** [pvrlabs.xyz/statlite](https://pvrlabs.xyz/statlite)
 
 ![StatLite example dashboard](docs/images/dashboard.webp)
+
+StatLite is built for [resource-constrained servers](docs/low-resource-monitoring.md).
+Low memory, CPU, disk, and operational overhead are treated as product
+constraints.
 
 Learn how to set up [lightweight Spring Boot monitoring without Prometheus and Grafana](https://pvrlabs.xyz/articles/lightweight-spring-boot-monitoring.html).
 
