@@ -166,6 +166,16 @@ The workflow is triggered by pushes of `v*` tags.
 Container publication is currently manual. Publish the versioned image and
 `:latest` from the same multi-platform build.
 
+On macOS, StatLite release work uses [Colima](https://github.com/abiosoft/colima)
+as the Docker runtime. Start it before running the container commands and
+confirm that the active Docker context points to the running Colima daemon:
+
+```bash
+colima start
+docker context show
+docker info
+```
+
 Confirm the active Buildx builder supports both target platforms:
 
 ```bash
