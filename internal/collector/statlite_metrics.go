@@ -113,6 +113,13 @@ func (c *StatliteMetricsClient) Fetch(ctx context.Context) (*StatliteMetricsResp
 		return nil, fmt.Errorf("statlite metrics returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
+	return ParseStatliteMetricsResponse(body)
+}
+
+// ParseStatliteMetricsResponse decodes and validates the required fields of the
+// StatLite Metrics wire contract. Optional metric validation remains the
+// collector's responsibility so a usable response can retain partial data.
+func ParseStatliteMetricsResponse(body []byte) (*StatliteMetricsResponse, error) {
 	var metrics StatliteMetricsResponse
 	if err := json.Unmarshal(body, &metrics); err != nil {
 		return nil, fmt.Errorf("parsing statlite metrics response: %w", err)
