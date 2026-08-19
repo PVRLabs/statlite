@@ -32,12 +32,13 @@ recognized, the supplied base URL is tried once as a direct StatLite Metrics
 fallback. The command prints a copyable target snippet and the next command;
 copy that target into a complete `statlite.yaml` before running StatLite.
 
-Quote browser-pasted URLs, especially URLs containing `?` or `&`. Inspection
-accepts only an absolute HTTP or HTTPS application URL without a query string,
-fragment, or user information. It is bounded, read-only, and does not load
-configuration, create SQLite state, or start monitoring. It does not support
-authentication flags. Authentication-required, unreachable, timed-out,
-malformed, unknown, or ambiguous responses produce an error without YAML.
+> [!NOTE]
+> Quote browser-pasted URLs, especially URLs containing `?` or `&`. Inspection
+> accepts only an absolute HTTP or HTTPS application URL without a query string,
+> fragment, or user information. It is bounded, read-only, and does not load
+> configuration, create SQLite state, or start monitoring. It does not support
+> authentication flags. Authentication-required, unreachable, timed-out,
+> malformed, unknown, or ambiguous responses produce an error without YAML.
 
 ## Server
 

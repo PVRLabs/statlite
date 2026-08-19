@@ -58,8 +58,10 @@ v1 paths, then prints the detected endpoint, available capabilities, and the
 next command. It is bounded and read-only: it does not require or create
 `statlite.yaml`, open SQLite, or start monitoring.
 
-Quote browser-pasted URLs, especially URLs containing `?` or `&`. Inspection
-requires a base HTTP or HTTPS URL, so remove any query string or fragment first.
+> [!NOTE]
+> Quote browser-pasted URLs, especially URLs containing `?` or `&`. Inspection
+> requires a base HTTP or HTTPS URL, so remove any query string or fragment
+> first.
 
 For a Spring application, the successful output includes:
 
