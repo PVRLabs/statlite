@@ -294,18 +294,21 @@ are available.
 
 From the tap checkout, update `Formula/statlite.rb`:
 
-- Set `version` to `${RELEASE_VERSION#v}`.
-- Update the four `sha256` values from the matching GitHub Release archives.
+- Set each platform URL to the matching `${RELEASE_VERSION}` GitHub Release
+  archive and update the four `sha256` values from those archives.
 
-Then validate and publish the formula:
+Commit and publish the formula, then refresh and validate the tap by name:
 
 ```bash
-brew audit --formula Formula/statlite.rb
-brew test Formula/statlite.rb
 git diff --check
 git add Formula/statlite.rb
 git commit -m "statlite: update to ${RELEASE_VERSION#v}"
 git push origin main
+brew update
+brew audit --formula pvrlabs/tap/statlite
+brew upgrade pvrlabs/tap/statlite
+brew test pvrlabs/tap/statlite
+statlite --version
 ```
 
 Verify installation through the tap and confirm the binary reports the release

@@ -17,6 +17,28 @@ See `examples/` for starter templates (Actuator, StatLite Metrics, multi-target,
 self-monitoring), `examples/python-fastapi-demo/` for a runnable FastAPI app,
 and `examples/spring-actuator-demo/` for a standalone Spring Boot demo app.
 
+## Discover a target with `inspect`
+
+When you know an application's base URL but not its metrics endpoint, run:
+
+```bash
+statlite inspect 'http://localhost:8080'
+```
+
+Inspection probes the conventional `/actuator/health` and
+`/statlite/metrics` paths. A recognized Spring application gets a conditional
+`/actuator/metrics` capability check; if neither conventional integration is
+recognized, the supplied base URL is tried once as a direct StatLite Metrics
+fallback. The command prints a copyable target snippet and the next command;
+copy that target into a complete `statlite.yaml` before running StatLite.
+
+Quote browser-pasted URLs, especially URLs containing `?` or `&`. Inspection
+accepts only an absolute HTTP or HTTPS application URL without a query string,
+fragment, or user information. It is bounded, read-only, and does not load
+configuration, create SQLite state, or start monitoring. It does not support
+authentication flags. Authentication-required, unreachable, timed-out,
+malformed, unknown, or ambiguous responses produce an error without YAML.
+
 ## Server
 
 ```yaml

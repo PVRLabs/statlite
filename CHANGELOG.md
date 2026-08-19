@@ -3,7 +3,7 @@
 This file summarizes the main user-facing changes in each StatLite release.
 Detailed release notes are generated on GitHub from the commit history.
 
-## v0.3.0 — Unreleased
+## v0.3.0 — 2026-08-19
 
 - Added `statlite inspect <application-url>` to discover supported Spring Boot
   Actuator and StatLite Metrics v1 applications and print validated target YAML.
