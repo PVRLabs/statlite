@@ -1,6 +1,7 @@
 # Built binaries (Quick Start and local builds)
 /statlite
 /dist/
+/release/
 
 # Runtime SQLite and local config overrides
 *.sqlite

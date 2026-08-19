@@ -50,6 +50,14 @@ statlite --version
 `GET /healthz` exposes the same version string and SQLite readiness. It is not
 a dashboard metrics endpoint.
 
+## Release Journal
+
+Keep a local process journal at `release/release-vX.Y.Z-journal.md` for each
+release. The `release/` directory is ignored because the journal is an
+operator's working record, not a release artifact. Start the journal before
+the pre-release checks and record the commands, results, blockers, publication
+verification, and post-release documentation work there.
+
 ## Before Releasing
 
 1. Choose the release version:

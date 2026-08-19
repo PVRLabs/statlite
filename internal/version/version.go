@@ -2,4 +2,4 @@ package version
 
 // Version is the StatLite build version.
 // Release tags use vX.Y.Z. Development builds on main use a -dev suffix.
-var Version = "v0.2.4-dev"
+var Version = "v0.3.0-dev"

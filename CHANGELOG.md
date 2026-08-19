@@ -3,6 +3,23 @@
 This file summarizes the main user-facing changes in each StatLite release.
 Detailed release notes are generated on GitHub from the commit history.
 
+## v0.3.0 — Unreleased
+
+- Added `statlite inspect <application-url>` to discover supported Spring Boot
+  Actuator and StatLite Metrics v1 applications and print validated target YAML.
+  Inspection is bounded and read-only, works without an existing
+  `statlite.yaml`, and reports actionable results for authentication,
+  reachability, ambiguity, and unsupported applications.
+- Improved Spring polling efficiency by deduplicating equivalent requests and
+  coalescing repeated failures while preserving useful poll and restart state.
+- Improved dashboard startup readiness so refresh behavior follows the active
+  application run and handles transient empty or failed series more clearly.
+- Added a low-resource monitoring guide and clarified resource expectations,
+  metric governance, integration boundaries, historical coverage, and the
+  recommended Go testing workflow.
+- Expanded the Spring Actuator example and traffic recipe, including clearer
+  status handling and configuration guidance.
+
 ## v0.2.3 — 2026-08-10
 
 - Vendored Chart.js and Orbitron font assets into the dashboard so it renders
