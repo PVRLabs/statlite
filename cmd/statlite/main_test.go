@@ -315,8 +315,15 @@ func TestRunInspectHelp(t *testing.T) {
 	if code := run([]string{"inspect", "--help"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("run() exit code = %d, want 0; stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "statlite inspect <application-url>") {
-		t.Fatalf("stdout = %q, want inspect help", stdout.String())
+	for _, want := range []string{
+		"statlite inspect <application-url>",
+		"statlite inspect 'http://localhost:8080'",
+		"Quote the URL when pasting it from a browser",
+		"remove any query string or fragment first",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("stdout = %q, want inspect help containing %q", stdout.String(), want)
+		}
 	}
 }
 

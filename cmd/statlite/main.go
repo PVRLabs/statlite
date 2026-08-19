@@ -237,8 +237,14 @@ func printInspectHelp(w io.Writer) {
 	fmt.Fprintln(w, `Usage:
   statlite inspect <application-url>
 
+Example:
+  statlite inspect 'http://localhost:8080'
+
 Probe a supported application endpoint and print an inspection summary.
-Inspection is read-only and does not require or create statlite.yaml.`)
+Inspection is read-only and does not require or create statlite.yaml.
+
+Quote the URL when pasting it from a browser, especially if it contains ? or &.
+Inspection requires a base URL, so remove any query string or fragment first.`)
 }
 
 type springSuggestedTarget struct {
