@@ -12,6 +12,11 @@ endpoint](docs/statlite-metrics-v1.md), without requiring Prometheus or Grafana.
 It stores focused health, traffic, latency, CPU, memory, and optional host metrics
 in SQLite.
 
+StatLite is designed for
+[monitoring on resource-constrained servers](docs/low-resource-monitoring.md),
+with low memory, CPU, disk, and operational overhead treated as product
+constraints.
+
 **Website:** [pvrlabs.xyz/statlite](https://pvrlabs.xyz/statlite)
 
 ![StatLite example dashboard](docs/images/dashboard.webp)
@@ -75,6 +80,7 @@ metrics for the environment running the application.
 - [Installation](docs/install.md)
 - [Docker](docs/docker.md)
 - [Configuration](docs/configuration.md)
+- [Monitoring on resource-constrained servers](docs/low-resource-monitoring.md)
 - [StatLite Metrics v1](docs/statlite-metrics-v1.md)
 - [systemd deployment](docs/systemd.md)
 - [Product and architecture](docs/product.md)
