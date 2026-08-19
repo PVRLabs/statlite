@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pvrlabs/statlite/internal/config"
 	"github.com/pvrlabs/statlite/internal/inspect"
 	"github.com/pvrlabs/statlite/internal/version"
 )
@@ -144,11 +145,146 @@ func TestRunInspectDispatchesWithoutLoadingConfig(t *testing.T) {
 	if inspectedURL != "http://app.test" {
 		t.Fatalf("inspected URL = %q", inspectedURL)
 	}
-	if !strings.Contains(stdout.String(), "Detected: Spring Boot Actuator") {
+	output := stdout.String()
+	if !strings.Contains(output, "Detected: Spring Boot Actuator") {
 		t.Fatalf("stdout = %q, want inspection result", stdout.String())
+	}
+	if !strings.Contains(output, "actuator_base_url: http://app.test/actuator") || !strings.Contains(output, "Next: add this target to statlite.yaml") {
+		t.Fatalf("stdout = %q, want suggested YAML and next step", output)
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestRenderInspectionSpringOutputAndConfigRoundTrip(t *testing.T) {
+	result := &inspect.Result{
+		TargetType:   inspect.TargetSpring,
+		Endpoint:     "https://example.test/service/actuator",
+		Capabilities: []string{"health", "metrics"},
+	}
+
+	got, err := renderInspection(result)
+	if err != nil {
+		t.Fatalf("renderInspection() error = %v", err)
+	}
+	want := `Detected: Spring Boot Actuator
+
+Endpoint:
+  https://example.test/service/actuator
+
+Available:
+  ✓ health
+  ✓ metrics
+
+Suggested target:
+
+targets:
+    - name: app
+      type: spring
+      actuator_base_url: https://example.test/service/actuator
+
+Next: add this target to statlite.yaml, run statlite, then open
+http://127.0.0.1:9090
+`
+	if got != want {
+		t.Fatalf("renderInspection() = %q, want %q", got, want)
+	}
+	assertSuggestedTargetLoads(t, got, config.TargetTypeSpring, "https://example.test/service/actuator")
+}
+
+func TestRenderInspectionStatliteMetricsOutputOmitsIrrelevantFields(t *testing.T) {
+	result := &inspect.Result{
+		TargetType:   inspect.TargetStatliteMetrics,
+		Endpoint:     "http://localhost:9090/statlite/metrics",
+		Capabilities: []string{"health"},
+		Warnings:     []string{"metrics are unavailable"},
+	}
+
+	got, err := renderInspection(result)
+	if err != nil {
+		t.Fatalf("renderInspection() error = %v", err)
+	}
+	for _, want := range []string{
+		"Detected: StatLite Metrics v1",
+		"type: statlite-metrics",
+		"url: http://localhost:9090/statlite/metrics",
+		"Warning: metrics are unavailable",
+		"Next: add this target to statlite.yaml, run statlite, then open",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("renderInspection() = %q, missing %q", got, want)
+		}
+	}
+	if strings.Contains(got, "actuator_base_url") {
+		t.Fatalf("renderInspection() = %q, must omit Spring-only field", got)
+	}
+	assertSuggestedTargetLoads(t, got, config.TargetTypeStatliteMetrics, "http://localhost:9090/statlite/metrics")
+}
+
+func TestRunInspectFailuresUseExitOneAndPrintNoYAML(t *testing.T) {
+	for _, kind := range []inspect.FailureKind{
+		inspect.FailureAuthRequired,
+		inspect.FailureUnreachable,
+		inspect.FailureIncomplete,
+		inspect.FailureMultiple,
+		inspect.FailureUnrecognized,
+	} {
+		t.Run(string(kind), func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := runWithInspector([]string{"inspect", "http://app.test"}, &stdout, &stderr,
+				func(context.Context, string) (*inspect.Result, error) {
+					return nil, &inspect.Failure{Kind: kind}
+				})
+			if code != 1 {
+				t.Fatalf("run() exit code = %d, want 1", code)
+			}
+			if stdout.Len() != 0 || strings.Contains(stderr.String(), "targets:") {
+				t.Fatalf("stdout=%q stderr=%q, want failure without YAML", stdout.String(), stderr.String())
+			}
+		})
+	}
+}
+
+func TestRenderInspectionRejectsInvalidSuggestedTarget(t *testing.T) {
+	_, err := renderInspection(&inspect.Result{TargetType: inspect.TargetSpring})
+	if err == nil || !strings.Contains(err.Error(), "actuator_base_url is required") {
+		t.Fatalf("renderInspection() error = %v, want config validation error", err)
+	}
+}
+
+func assertSuggestedTargetLoads(t *testing.T, output string, targetType, endpoint string) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "statlite.yaml")
+	targetStart := strings.Index(output, "targets:\n")
+	targetEnd := strings.Index(output[targetStart:], "\nNext:")
+	if targetStart < 0 || targetEnd < 0 {
+		t.Fatalf("output = %q, missing target YAML boundaries", output)
+	}
+	targetYAML := output[targetStart : targetStart+targetEnd]
+	configText := `server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "./statlite.sqlite"
+polling:
+  interval: "30s"
+` + targetYAML + "\n"
+	if err := os.WriteFile(path, []byte(configText), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("config.Load() error = %v; config=%q", err, configText)
+	}
+	if len(cfg.Targets) != 1 || cfg.Targets[0].Type != targetType {
+		t.Fatalf("targets = %#v, want one %q target", cfg.Targets, targetType)
+	}
+	gotEndpoint := cfg.Targets[0].URL
+	if targetType == config.TargetTypeSpring {
+		gotEndpoint = cfg.Targets[0].ActuatorBaseURL
+	}
+	if gotEndpoint != endpoint {
+		t.Fatalf("endpoint = %q, want %q", gotEndpoint, endpoint)
 	}
 }
 

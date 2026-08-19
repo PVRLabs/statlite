@@ -72,13 +72,22 @@ func Load(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
-	cfg.upgradeDeprecatedTargets()
-
-	if err := cfg.validate(); err != nil {
+	if err := Validate(&cfg); err != nil {
 		return nil, err
 	}
 
 	return &cfg, nil
+}
+
+// Validate applies configuration defaults and checks that cfg is complete
+// enough for normal StatLite startup. It is also used to validate generated
+// onboarding snippets before they are shown to a user.
+func Validate(cfg *Config) error {
+	if cfg == nil {
+		return fmt.Errorf("config is required")
+	}
+	cfg.upgradeDeprecatedTargets()
+	return cfg.validate()
 }
 
 func expandEnvironmentVariables(config string) string {

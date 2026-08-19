@@ -142,11 +142,15 @@ func (i *inspector) application(parent context.Context, base *url.URL) (*Result,
 	}
 
 	if statliteMatched {
-		return &Result{
+		result := &Result{
 			TargetType:   TargetStatliteMetrics,
 			Endpoint:     statliteURL,
 			Capabilities: statliteCaps,
-		}, nil
+		}
+		if !containsCapability(statliteCaps, "metrics") {
+			result.Warnings = append(result.Warnings, "metrics are unavailable")
+		}
+		return result, nil
 	}
 
 	directProbe := i.get(ctx, base.String())
@@ -157,16 +161,29 @@ func (i *inspector) application(parent context.Context, base *url.URL) (*Result,
 	}
 	directProbe.body = nil
 	if directMatched {
-		return &Result{
+		result := &Result{
 			TargetType:   TargetStatliteMetrics,
 			Endpoint:     base.String(),
 			Capabilities: directCapabilities,
-		}, nil
+		}
+		if !containsCapability(directCapabilities, "metrics") {
+			result.Warnings = append(result.Warnings, "metrics are unavailable")
+		}
+		return result, nil
 	}
 	if failure := recognitionFailure(directProbe); failure != nil {
 		return nil, failure
 	}
 	return nil, &Failure{Kind: FailureUnrecognized, Err: errors.New("no supported integration was recognized")}
+}
+
+func containsCapability(capabilities []string, want string) bool {
+	for _, capability := range capabilities {
+		if capability == want {
+			return true
+		}
+	}
+	return false
 }
 
 func parseApplicationURL(raw string) (*url.URL, error) {

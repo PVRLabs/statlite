@@ -22,6 +22,7 @@ import (
 	"github.com/pvrlabs/statlite/internal/server"
 	"github.com/pvrlabs/statlite/internal/storage"
 	"github.com/pvrlabs/statlite/internal/version"
+	"gopkg.in/yaml.v3"
 )
 
 func main() {
@@ -77,7 +78,12 @@ func runInspect(args []string, stdout, stderr io.Writer, inspectApplication insp
 		}
 		return 1
 	}
-	printInspectionSummary(stdout, result)
+	output, err := renderInspection(result)
+	if err != nil {
+		fmt.Fprintf(stderr, "inspect: could not render suggested target: %v\n", err)
+		return 1
+	}
+	fmt.Fprint(stdout, output)
 	return 0
 }
 
@@ -235,18 +241,98 @@ Probe a supported application endpoint and print an inspection summary.
 Inspection is read-only and does not require or create statlite.yaml.`)
 }
 
-func printInspectionSummary(w io.Writer, result *inspect.Result) {
+type springSuggestedTarget struct {
+	Name            string `yaml:"name"`
+	Type            string `yaml:"type"`
+	ActuatorBaseURL string `yaml:"actuator_base_url"`
+}
+
+type statliteSuggestedTarget struct {
+	Name string `yaml:"name"`
+	Type string `yaml:"type"`
+	URL  string `yaml:"url"`
+}
+
+type springSuggestedConfig struct {
+	Targets []springSuggestedTarget `yaml:"targets"`
+}
+
+type statliteSuggestedConfig struct {
+	Targets []statliteSuggestedTarget `yaml:"targets"`
+}
+
+func renderInspection(result *inspect.Result) (string, error) {
+	if result == nil {
+		return "", errors.New("inspection returned no result")
+	}
+	targetYAML, err := renderSuggestedTarget(result)
+	if err != nil {
+		return "", err
+	}
+
 	name := "StatLite Metrics v1"
 	if result.TargetType == inspect.TargetSpring {
 		name = "Spring Boot Actuator"
+	} else if result.TargetType != inspect.TargetStatliteMetrics {
+		return "", fmt.Errorf("unsupported inspection target type %q", result.TargetType)
 	}
-	fmt.Fprintf(w, "Detected: %s\n\nEndpoint:\n  %s\n\nAvailable:\n", name, result.Endpoint)
+	var output strings.Builder
+	fmt.Fprintf(&output, "Detected: %s\n\nEndpoint:\n  %s\n\nAvailable:\n", name, result.Endpoint)
 	for _, capability := range result.Capabilities {
-		fmt.Fprintf(w, "  ✓ %s\n", capability)
+		fmt.Fprintf(&output, "  ✓ %s\n", capability)
 	}
 	for _, warning := range result.Warnings {
-		fmt.Fprintf(w, "\nWarning: %s\n", warning)
+		fmt.Fprintf(&output, "\nWarning: %s\n", warning)
 	}
+	fmt.Fprintf(&output, "\nSuggested target:\n\n%s\nNext: add this target to statlite.yaml, run statlite, then open\nhttp://127.0.0.1:9090\n", targetYAML)
+	return output.String(), nil
+}
+
+func renderSuggestedTarget(result *inspect.Result) (string, error) {
+	switch result.TargetType {
+	case inspect.TargetSpring:
+		cfg := springSuggestedConfig{Targets: []springSuggestedTarget{{
+			Name:            "app",
+			Type:            "spring",
+			ActuatorBaseURL: result.Endpoint,
+		}}}
+		validation := config.Config{
+			Server:  config.ServerConfig{Listen: "127.0.0.1:9090"},
+			Storage: config.StorageConfig{SQLitePath: "./statlite.sqlite"},
+			Polling: config.PollingConfig{Interval: "30s"},
+			Targets: []config.TargetConfig{{Name: "app", Type: config.TargetTypeSpring, ActuatorBaseURL: result.Endpoint}},
+		}
+		if err := config.Validate(&validation); err != nil {
+			return "", fmt.Errorf("spring target: %w", err)
+		}
+		return marshalSuggestedConfig(cfg)
+	case inspect.TargetStatliteMetrics:
+		cfg := statliteSuggestedConfig{Targets: []statliteSuggestedTarget{{
+			Name: "app",
+			Type: config.TargetTypeStatliteMetrics,
+			URL:  result.Endpoint,
+		}}}
+		validation := config.Config{
+			Server:  config.ServerConfig{Listen: "127.0.0.1:9090"},
+			Storage: config.StorageConfig{SQLitePath: "./statlite.sqlite"},
+			Polling: config.PollingConfig{Interval: "30s"},
+			Targets: []config.TargetConfig{{Name: "app", Type: config.TargetTypeStatliteMetrics, URL: result.Endpoint}},
+		}
+		if err := config.Validate(&validation); err != nil {
+			return "", fmt.Errorf("statlite-metrics target: %w", err)
+		}
+		return marshalSuggestedConfig(cfg)
+	default:
+		return "", fmt.Errorf("unsupported inspection target type %q", result.TargetType)
+	}
+}
+
+func marshalSuggestedConfig(value any) (string, error) {
+	data, err := yaml.Marshal(value)
+	if err != nil {
+		return "", fmt.Errorf("marshal YAML: %w", err)
+	}
+	return string(data), nil
 }
 
 func printInspectFailure(w io.Writer, err error) {
