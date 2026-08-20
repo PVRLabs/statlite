@@ -47,15 +47,16 @@ source-build instructions.
 ## Configure an application
 
 Start with an application's base URL. StatLite can identify a supported
-integration and print the target YAML to copy into `statlite.yaml`:
+integration and print a minimal, runnable `statlite.yaml`:
 
 ```bash
 statlite inspect 'http://localhost:8080'
 ```
 
 The command checks the conventional Spring Boot Actuator and StatLite Metrics
-v1 paths, then prints the detected endpoint, available capabilities, and the
-next command. It is bounded and read-only: it does not require or create
+v1 paths, then prints the detected endpoint, available capabilities, a minimal
+configuration, and the next command. It is bounded and read-only: it does not
+require or create
 `statlite.yaml`, open SQLite, or start monitoring.
 
 > [!IMPORTANT]
@@ -63,16 +64,28 @@ next command. It is bounded and read-only: it does not require or create
 > requires a base HTTP or HTTPS URL, so remove any query string or fragment
 > first.
 
-For a Spring application, the successful output includes:
+For a new Spring application, the successful output includes a complete
+minimal configuration:
 
 ```yaml
+server:
+  listen: "127.0.0.1:9090"
+
+storage:
+  sqlite_path: "./statlite.sqlite"
+
+polling:
+  interval: "30s"
+
 targets:
-  - name: "my-app"
+  - name: "app"
     type: "spring"
     actuator_base_url: "http://localhost:8080/actuator"
 ```
 
-Copy the suggested target into a complete `statlite.yaml`, then run:
+For a new setup, save the configuration as `statlite.yaml`. If you already
+have a configuration, copy only the target entry into its `targets` list. Then
+run:
 
 ```bash
 statlite

@@ -80,7 +80,7 @@ func runInspect(args []string, stdout, stderr io.Writer, inspectApplication insp
 	}
 	output, err := renderInspection(result)
 	if err != nil {
-		fmt.Fprintf(stderr, "inspect: could not render suggested target: %v\n", err)
+		fmt.Fprintf(stderr, "inspect: could not render suggested configuration: %v\n", err)
 		return 1
 	}
 	fmt.Fprint(stdout, output)
@@ -247,31 +247,39 @@ Quote the URL when pasting it from a browser, especially if it contains ? or &.
 Inspection requires a base URL, so remove any query string or fragment first.`)
 }
 
-type springSuggestedTarget struct {
+const configurationDocsURL = "https://github.com/PVRLabs/statlite/blob/main/docs/configuration.md"
+
+type suggestedServerConfig struct {
+	Listen string `yaml:"listen"`
+}
+
+type suggestedStorageConfig struct {
+	SQLitePath string `yaml:"sqlite_path"`
+}
+
+type suggestedPollingConfig struct {
+	Interval string `yaml:"interval"`
+}
+
+type suggestedTarget struct {
 	Name            string `yaml:"name"`
 	Type            string `yaml:"type"`
-	ActuatorBaseURL string `yaml:"actuator_base_url"`
+	ActuatorBaseURL string `yaml:"actuator_base_url,omitempty"`
+	URL             string `yaml:"url,omitempty"`
 }
 
-type statliteSuggestedTarget struct {
-	Name string `yaml:"name"`
-	Type string `yaml:"type"`
-	URL  string `yaml:"url"`
-}
-
-type springSuggestedConfig struct {
-	Targets []springSuggestedTarget `yaml:"targets"`
-}
-
-type statliteSuggestedConfig struct {
-	Targets []statliteSuggestedTarget `yaml:"targets"`
+type suggestedConfig struct {
+	Server  suggestedServerConfig  `yaml:"server"`
+	Storage suggestedStorageConfig `yaml:"storage"`
+	Polling suggestedPollingConfig `yaml:"polling"`
+	Targets []suggestedTarget      `yaml:"targets"`
 }
 
 func renderInspection(result *inspect.Result) (string, error) {
 	if result == nil {
 		return "", errors.New("inspection returned no result")
 	}
-	targetYAML, err := renderSuggestedTarget(result)
+	configYAML, err := renderSuggestedConfig(result)
 	if err != nil {
 		return "", err
 	}
@@ -290,18 +298,19 @@ func renderInspection(result *inspect.Result) (string, error) {
 	for _, warning := range result.Warnings {
 		fmt.Fprintf(&output, "\nWarning: %s\n", warning)
 	}
-	fmt.Fprintf(&output, "\nSuggested target:\n\n%s\nNext: add this target to statlite.yaml, run statlite, then open\nhttp://127.0.0.1:9090\n", targetYAML)
+	fmt.Fprintf(&output, "\nSuggested statlite.yaml:\n\n----- BEGIN statlite.yaml -----\n%s----- END statlite.yaml -----\n\nNext:\n  New setup: save only the YAML between the markers as statlite.yaml.\n  Existing setup: add the target entry to your existing targets list, changing name if needed.\n\nThen run:\n  statlite\n\nOpen:\n  http://127.0.0.1:9090\n\nMore configuration options:\n  %s\n", configYAML, configurationDocsURL)
 	return output.String(), nil
 }
 
-func renderSuggestedTarget(result *inspect.Result) (string, error) {
+func renderSuggestedConfig(result *inspect.Result) (string, error) {
 	switch result.TargetType {
 	case inspect.TargetSpring:
-		cfg := springSuggestedConfig{Targets: []springSuggestedTarget{{
-			Name:            "app",
-			Type:            "spring",
-			ActuatorBaseURL: result.Endpoint,
-		}}}
+		cfg := suggestedConfig{
+			Server:  suggestedServerConfig{Listen: "127.0.0.1:9090"},
+			Storage: suggestedStorageConfig{SQLitePath: "./statlite.sqlite"},
+			Polling: suggestedPollingConfig{Interval: "30s"},
+			Targets: []suggestedTarget{{Name: "app", Type: "spring", ActuatorBaseURL: result.Endpoint}},
+		}
 		validation := config.Config{
 			Server:  config.ServerConfig{Listen: "127.0.0.1:9090"},
 			Storage: config.StorageConfig{SQLitePath: "./statlite.sqlite"},
@@ -313,11 +322,12 @@ func renderSuggestedTarget(result *inspect.Result) (string, error) {
 		}
 		return marshalSuggestedConfig(cfg)
 	case inspect.TargetStatliteMetrics:
-		cfg := statliteSuggestedConfig{Targets: []statliteSuggestedTarget{{
-			Name: "app",
-			Type: config.TargetTypeStatliteMetrics,
-			URL:  result.Endpoint,
-		}}}
+		cfg := suggestedConfig{
+			Server:  suggestedServerConfig{Listen: "127.0.0.1:9090"},
+			Storage: suggestedStorageConfig{SQLitePath: "./statlite.sqlite"},
+			Polling: suggestedPollingConfig{Interval: "30s"},
+			Targets: []suggestedTarget{{Name: "app", Type: config.TargetTypeStatliteMetrics, URL: result.Endpoint}},
+		}
 		validation := config.Config{
 			Server:  config.ServerConfig{Listen: "127.0.0.1:9090"},
 			Storage: config.StorageConfig{SQLitePath: "./statlite.sqlite"},
@@ -368,7 +378,7 @@ func isInspectUsageError(err error) bool {
 
 func printMissingConfigSuggestion(w io.Writer) {
 	fmt.Fprintln(w, `
-To identify a supported application endpoint and print target YAML:
+To identify a supported application endpoint and print a minimal statlite.yaml:
   statlite inspect <application-url>
 
 To use an existing configuration:

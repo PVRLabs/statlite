@@ -29,8 +29,10 @@ Inspection probes the conventional `/actuator/health` and
 `/statlite/metrics` paths. A recognized Spring application gets a conditional
 `/actuator/metrics` capability check; if neither conventional integration is
 recognized, the supplied base URL is tried once as a direct StatLite Metrics
-fallback. The command prints a copyable target snippet and the next command;
-copy that target into a complete `statlite.yaml` before running StatLite.
+fallback. The command prints a copyable minimal configuration and the next
+command; for a new setup, save the printed configuration as `statlite.yaml`.
+With an existing configuration, copy only the target entry into its `targets`
+list before running StatLite.
 
 > [!IMPORTANT]
 > Quote browser-pasted URLs, especially URLs containing `?` or `&`. Inspection

@@ -149,7 +149,7 @@ func TestRunInspectDispatchesWithoutLoadingConfig(t *testing.T) {
 	if !strings.Contains(output, "Detected: Spring Boot Actuator") {
 		t.Fatalf("stdout = %q, want inspection result", stdout.String())
 	}
-	if !strings.Contains(output, "actuator_base_url: http://app.test/actuator") || !strings.Contains(output, "Next: add this target to statlite.yaml") {
+	if !strings.Contains(output, "----- BEGIN statlite.yaml -----") || !strings.Contains(output, "actuator_base_url: http://app.test/actuator") || !strings.Contains(output, "New setup: save only the YAML between the markers as statlite.yaml.") {
 		t.Fatalf("stdout = %q, want suggested YAML and next step", output)
 	}
 	if stderr.Len() != 0 {
@@ -177,20 +177,38 @@ Available:
   ✓ health
   ✓ metrics
 
-Suggested target:
+Suggested statlite.yaml:
 
+----- BEGIN statlite.yaml -----
+server:
+    listen: 127.0.0.1:9090
+storage:
+    sqlite_path: ./statlite.sqlite
+polling:
+    interval: 30s
 targets:
     - name: app
       type: spring
       actuator_base_url: https://example.test/service/actuator
+----- END statlite.yaml -----
 
-Next: add this target to statlite.yaml, run statlite, then open
-http://127.0.0.1:9090
+Next:
+  New setup: save only the YAML between the markers as statlite.yaml.
+  Existing setup: add the target entry to your existing targets list, changing name if needed.
+
+Then run:
+  statlite
+
+Open:
+  http://127.0.0.1:9090
+
+More configuration options:
+  https://github.com/PVRLabs/statlite/blob/main/docs/configuration.md
 `
 	if got != want {
 		t.Fatalf("renderInspection() = %q, want %q", got, want)
 	}
-	assertSuggestedTargetLoads(t, got, config.TargetTypeSpring, "https://example.test/service/actuator")
+	assertSuggestedConfigLoads(t, got, config.TargetTypeSpring, "https://example.test/service/actuator")
 }
 
 func TestRenderInspectionStatliteMetricsOutputOmitsIrrelevantFields(t *testing.T) {
@@ -210,7 +228,15 @@ func TestRenderInspectionStatliteMetricsOutputOmitsIrrelevantFields(t *testing.T
 		"type: statlite-metrics",
 		"url: http://localhost:9090/statlite/metrics",
 		"Warning: metrics are unavailable",
-		"Next: add this target to statlite.yaml, run statlite, then open",
+		"Suggested statlite.yaml:",
+		"server:",
+		"storage:",
+		"polling:",
+		"----- BEGIN statlite.yaml -----",
+		"----- END statlite.yaml -----",
+		"New setup: save only the YAML between the markers as statlite.yaml.",
+		"Existing setup: add the target entry to your existing targets list, changing name if needed.",
+		"More configuration options:",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("renderInspection() = %q, missing %q", got, want)
@@ -219,7 +245,7 @@ func TestRenderInspectionStatliteMetricsOutputOmitsIrrelevantFields(t *testing.T
 	if strings.Contains(got, "actuator_base_url") {
 		t.Fatalf("renderInspection() = %q, must omit Spring-only field", got)
 	}
-	assertSuggestedTargetLoads(t, got, config.TargetTypeStatliteMetrics, "http://localhost:9090/statlite/metrics")
+	assertSuggestedConfigLoads(t, got, config.TargetTypeStatliteMetrics, "http://localhost:9090/statlite/metrics")
 }
 
 func TestRunInspectFailuresUseExitOneAndPrintNoYAML(t *testing.T) {
@@ -246,29 +272,25 @@ func TestRunInspectFailuresUseExitOneAndPrintNoYAML(t *testing.T) {
 	}
 }
 
-func TestRenderInspectionRejectsInvalidSuggestedTarget(t *testing.T) {
+func TestRenderInspectionRejectsInvalidSuggestedConfig(t *testing.T) {
 	_, err := renderInspection(&inspect.Result{TargetType: inspect.TargetSpring})
 	if err == nil || !strings.Contains(err.Error(), "actuator_base_url is required") {
 		t.Fatalf("renderInspection() error = %v, want config validation error", err)
 	}
 }
 
-func assertSuggestedTargetLoads(t *testing.T, output string, targetType, endpoint string) {
+func assertSuggestedConfigLoads(t *testing.T, output string, targetType, endpoint string) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "statlite.yaml")
-	targetStart := strings.Index(output, "targets:\n")
-	targetEnd := strings.Index(output[targetStart:], "\nNext:")
-	if targetStart < 0 || targetEnd < 0 {
-		t.Fatalf("output = %q, missing target YAML boundaries", output)
+	configStart := strings.Index(output, "server:\n")
+	if configStart < 0 {
+		t.Fatalf("output = %q, missing config YAML boundaries", output)
 	}
-	targetYAML := output[targetStart : targetStart+targetEnd]
-	configText := `server:
-  listen: "127.0.0.1:9090"
-storage:
-  sqlite_path: "./statlite.sqlite"
-polling:
-  interval: "30s"
-` + targetYAML + "\n"
+	configEnd := strings.Index(output[configStart:], "----- END statlite.yaml -----")
+	if configEnd < 0 {
+		t.Fatalf("output = %q, missing config YAML end", output)
+	}
+	configText := output[configStart : configStart+configEnd]
 	if err := os.WriteFile(path, []byte(configText), 0o600); err != nil {
 		t.Fatal(err)
 	}
