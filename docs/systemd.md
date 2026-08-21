@@ -11,15 +11,12 @@ a pinned release never fetches mutable installer code from `main`.
 
 ## Install
 
-Choose the StatLite release to install:
+This example uses `v0.3.0`. Replace it with the latest release tag, or the
+specific version you need:
 
 ```bash
-STATLITE_VERSION=v0.1.0
-```
+STATLITE_VERSION="v0.3.0"
 
-Download the provisioning script from the same release tag:
-
-```bash
 curl -fsSL \
   "https://raw.githubusercontent.com/PVRLabs/statlite/${STATLITE_VERSION}/scripts/systemd.sh" \
   -o statlite-systemd.sh
