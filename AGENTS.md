@@ -52,24 +52,21 @@ Use SQLite through Go `database/sql`. Prefer `modernc.org/sqlite` unless there i
 When changing `internal/dashboard/static/index.html`, `dashboard.js`, or
 `dashboard.test.js`, run the dashboard unit tests locally:
 
-```bash
-npm-lite node --test internal/dashboard/static/dashboard.test.js
-```
+Use the `lite-tools` skill for routine npm/Node and Go test workflows.
 
-`go-lite test ./...` intentionally does not run Node tests; it is the preferred
-Go-only verification command for unrelated changes. Use `go-lite --full test
-./...` when complete live output is needed.
+Go-only verification does not run the dashboard Node tests. When changing the
+dashboard, run its Node test separately:
+
+`npm-lite node --test internal/dashboard/static/dashboard.test.js`
 
 For large or ambiguous changes, propose the smallest independently testable slice first.
 
 ## Related Repositories and Release Tooling
 
-Use `repo-map` to discover related repositories and their local paths and broad
-roles. Use `repo-map commands` to discover shared agent-oriented tools available
-on `PATH`, including low-noise build and test wrappers and browser helpers;
-invoke them by name. Project-specific workflow instructions remain
-authoritative. When a Homebrew formula update is in scope, use
-`repo-map get homebrew-tap` to locate the shared PVRLabs tap.
+Use the `repo-map` skill to discover related repositories and their local paths.
+Project-specific workflow instructions remain authoritative. When a Homebrew
+formula update is in scope, use `repo-map get homebrew-tap` to locate the
+shared PVRLabs tap.
 
 ## Capitalization Convention
 
