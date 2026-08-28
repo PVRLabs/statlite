@@ -16,6 +16,8 @@ import (
 //go:embed schema.sql
 var schemaFS embed.FS
 
+const currentSchemaVersion = 1
+
 type Store struct {
 	db     *sql.DB
 	closed atomic.Bool
@@ -69,12 +71,41 @@ func (s *Store) init(ctx context.Context) error {
 		return fmt.Errorf("enable sqlite foreign keys: %w", err)
 	}
 
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin sqlite schema initialization: %w", err)
+	}
+	defer tx.Rollback()
+
+	var schemaVersion int
+	if err := tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schemaVersion); err != nil {
+		return fmt.Errorf("read sqlite schema version: %w", err)
+	}
+	if schemaVersion > currentSchemaVersion {
+		return fmt.Errorf("sqlite schema version %d is newer than supported version %d", schemaVersion, currentSchemaVersion)
+	}
+	if schemaVersion != 0 && schemaVersion < currentSchemaVersion {
+		return fmt.Errorf("sqlite schema version %d requires a migration to version %d", schemaVersion, currentSchemaVersion)
+	}
+	if schemaVersion == currentSchemaVersion {
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("finish sqlite schema initialization: %w", err)
+		}
+		return nil
+	}
+
 	schema, err := schemaFS.ReadFile("schema.sql")
 	if err != nil {
 		return fmt.Errorf("read embedded schema: %w", err)
 	}
-	if _, err := s.db.ExecContext(ctx, string(schema)); err != nil {
+	if _, err := tx.ExecContext(ctx, string(schema)); err != nil {
 		return fmt.Errorf("initialize sqlite schema: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", currentSchemaVersion)); err != nil {
+		return fmt.Errorf("set sqlite schema version: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("finish sqlite schema initialization: %w", err)
 	}
 	return nil
 }

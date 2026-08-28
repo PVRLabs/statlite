@@ -26,6 +26,60 @@ func TestOpenCreatesSchema(t *testing.T) {
 			t.Fatalf("schema table %s missing: %v", table, err)
 		}
 	}
+
+	var schemaVersion int
+	if err := store.db.QueryRow("PRAGMA user_version").Scan(&schemaVersion); err != nil {
+		t.Fatalf("read schema version: %v", err)
+	}
+	if schemaVersion != currentSchemaVersion {
+		t.Fatalf("schema version = %d, want %d", schemaVersion, currentSchemaVersion)
+	}
+}
+
+func TestOpenAdoptsExistingUnversionedSchema(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "statlite.sqlite")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("open unversioned database: %v", err)
+	}
+	schema, err := schemaFS.ReadFile("schema.sql")
+	if err != nil {
+		db.Close()
+		t.Fatalf("read embedded schema: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, string(schema)); err != nil {
+		db.Close()
+		t.Fatalf("initialize unversioned schema: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO targets (name, created_at) VALUES ('existing', '2026-08-28T00:00:00Z')`); err != nil {
+		db.Close()
+		t.Fatalf("insert existing data: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close unversioned database: %v", err)
+	}
+
+	store, err := Open(ctx, path)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer store.Close()
+
+	var schemaVersion int
+	if err := store.db.QueryRow("PRAGMA user_version").Scan(&schemaVersion); err != nil {
+		t.Fatalf("read schema version: %v", err)
+	}
+	if schemaVersion != currentSchemaVersion {
+		t.Fatalf("schema version = %d, want %d", schemaVersion, currentSchemaVersion)
+	}
+	var targetName string
+	if err := store.db.QueryRow("SELECT name FROM targets").Scan(&targetName); err != nil {
+		t.Fatalf("read existing target: %v", err)
+	}
+	if targetName != "existing" {
+		t.Fatalf("existing target name = %q, want existing", targetName)
+	}
 }
 
 func TestSaveCollectionResultAndLatestSnapshot(t *testing.T) {
