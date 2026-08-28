@@ -23,7 +23,7 @@ StatLite is a small, self-hosted, SQLite-backed metrics dashboard focused on Spr
 
 Unless explicitly requested, do not implement:
 
-* Prometheus scraping
+* generic Prometheus targets or arbitrary Prometheus metric ingestion
 * arbitrary metric definitions
 * alert manager
 * logs or traces

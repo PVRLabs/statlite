@@ -20,7 +20,8 @@ StatLite prioritizes:
 * low steady-state memory and CPU usage;
 * explicit, maintainable implementation over framework-heavy abstraction;
 * local SQLite storage;
-* fixed supported collectors rather than arbitrary metrics;
+* a small, closed set of supported runtime and framework targets rather than
+  arbitrary metrics;
 * a clean normalized boundary between collectors and the rest of the system;
 * a simple, collector-neutral dashboard;
 * systemd-friendly deployment; and
@@ -53,6 +54,8 @@ and retention cost, dashboard behavior, and long-term compatibility.
 
 ## Supported integration boundaries
 
+### Currently supported targets
+
 StatLite has two supported target types:
 
 * `spring`: Spring Boot Actuator and a fixed set of Micrometer metrics. This
@@ -63,6 +66,34 @@ StatLite has two supported target types:
   contract.
 Spring and StatLite Metrics are application integrations. None of these
 boundaries is an arbitrary metrics API.
+
+### Framework-first integration model
+
+StatLite's public integration surface follows application runtimes and
+frameworks rather than telemetry standards. Target types represent
+technologies developers recognize and run, such as Spring Boot, Quarkus, Go,
+Gin, and Fiber. Only the target types listed as currently supported above are
+available today; other names describe product direction until their contracts
+are implemented and certified.
+
+Each target type owns its supported application setup, configuration and
+connection behavior, compatibility inspection, normalization contract,
+certification fixtures, documentation, and user-facing explanation. A valid
+metrics endpoint alone is not a StatLite integration. StatLite must know which
+application concepts the endpoint represents and how they can be normalized
+safely.
+
+Prometheus/OpenMetrics, Micrometer, and similar metric technologies may be
+shared internally by multiple target adapters. They are implementation
+plumbing, not sufficient user-facing compatibility contracts. StatLite should
+not expose a generic target merely because it can parse that target's wire
+format, and it should not guess the semantics of arbitrary metric names or
+middleware.
+
+`statlite-metrics` remains a deliberate exception: it is StatLite's own small,
+fixed producer contract for applications that choose to integrate directly. It
+does not make third-party metric standards or arbitrary producer schemas into
+public target contracts.
 
 ## Deployment topology
 
@@ -207,7 +238,7 @@ The dashboard is intentionally simple, local-first, and collector-neutral.
 
 The current product scope does not include:
 
-* Prometheus or OpenMetrics scraping;
+* a generic Prometheus or OpenMetrics target and arbitrary scrape ingestion;
 * arbitrary metric definitions;
 * labels or a custom dashboard builder;
 * logs or traces;
@@ -222,13 +253,21 @@ without turning it into a general observability platform.
 
 ## Future direction
 
-Future extensions may include additional focused application integrations,
-optional alerting, or rebuildable query acceleration if real usage justifies
-them. Such possibilities are non-binding; concrete work belongs in GitHub
-issues and must preserve the product’s small, understandable core.
+Future extensions may include additional focused runtime and framework
+integrations, optional alerting, or rebuildable query acceleration if real
+usage justifies them. Such possibilities are non-binding until implemented and
+certified; concrete work belongs in GitHub issues and must preserve the
+product's small, understandable core.
 
-A Go application target is under consideration as a possible focused
-integration. It may eventually consume recognized Go Prometheus/OpenMetrics
-endpoints while mapping only into StatLite's existing normalized concepts. Go
-is not a currently supported target, and this direction does not imply
-generic Prometheus compatibility.
+The planned Go ecosystem direction begins with a narrow `go` target for
+reliably recognizable Go runtime and process concepts. Generic Go does not
+imply application HTTP traffic, error, or latency support. Gin and Fiber are
+the first intended framework-specific Go targets and may extend the Go
+baseline with HTTP concepts only after their recommended instrumentation
+contracts are investigated and certified. Quarkus is likewise planned as a
+framework target backed internally by reusable Micrometer normalization.
+
+`go`, `gin`, `fiber`, and `quarkus` are not currently supported target types.
+Their planned adapters may reuse bounded Prometheus/OpenMetrics parsing, but
+this direction does not imply generic Prometheus compatibility or authorize
+arbitrary metric ingestion.
