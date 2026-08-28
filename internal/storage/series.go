@@ -57,7 +57,7 @@ WHERE t.name = ?
   AND p.started_at <= ?
   AND ms.metric_key IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ORDER BY p.started_at ASC, p.id ASC, ms.metric_key ASC
-`, targetName, formatTime(start), formatTime(end), keys[0], keys[1], keys[2], keys[3], keys[4], keys[5], keys[6], keys[7], keys[8], keys[9], keys[10], keys[11], keys[12])
+`, targetName, formatSortableTime(start), formatSortableTime(end), keys[0], keys[1], keys[2], keys[3], keys[4], keys[5], keys[6], keys[7], keys[8], keys[9], keys[10], keys[11], keys[12])
 	if err != nil {
 		return nil, fmt.Errorf("query series samples: %w", err)
 	}
@@ -84,7 +84,7 @@ ORDER BY p.started_at ASC, p.id ASC, ms.metric_key ASC
 		if err := rows.Scan(&pollID, &startedAtText, &appRunID, &metricKey, &metricKind, &value); err != nil {
 			return nil, fmt.Errorf("scan series sample: %w", err)
 		}
-		startedAt, err := parseTime(startedAtText)
+		startedAt, err := parseStoredTime(startedAtText)
 		if err != nil {
 			return nil, fmt.Errorf("parse series sample started_at: %w", err)
 		}
@@ -134,7 +134,7 @@ WHERE t.name = ?
   AND ms.metric_kind = ?
 ORDER BY p.started_at DESC, p.id DESC
 LIMIT 1
-`, targetName, formatTime(start), key, collector.MetricKindCounter).Scan(&appRunID, &value)
+`, targetName, formatSortableTime(start), key, collector.MetricKindCounter).Scan(&appRunID, &value)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				continue

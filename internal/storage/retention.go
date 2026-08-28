@@ -93,7 +93,7 @@ func (s *Store) DeletePollsBefore(ctx context.Context, cutoff time.Time) (int64,
 	result, err := tx.ExecContext(ctx, `
 DELETE FROM polls
 WHERE started_at < ?
-`, formatTime(cutoff))
+`, formatSortableTime(cutoff))
 	if err != nil {
 		return 0, fmt.Errorf("delete expired polls: %w", err)
 	}

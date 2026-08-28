@@ -122,6 +122,7 @@ metrics for the environment running the application.
 - [StatLite Metrics v1](docs/statlite-metrics-v1.md)
 - [systemd deployment](docs/systemd.md)
 - [Product and architecture](docs/product.md)
+- [Storage and schema direction](docs/storage.md)
 - [Spring Boot guide](https://pvrlabs.xyz/articles/lightweight-spring-boot-monitoring.html)
 - [Examples](examples/)
 

@@ -111,7 +111,7 @@ func (s *Store) TouchAppRun(ctx context.Context, appRunID int64, seenAt time.Tim
 UPDATE app_runs
 SET last_seen_at = ?
 WHERE id = ?
-`, formatTime(seenAt), appRunID)
+`, formatSortableTime(seenAt), appRunID)
 	if err != nil {
 		return fmt.Errorf("touch app run: %w", err)
 	}
@@ -141,7 +141,7 @@ func upsertTarget(ctx context.Context, tx *sql.Tx, name string, now time.Time) (
 INSERT INTO targets (name, created_at)
 VALUES (?, ?)
 ON CONFLICT(name) DO NOTHING
-`, name, formatTime(now)); err != nil {
+`, name, formatSortableTime(now)); err != nil {
 		return 0, fmt.Errorf("upsert target %q: %w", name, err)
 	}
 
@@ -162,7 +162,7 @@ INSERT INTO app_runs (target_id, process_start_time, first_seen_at, last_seen_at
 VALUES (?, ?, ?, ?)
 ON CONFLICT(target_id, process_start_time) DO UPDATE SET
   last_seen_at = excluded.last_seen_at
-`, targetID, formatTime(*processStartTime), formatTime(seenAt), formatTime(seenAt)); err != nil {
+`, targetID, formatIdentityTime(*processStartTime), formatSortableTime(seenAt), formatSortableTime(seenAt)); err != nil {
 		return nil, fmt.Errorf("upsert app run: %w", err)
 	}
 
@@ -170,7 +170,7 @@ ON CONFLICT(target_id, process_start_time) DO UPDATE SET
 	if err := tx.QueryRowContext(ctx, `
 SELECT id FROM app_runs
 WHERE target_id = ? AND process_start_time = ?
-`, targetID, formatTime(*processStartTime)).Scan(&id); err != nil {
+`, targetID, formatIdentityTime(*processStartTime)).Scan(&id); err != nil {
 		return nil, fmt.Errorf("query app run: %w", err)
 	}
 	return &id, nil
@@ -180,7 +180,7 @@ func insertAnonymousAppRun(ctx context.Context, tx *sql.Tx, targetID int64, seen
 	result, err := tx.ExecContext(ctx, `
 INSERT INTO app_runs (target_id, process_start_time, first_seen_at, last_seen_at)
 VALUES (?, NULL, ?, ?)
-`, targetID, formatTime(seenAt), formatTime(seenAt))
+`, targetID, formatSortableTime(seenAt), formatSortableTime(seenAt))
 	if err != nil {
 		return 0, fmt.Errorf("insert app run: %w", err)
 	}
@@ -204,7 +204,7 @@ INSERT INTO polls (
   error_summary
 )
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-`, targetID, nullableInt64(appRunID), formatTime(result.PollStartedAt), formatTime(result.PollFinishedAt), status, nullableString(result.HealthStatus), nullableString(result.DBHealthStatus), nullableString(errorSummary))
+`, targetID, nullableInt64(appRunID), formatSortableTime(result.PollStartedAt), formatSortableTime(result.PollFinishedAt), status, nullableString(result.HealthStatus), nullableString(result.DBHealthStatus), nullableString(errorSummary))
 	if err != nil {
 		return 0, fmt.Errorf("insert poll: %w", err)
 	}

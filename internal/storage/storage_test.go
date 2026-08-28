@@ -140,6 +140,63 @@ func TestSaveCollectionResultAndLatestSnapshot(t *testing.T) {
 	}
 }
 
+func TestEnsureAppRunPreservesLegacyProcessStartTimeIdentity(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	processStart := time.Date(2026, 8, 28, 18, 6, 20, 0, time.UTC)
+	seenAt := processStart.Add(time.Minute)
+	result, err := store.db.ExecContext(ctx, `
+INSERT INTO targets (name, created_at) VALUES (?, ?)
+`, "app", "2026-08-28T18:06:20Z")
+	if err != nil {
+		t.Fatalf("insert legacy target: %v", err)
+	}
+	targetID, err := result.LastInsertId()
+	if err != nil {
+		t.Fatalf("read target id: %v", err)
+	}
+	result, err = store.db.ExecContext(ctx, `
+INSERT INTO app_runs (target_id, process_start_time, first_seen_at, last_seen_at)
+VALUES (?, ?, ?, ?)
+`, targetID, "2026-08-28T18:06:20Z", "2026-08-28T18:07:20Z", "2026-08-28T18:07:20Z")
+	if err != nil {
+		t.Fatalf("insert legacy app run: %v", err)
+	}
+	wantID, err := result.LastInsertId()
+	if err != nil {
+		t.Fatalf("read legacy app run id: %v", err)
+	}
+
+	gotID, err := store.EnsureAppRun(ctx, "app", &processStart, seenAt)
+	if err != nil {
+		t.Fatalf("EnsureAppRun() error = %v", err)
+	}
+	if gotID != wantID {
+		t.Fatalf("EnsureAppRun() id = %d, want existing id %d", gotID, wantID)
+	}
+
+	var count int
+	var storedProcessStart, storedLastSeen string
+	if err := store.db.QueryRow(`
+SELECT COUNT(*), MIN(process_start_time), MIN(last_seen_at)
+FROM app_runs
+WHERE target_id = ?
+`, targetID).Scan(&count, &storedProcessStart, &storedLastSeen); err != nil {
+		t.Fatalf("query app runs: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("app run count = %d, want 1", count)
+	}
+	if storedProcessStart != "2026-08-28T18:06:20Z" {
+		t.Fatalf("process_start_time = %q, want legacy identity representation", storedProcessStart)
+	}
+	if storedLastSeen != "2026-08-28T18:07:20" {
+		t.Fatalf("last_seen_at = %q, want sortable implicit-UTC representation", storedLastSeen)
+	}
+}
+
 func TestSaveSpringContractResultRowDeltas(t *testing.T) {
 	store := openTestStore(t)
 	defer store.Close()

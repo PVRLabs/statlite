@@ -80,11 +80,11 @@ LIMIT 1
 		snapshot.ErrorSummary = errorSummary.String
 	}
 	snapshot.Result.TargetName = targetName
-	parsedStartedAt, err := parseTime(startedAt)
+	parsedStartedAt, err := parseStoredTime(startedAt)
 	if err != nil {
 		return nil, fmt.Errorf("parse poll started_at: %w", err)
 	}
-	parsedFinishedAt, err := parseTime(finishedAt)
+	parsedFinishedAt, err := parseStoredTime(finishedAt)
 	if err != nil {
 		return nil, fmt.Errorf("parse poll finished_at: %w", err)
 	}
@@ -186,7 +186,7 @@ SELECT process_start_time FROM app_runs WHERE id = ?
 	if !value.Valid {
 		return nil, nil
 	}
-	parsed, err := parseTime(value.String)
+	parsed, err := parseStoredTime(value.String)
 	if err != nil {
 		return nil, fmt.Errorf("parse app run process start time: %w", err)
 	}
@@ -243,7 +243,7 @@ func (s *Store) scanEvents(ctx context.Context, query string, args []interface{}
 		if err := rows.Scan(&event.PollID, &startedAt, &event.Severity, &event.Type, &metricKey, &event.Message); err != nil {
 			return nil, fmt.Errorf("scan event: %w", err)
 		}
-		parsedStartedAt, err := parseTime(startedAt)
+		parsedStartedAt, err := parseStoredTime(startedAt)
 		if err != nil {
 			return nil, fmt.Errorf("parse event started_at: %w", err)
 		}
@@ -272,7 +272,7 @@ WHERE t.name = ?
   AND p.started_at >= ?
   AND p.started_at <= ?
 `
-	args := []interface{}{targetName, formatTime(start), formatTime(end)}
+	args := []interface{}{targetName, formatSortableTime(start), formatSortableTime(end)}
 	if eventType != "" {
 		query += "  AND e.event_type = ?\n"
 		args = append(args, eventType)
