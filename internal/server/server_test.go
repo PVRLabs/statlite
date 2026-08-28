@@ -1547,22 +1547,23 @@ func TestHandleSeriesAggregatesDense7dWithScale(t *testing.T) {
 }
 
 func TestHandleSeriesKeepsSparse1hResolution(t *testing.T) {
-	// 12 points at 5-minute spacing with 1h range (1-minute buckets) → no shared buckets.
+	// 12 points at 4-minute spacing with 1h range → no shared buckets.
 	store, err := storage.Open(t.Context(), t.TempDir()+"/statlite.sqlite")
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
 	defer store.Close()
 
-	// Stay safely inside the live 1h window (not pinned to a stale "start" edge).
-	base := time.Now().UTC().Add(-55 * time.Minute).Truncate(time.Minute)
+	// Keep both ends safely inside the live 1h window. Ending exactly at the
+	// current minute would make inclusion depend on the request's subsecond time.
+	base := time.Now().UTC().Add(-50 * time.Minute).Truncate(time.Minute)
 	appRunID, err := store.EnsureAppRun(t.Context(), "app", nil, base)
 	if err != nil {
 		t.Fatalf("EnsureAppRun() error = %v", err)
 	}
 	const n = 12
 	for i := 0; i < n; i++ {
-		saveServerRetentionPoll(t, store, appRunID, base.Add(time.Duration(i)*5*time.Minute), float64(i+1), nil)
+		saveServerRetentionPoll(t, store, appRunID, base.Add(time.Duration(i)*4*time.Minute), float64(i+1), nil)
 	}
 
 	mon := newServerTestMonitor(t, "app", store, &noopCollector{})
