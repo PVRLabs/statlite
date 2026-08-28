@@ -42,8 +42,20 @@ Grafana.
 
 ## Install
 
-See [Installation](docs/install.md) for the release installer, Homebrew, and
-source-build instructions.
+Install the latest release on macOS or Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/PVRLabs/statlite/main/install.sh | sh
+```
+
+Or install with Homebrew:
+
+```bash
+brew install pvrlabs/tap/statlite
+```
+
+See [Installation](docs/install.md) for supported platforms, custom install
+locations, source builds, and server-wide Linux setup.
 
 ## Configure an application
 
