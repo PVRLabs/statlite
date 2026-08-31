@@ -30,19 +30,28 @@ func main() {
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
-	return runWithInspector(args, stdout, stderr, inspect.Application)
+	return runWithInspectors(args, stdout, stderr, inspect.Application, inspect.Inspect)
 }
 
 type inspectApplicationFunc func(context.Context, string) (*inspect.Result, error)
+type inspectApplicationByTypeFunc func(context.Context, inspect.TargetType, string) (*inspect.Result, error)
 
 func runWithInspector(args []string, stdout, stderr io.Writer, inspectApplication inspectApplicationFunc) int {
+	return runWithInspectors(args, stdout, stderr, inspectApplication, inspect.Inspect)
+}
+
+func runWithInspectors(args []string, stdout, stderr io.Writer, inspectApplication inspectApplicationFunc, inspectByType inspectApplicationByTypeFunc) int {
 	if len(args) > 0 && args[0] == "inspect" {
-		return runInspect(args[1:], stdout, stderr, inspectApplication)
+		return runInspectWithTyped(args[1:], stdout, stderr, inspectApplication, inspectByType)
 	}
 	return runMonitor(args, stdout, stderr)
 }
 
 func runInspect(args []string, stdout, stderr io.Writer, inspectApplication inspectApplicationFunc) int {
+	return runInspectWithTyped(args, stdout, stderr, inspectApplication, inspect.Inspect)
+}
+
+func runInspectWithTyped(args []string, stdout, stderr io.Writer, inspectApplication inspectApplicationFunc, inspectByType inspectApplicationByTypeFunc) int {
 	for _, arg := range args {
 		if arg == "--help" || arg == "-h" {
 			printInspectHelp(stdout)
@@ -54,6 +63,7 @@ func runInspect(args []string, stdout, stderr io.Writer, inspectApplication insp
 	inspectFlags.Usage = func() {
 		printInspectHelp(stderr)
 	}
+	typed := inspectFlags.String("type", "", "inspect a specific target type (currently: quarkus)")
 	if err := inspectFlags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -70,7 +80,13 @@ func runInspect(args []string, stdout, stderr io.Writer, inspectApplication insp
 		return 2
 	}
 
-	result, err := inspectApplication(context.Background(), inspectFlags.Arg(0))
+	var result *inspect.Result
+	var err error
+	if *typed == "" {
+		result, err = inspectApplication(context.Background(), inspectFlags.Arg(0))
+	} else {
+		result, err = inspectByType(context.Background(), inspect.TargetType(*typed), inspectFlags.Arg(0))
+	}
 	if err != nil {
 		printInspectFailure(stderr, err)
 		if isInspectUsageError(err) {
@@ -221,6 +237,7 @@ samples in local SQLite, and serves a localhost dashboard.
 Usage:
   statlite [--config path]
   statlite inspect <application-url>
+  statlite inspect --type quarkus <metrics-endpoint-url>
   statlite --version
   statlite --help
 
@@ -243,8 +260,12 @@ Example:
 Probe a supported application endpoint and print an inspection summary.
 Inspection is read-only and does not require or create statlite.yaml.
 
+Use --type quarkus when the URL is the exact Quarkus Prometheus/OpenMetrics
+endpoint, such as http://localhost:9000/q/metrics.
+
 Quote the URL when pasting it from a browser, especially if it contains ? or &.
-Inspection requires a base URL, so remove any query string or fragment first.`)
+Untyped inspection requires a base URL, so remove any query string or fragment first.
+Typed Quarkus inspection accepts the exact metrics endpoint URL.`)
 }
 
 const configurationDocsURL = "https://github.com/PVRLabs/statlite/blob/main/docs/configuration.md"
@@ -286,11 +307,17 @@ func renderInspection(result *inspect.Result) (string, error) {
 	name := "StatLite Metrics v1"
 	if result.TargetType == inspect.TargetSpring {
 		name = "Spring Boot Actuator"
+	} else if result.TargetType == inspect.TargetQuarkus {
+		name = "Quarkus Metrics"
 	} else if result.TargetType != inspect.TargetStatliteMetrics {
 		return "", fmt.Errorf("unsupported inspection target type %q", result.TargetType)
 	}
 	var output strings.Builder
-	fmt.Fprintf(&output, "Detected: %s\n\nEndpoint:\n  %s\n\nAvailable:\n", name, result.Endpoint)
+	fmt.Fprintf(&output, "Detected: %s\n\nEndpoint:\n  %s\n", name, result.Endpoint)
+	if result.Status != "" {
+		fmt.Fprintf(&output, "\nCompatibility: %s\n", result.Status)
+	}
+	fmt.Fprint(&output, "\nAvailable:\n")
 	for _, capability := range result.Capabilities {
 		fmt.Fprintf(&output, "  ✓ %s\n", capability)
 	}
@@ -337,6 +364,23 @@ func renderSuggestedConfig(result *inspect.Result) (string, error) {
 			return "", fmt.Errorf("statlite-metrics target: %w", err)
 		}
 		return marshalSuggestedConfig(cfg)
+	case inspect.TargetQuarkus:
+		cfg := suggestedConfig{
+			Server:  suggestedServerConfig{Listen: "127.0.0.1:9090"},
+			Storage: suggestedStorageConfig{SQLitePath: "./statlite.sqlite"},
+			Polling: suggestedPollingConfig{Interval: "30s"},
+			Targets: []suggestedTarget{{Name: "app", Type: config.TargetTypeQuarkus, URL: result.Endpoint}},
+		}
+		validation := config.Config{
+			Server:  config.ServerConfig{Listen: "127.0.0.1:9090"},
+			Storage: config.StorageConfig{SQLitePath: "./statlite.sqlite"},
+			Polling: config.PollingConfig{Interval: "30s"},
+			Targets: []config.TargetConfig{{Name: "app", Type: config.TargetTypeQuarkus, URL: result.Endpoint}},
+		}
+		if err := config.Validate(&validation); err != nil {
+			return "", fmt.Errorf("quarkus target: %w", err)
+		}
+		return marshalSuggestedConfig(cfg)
 	default:
 		return "", fmt.Errorf("unsupported inspection target type %q", result.TargetType)
 	}
@@ -365,6 +409,10 @@ func printInspectFailure(w io.Writer, err error) {
 		fmt.Fprintln(w, "inspect: inspection could not complete within the bounded probe")
 	case inspect.FailureMultiple:
 		fmt.Fprintln(w, "inspect: more than one supported integration was found")
+	case inspect.FailureIncompatible:
+		fmt.Fprintf(w, "inspect: the configured Quarkus metrics endpoint is incompatible: %v\n", failure.Err)
+	case inspect.FailureTypeUnsupported, inspect.FailureTypeUnavailable:
+		fmt.Fprintf(w, "inspect: %v\n", failure)
 	default:
 		fmt.Fprintln(w, "inspect: no supported integration was recognized")
 	}
@@ -372,7 +420,10 @@ func printInspectFailure(w io.Writer, err error) {
 
 func isInspectUsageError(err error) bool {
 	var failure *inspect.Failure
-	return !errors.As(err, &failure)
+	if !errors.As(err, &failure) {
+		return true
+	}
+	return failure.Kind == inspect.FailureTypeUnsupported || failure.Kind == inspect.FailureTypeUnavailable
 }
 
 func printMissingConfigSuggestion(w io.Writer) {

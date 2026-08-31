@@ -31,7 +31,15 @@ type TargetType string
 
 const (
 	TargetSpring          TargetType = "spring"
+	TargetQuarkus         TargetType = "quarkus"
 	TargetStatliteMetrics TargetType = "statlite-metrics"
+)
+
+type CompatibilityStatus string
+
+const (
+	CompatibilityCompatible CompatibilityStatus = "compatible"
+	CompatibilityPartial    CompatibilityStatus = "partial"
 )
 
 // Result contains only information needed to render a suggested target.
@@ -40,6 +48,7 @@ type Result struct {
 	Endpoint     string
 	Capabilities []string
 	Warnings     []string
+	Status       CompatibilityStatus
 }
 
 // FailureKind describes the small set of outcomes the command layer needs to
@@ -47,11 +56,14 @@ type Result struct {
 type FailureKind string
 
 const (
-	FailureUnrecognized FailureKind = "unrecognized"
-	FailureIncomplete   FailureKind = "incomplete"
-	FailureAuthRequired FailureKind = "authentication_required"
-	FailureUnreachable  FailureKind = "unreachable"
-	FailureMultiple     FailureKind = "multiple_matches"
+	FailureUnrecognized    FailureKind = "unrecognized"
+	FailureIncomplete      FailureKind = "incomplete"
+	FailureAuthRequired    FailureKind = "authentication_required"
+	FailureUnreachable     FailureKind = "unreachable"
+	FailureIncompatible    FailureKind = "incompatible"
+	FailureMultiple        FailureKind = "multiple_matches"
+	FailureTypeUnsupported FailureKind = "type_unsupported"
+	FailureTypeUnavailable FailureKind = "type_unavailable"
 )
 
 // Failure reports why inspection could not produce one confident target.
@@ -101,6 +113,32 @@ func Application(ctx context.Context, rawURL string) (*Result, error) {
 		timeout: defaultTimeout,
 	}
 	return i.application(ctx, base)
+}
+
+// Inspect performs one explicit framework inspection. Application remains the
+// separate conservative untyped discovery entry point.
+func Inspect(ctx context.Context, targetType TargetType, rawURL string) (*Result, error) {
+	switch targetType {
+	case TargetSpring:
+		return inspectSpring(ctx, rawURL)
+	case TargetQuarkus:
+		return inspectQuarkus(ctx, rawURL)
+	default:
+		return nil, &Failure{
+			Kind: FailureTypeUnsupported,
+			Err:  fmt.Errorf("unsupported inspection type %q (supported: quarkus)", targetType),
+		}
+	}
+}
+
+// inspectSpring is the framework-owned boundary for Spring inspection. Spring
+// continues to use untyped discovery until its explicit source/Actuator
+// inspection contract is defined.
+func inspectSpring(context.Context, string) (*Result, error) {
+	return nil, &Failure{
+		Kind: FailureTypeUnavailable,
+		Err:  errors.New("typed inspection type \"spring\" is not available (supported: quarkus)"),
+	}
 }
 
 func (i *inspector) application(parent context.Context, base *url.URL) (*Result, error) {

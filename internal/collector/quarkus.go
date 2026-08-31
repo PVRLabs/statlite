@@ -24,6 +24,20 @@ type QuarkusCollector struct {
 	client     *prometheus.Client
 }
 
+var ErrQuarkusIncompatible = errors.New("Quarkus metrics endpoint does not expose a finite recognized runtime family")
+
+type QuarkusInspection struct {
+	Status       string
+	Capabilities []string
+	Warnings     []string
+}
+
+type quarkusEvaluation struct {
+	samples          []MetricSample
+	events           []CollectorEvent
+	processStartTime *time.Time
+}
+
 // quarkusHTTPValues retains fixed-size StatLite aggregates plus a bounded set
 // of label fingerprints used only to match timer count and sum populations.
 // Source labels and series are inspected while streaming and are not retained.
@@ -66,6 +80,27 @@ func NewQuarkusCollector(targetName, endpoint string, client *prometheus.Client)
 	return &QuarkusCollector{targetName: targetName, endpoint: endpoint, client: client}
 }
 
+func InspectQuarkus(ctx context.Context, endpoint string, client *prometheus.Client) (*QuarkusInspection, error) {
+	evaluation, err := NewQuarkusCollector("", endpoint, client).evaluate(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	inspection := &QuarkusInspection{Status: "compatible"}
+	for _, sample := range evaluation.samples {
+		inspection.Capabilities = append(inspection.Capabilities, sample.Key)
+	}
+	for _, event := range evaluation.events {
+		if event.Severity == EventSeverityWarning {
+			inspection.Warnings = append(inspection.Warnings, event.Message)
+		}
+	}
+	if len(inspection.Warnings) > 0 {
+		inspection.Status = "partial"
+	}
+	return inspection, nil
+}
+
 func (c *QuarkusCollector) Collect(ctx context.Context) (*CollectionResult, error) {
 	started := time.Now().UTC()
 	result := &CollectionResult{TargetName: c.targetName, PollStartedAt: started}
@@ -76,6 +111,25 @@ func (c *QuarkusCollector) Collect(ctx context.Context) (*CollectionResult, erro
 		return result, err
 	}
 
+	evaluation, err := c.evaluate(ctx)
+	if err != nil {
+		if errors.Is(err, ErrQuarkusIncompatible) {
+			result.addEvent(EventSeverityError, "metrics_source_incompatible", "", err.Error())
+		} else {
+			result.addEvent(EventSeverityError, "metrics_fetch_failed", "", err.Error())
+		}
+		return result, err
+	}
+	result.Samples = evaluation.samples
+	result.Events = evaluation.events
+	result.ProcessStartTime = evaluation.processStartTime
+	return result, nil
+}
+
+func (c *QuarkusCollector) evaluate(ctx context.Context) (*quarkusEvaluation, error) {
+	if c.client == nil || c.endpoint == "" {
+		return nil, errors.New("Quarkus metrics client is not configured")
+	}
 	httpValues := quarkusHTTPValues{completeCountLabels: true}
 	runtimeValues := quarkusRuntimeValues{}
 	_, err := c.client.Scrape(ctx, c.endpoint, func(sample prometheus.Sample) error {
@@ -105,19 +159,21 @@ func (c *QuarkusCollector) Collect(ctx context.Context) (*CollectionResult, erro
 		return nil
 	})
 	if err != nil {
-		wrapped := fmt.Errorf("scraping Quarkus metrics: %w", err)
-		result.addEvent(EventSeverityError, "metrics_fetch_failed", "", wrapped.Error())
-		return result, wrapped
+		return nil, fmt.Errorf("scraping Quarkus metrics: %w", err)
 	}
 	if !runtimeValues.compatible() {
-		err := errors.New("Quarkus metrics endpoint does not expose a finite recognized runtime family")
-		result.addEvent(EventSeverityError, "metrics_source_incompatible", "", err.Error())
-		return result, err
+		err := fmt.Errorf("%w", ErrQuarkusIncompatible)
+		return nil, err
 	}
-	httpValues.addTo(result)
-	runtimeValues.addTo(result)
-	addQuarkusPartialWarning(result, runtimeValues)
-	return result, nil
+	normalized := &CollectionResult{}
+	httpValues.addTo(normalized)
+	runtimeValues.addTo(normalized)
+	addQuarkusPartialWarning(normalized, runtimeValues)
+	return &quarkusEvaluation{
+		samples:          normalized.Samples,
+		events:           normalized.Events,
+		processStartTime: normalized.ProcessStartTime,
+	}, nil
 }
 
 func (v quarkusRuntimeValues) compatible() bool {

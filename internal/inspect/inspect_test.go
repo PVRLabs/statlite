@@ -455,6 +455,19 @@ func TestInspectorStopsAfterRedirectLimit(t *testing.T) {
 	}
 }
 
+func TestInspectDispatchesFrameworkTypesWithoutAddingSpringTypedBehavior(t *testing.T) {
+	_, err := Inspect(context.Background(), TargetSpring, "http://app.test")
+	assertFailureKind(t, err, FailureTypeUnavailable)
+	if !strings.Contains(err.Error(), "not available") || !strings.Contains(err.Error(), "supported: quarkus") {
+		t.Fatalf("Inspect(spring) error = %v, want unavailable type with current support", err)
+	}
+	_, err = Inspect(context.Background(), TargetType("prometheus"), "http://app.test")
+	assertFailureKind(t, err, FailureTypeUnsupported)
+	if !strings.Contains(err.Error(), "unsupported inspection type") || !strings.Contains(err.Error(), "supported: quarkus") || strings.Contains(err.Error(), "spring, quarkus") {
+		t.Fatalf("Inspect(prometheus) error = %v, want current typed support only", err)
+	}
+}
+
 func TestParseApplicationURLRejectsUnsafeForms(t *testing.T) {
 	for _, raw := range []string{
 		"ftp://app.test",

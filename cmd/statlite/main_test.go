@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -157,6 +158,29 @@ func TestRunInspectDispatchesWithoutLoadingConfig(t *testing.T) {
 	}
 }
 
+func TestRunTypedInspectDispatchesOnlyToRequestedTarget(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	var untypedCalls, typedCalls int
+	code := runWithInspectors([]string{"inspect", "--type", "quarkus", "http://app.test/q/metrics?scope=app"}, &stdout, &stderr,
+		func(context.Context, string) (*inspect.Result, error) {
+			untypedCalls++
+			return nil, errors.New("untyped inspector must not run")
+		},
+		func(_ context.Context, targetType inspect.TargetType, endpoint string) (*inspect.Result, error) {
+			typedCalls++
+			if targetType != inspect.TargetQuarkus || endpoint != "http://app.test/q/metrics?scope=app" {
+				t.Fatalf("typed inspection arguments = %q, %q", targetType, endpoint)
+			}
+			return &inspect.Result{TargetType: inspect.TargetQuarkus, Endpoint: endpoint, Status: inspect.CompatibilityPartial, Capabilities: []string{"jvm_heap_used_bytes"}}, nil
+		})
+	if code != 0 || untypedCalls != 0 || typedCalls != 1 {
+		t.Fatalf("code=%d untyped=%d typed=%d stdout=%q stderr=%q", code, untypedCalls, typedCalls, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Detected: Quarkus Metrics") || !strings.Contains(stdout.String(), "type: quarkus") || !strings.Contains(stdout.String(), "Compatibility: partial") {
+		t.Fatalf("stdout = %q, want typed Quarkus output", stdout.String())
+	}
+}
+
 func TestRenderInspectionSpringOutputAndConfigRoundTrip(t *testing.T) {
 	result := &inspect.Result{
 		TargetType:   inspect.TargetSpring,
@@ -248,6 +272,33 @@ func TestRenderInspectionStatliteMetricsOutputOmitsIrrelevantFields(t *testing.T
 	assertSuggestedConfigLoads(t, got, config.TargetTypeStatliteMetrics, "http://localhost:9090/statlite/metrics")
 }
 
+func TestRenderInspectionQuarkusOutputRoundTripsExactEndpoint(t *testing.T) {
+	result := &inspect.Result{
+		TargetType:   inspect.TargetQuarkus,
+		Endpoint:     "http://localhost:9000/q/metrics/?scope=app",
+		Status:       inspect.CompatibilityCompatible,
+		Capabilities: []string{"process_cpu_usage", "jvm_heap_used_bytes"},
+	}
+
+	got, err := renderInspection(result)
+	if err != nil {
+		t.Fatalf("renderInspection() error = %v", err)
+	}
+	for _, want := range []string{
+		"Detected: Quarkus Metrics",
+		"Compatibility: compatible",
+		"type: quarkus",
+		"url: http://localhost:9000/q/metrics/?scope=app",
+		"process_cpu_usage",
+		"jvm_heap_used_bytes",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("renderInspection() = %q, missing %q", got, want)
+		}
+	}
+	assertSuggestedConfigLoads(t, got, config.TargetTypeQuarkus, "http://localhost:9000/q/metrics/?scope=app")
+}
+
 func TestRunInspectFailuresUseExitOneAndPrintNoYAML(t *testing.T) {
 	for _, kind := range []inspect.FailureKind{
 		inspect.FailureAuthRequired,
@@ -267,6 +318,28 @@ func TestRunInspectFailuresUseExitOneAndPrintNoYAML(t *testing.T) {
 			}
 			if stdout.Len() != 0 || strings.Contains(stderr.String(), "targets:") {
 				t.Fatalf("stdout=%q stderr=%q, want failure without YAML", stdout.String(), stderr.String())
+			}
+		})
+	}
+}
+
+func TestRunInspectTypeErrorsUseAccurateUsageMessages(t *testing.T) {
+	tests := []struct {
+		targetType string
+		want       string
+	}{
+		{targetType: "prometheus", want: `unsupported inspection type "prometheus" (supported: quarkus)`},
+		{targetType: "spring", want: `typed inspection type "spring" is not available (supported: quarkus)`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.targetType, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := run([]string{"inspect", "--type", tt.targetType, "http://app.test"}, &stdout, &stderr)
+			if code != 2 {
+				t.Fatalf("run() exit code = %d, want 2; stderr=%q", code, stderr.String())
+			}
+			if stdout.Len() != 0 || !strings.Contains(stderr.String(), tt.want) || strings.Contains(stderr.String(), "invalid application URL") {
+				t.Fatalf("stdout=%q stderr=%q, want accurate type usage error", stdout.String(), stderr.String())
 			}
 		})
 	}
