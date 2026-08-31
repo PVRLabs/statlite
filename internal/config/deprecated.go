@@ -14,6 +14,16 @@ const targetTypeStatliteLegacy = "statlite"
 func (c *Config) upgradeDeprecatedTargets() {
 	for i := range c.Targets {
 		target := &c.Targets[i]
+		if target.Type == "" || target.Type == TargetTypeSpring {
+			if target.URL != "" && target.ActuatorBaseURL != "" {
+				continue
+			}
+			if target.ActuatorBaseURL != "" {
+				target.URL = target.ActuatorBaseURL
+				target.ActuatorBaseURL = ""
+				c.deprecationWarnings = append(c.deprecationWarnings, fmt.Sprintf("targets[%d].actuator_base_url is deprecated; use url instead", i))
+			}
+		}
 		if target.Type != targetTypeStatliteLegacy {
 			continue
 		}

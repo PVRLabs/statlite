@@ -13,7 +13,8 @@ targets:
   # Replace this with a real Spring Boot Actuator app.
   # `example.org` is just a placeholder and is not an ideal target.
   - name: "example-web"
-    actuator_base_url: "https://example.org/example-web/actuator"
+    type: "spring"
+    url: "https://example.org/example-web/actuator"
     auth:
       type: "basic"
       username: "admin"

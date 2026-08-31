@@ -15,6 +15,10 @@ import (
 const (
 	TargetTypeSpring          = "spring"
 	TargetTypeStatliteMetrics = "statlite-metrics"
+
+	SpringMetricsSourceAuto       = "auto"
+	SpringMetricsSourcePrometheus = "prometheus"
+	SpringMetricsSourceActuator   = "actuator"
 )
 
 type Config struct {
@@ -44,6 +48,7 @@ type TargetConfig struct {
 	Name               string      `yaml:"name"`
 	ActuatorBaseURL    string      `yaml:"actuator_base_url"`
 	URL                string      `yaml:"url"`
+	MetricsSource      string      `yaml:"metrics_source,omitempty"`
 	CollectHostMetrics bool        `yaml:"collect_host_metrics,omitempty"`
 	Auth               *AuthConfig `yaml:"auth,omitempty"`
 }
@@ -86,6 +91,12 @@ func Validate(cfg *Config) error {
 	if cfg == nil {
 		return fmt.Errorf("config is required")
 	}
+	for i, target := range cfg.Targets {
+		if (target.Type == "" || target.Type == TargetTypeSpring) && target.URL != "" && target.ActuatorBaseURL != "" {
+			return fmt.Errorf("targets[%d] configures both url and deprecated actuator_base_url; use only url", i)
+		}
+	}
+	cfg.deprecationWarnings = nil
 	cfg.upgradeDeprecatedTargets()
 	return cfg.validate()
 }
@@ -160,12 +171,20 @@ func (c *Config) validate() error {
 		}
 		switch targetType {
 		case TargetTypeSpring:
-			if t.ActuatorBaseURL == "" {
-				return fmt.Errorf("targets[%d].actuator_base_url is required", i)
+			if t.URL == "" {
+				return fmt.Errorf("targets[%d].url is required for type spring", i)
+			}
+			if t.MetricsSource == "" {
+				c.Targets[i].MetricsSource = SpringMetricsSourceAuto
+			} else if t.MetricsSource != SpringMetricsSourceAuto && t.MetricsSource != SpringMetricsSourcePrometheus && t.MetricsSource != SpringMetricsSourceActuator {
+				return fmt.Errorf("targets[%d].metrics_source: unsupported value %q (supported: auto, prometheus, actuator)", i, t.MetricsSource)
 			}
 		case TargetTypeStatliteMetrics:
 			if t.URL == "" {
 				return fmt.Errorf("targets[%d].url is required for type %s", i, targetType)
+			}
+			if t.MetricsSource != "" {
+				return fmt.Errorf("targets[%d].metrics_source is supported only for type spring", i)
 			}
 		default:
 			return fmt.Errorf("targets[%d].type: unsupported type %q (supported: spring, statlite-metrics)", i, targetType)
@@ -202,12 +221,7 @@ func (t TargetConfig) DisplayMetadata() TargetDisplayMetadata {
 }
 
 func (t TargetConfig) displayEndpoint() (string, string) {
-	switch t.Type {
-	case TargetTypeStatliteMetrics:
-		return t.URL, "url"
-	default:
-		return t.ActuatorBaseURL, "actuator_base_url"
-	}
+	return t.URL, "url"
 }
 
 func sanitizeEndpoint(endpoint string) string {

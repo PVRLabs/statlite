@@ -99,16 +99,27 @@ At least one target is required. Names must be unique.
 ```yaml
 targets:
   - name: "my-app"
-    actuator_base_url: "https://example.com/actuator"
+    type: "spring"
+    url: "https://example.com/actuator"
+    metrics_source: "auto"
     auth:
       type: "basic"
       username: "admin"
       password: "change-me"
 ```
 
-Omit `type` (or treat as the default Actuator target). StatLite polls Actuator
-health and a fixed set of Micrometer metrics and normalizes them for the
-dashboard.
+`url` is the Spring management base URL. StatLite derives the health and
+metrics endpoints from it. `type` may be omitted for compatibility with older
+Spring configurations, but new configuration should use explicit
+`type: "spring"`.
+
+`metrics_source` accepts `auto`, `prometheus`, or `actuator` and defaults to
+`auto` when omitted. Source selection is implemented in the Spring production
+metrics rollout; this setting establishes its configuration contract.
+
+The former `actuator_base_url` field remains a deprecated compatibility alias.
+StatLite logs a warning and treats it as `url`. Configuring both fields is an
+error, even when their values are identical.
 
 Missing optional metrics are handled gracefully: values may appear as `null` or charts may show gaps instead of failing the whole poll.
 
@@ -121,7 +132,8 @@ for that target:
 ```yaml
 targets:
   - name: "remote-app"
-    actuator_base_url: "https://remote.example.com/actuator"
+    type: "spring"
+    url: "https://remote.example.com/actuator"
     collect_host_metrics: true
 ```
 

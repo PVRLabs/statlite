@@ -22,13 +22,13 @@ func TestNewCollectorBuildsConfiguredTargetTypes(t *testing.T) {
 	}{
 		{
 			name:       "default spring",
-			target:     config.TargetConfig{Name: "spring", ActuatorBaseURL: "https://example.com/actuator"},
+			target:     config.TargetConfig{Name: "spring", URL: "https://example.com/actuator"},
 			wantType:   "spring",
 			wantTarget: "*collector.SpringActuatorCollector",
 		},
 		{
 			name:       "explicit spring",
-			target:     config.TargetConfig{Name: "spring", Type: config.TargetTypeSpring, ActuatorBaseURL: "https://example.com/actuator"},
+			target:     config.TargetConfig{Name: "spring", Type: config.TargetTypeSpring, URL: "https://example.com/actuator"},
 			wantType:   "spring",
 			wantTarget: "*collector.SpringActuatorCollector",
 		},

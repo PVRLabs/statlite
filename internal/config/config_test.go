@@ -118,7 +118,7 @@ targets:
 		t.Fatalf("expanded general config = %#v, want environment values", cfg)
 	}
 	target := cfg.Targets[0]
-	if target.Name != "from-env" || target.ActuatorBaseURL != "https://example.com/actuator" || target.Auth.Username != "admin" || target.Auth.Password != "secret" {
+	if target.Name != "from-env" || target.URL != "https://example.com/actuator" || target.ActuatorBaseURL != "" || target.Auth.Username != "admin" || target.Auth.Password != "secret" {
 		t.Fatalf("expanded target = %#v, want environment values", target)
 	}
 }
@@ -309,7 +309,7 @@ targets:
 		Name:           "app",
 		Type:           "spring",
 		Endpoint:       "http://example.com:8080/actuator",
-		EndpointSource: "actuator_base_url",
+		EndpointSource: "url",
 	}) {
 		t.Fatalf("DisplayMetadata() = %#v, want sanitized spring endpoint", metadata)
 	}

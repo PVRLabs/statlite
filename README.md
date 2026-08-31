@@ -93,7 +93,7 @@ polling:
 targets:
   - name: "app"
     type: "spring"
-    actuator_base_url: "http://localhost:8080/actuator"
+    url: "http://localhost:8080/actuator"
 ```
 
 For a new setup, save the configuration as `statlite.yaml`. If you already

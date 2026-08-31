@@ -262,10 +262,9 @@ type suggestedPollingConfig struct {
 }
 
 type suggestedTarget struct {
-	Name            string `yaml:"name"`
-	Type            string `yaml:"type"`
-	ActuatorBaseURL string `yaml:"actuator_base_url,omitempty"`
-	URL             string `yaml:"url,omitempty"`
+	Name string `yaml:"name"`
+	Type string `yaml:"type"`
+	URL  string `yaml:"url,omitempty"`
 }
 
 type suggestedConfig struct {
@@ -309,13 +308,13 @@ func renderSuggestedConfig(result *inspect.Result) (string, error) {
 			Server:  suggestedServerConfig{Listen: "127.0.0.1:9090"},
 			Storage: suggestedStorageConfig{SQLitePath: "./statlite.sqlite"},
 			Polling: suggestedPollingConfig{Interval: "30s"},
-			Targets: []suggestedTarget{{Name: "app", Type: "spring", ActuatorBaseURL: result.Endpoint}},
+			Targets: []suggestedTarget{{Name: "app", Type: "spring", URL: result.Endpoint}},
 		}
 		validation := config.Config{
 			Server:  config.ServerConfig{Listen: "127.0.0.1:9090"},
 			Storage: config.StorageConfig{SQLitePath: "./statlite.sqlite"},
 			Polling: config.PollingConfig{Interval: "30s"},
-			Targets: []config.TargetConfig{{Name: "app", Type: config.TargetTypeSpring, ActuatorBaseURL: result.Endpoint}},
+			Targets: []config.TargetConfig{{Name: "app", Type: config.TargetTypeSpring, URL: result.Endpoint}},
 		}
 		if err := config.Validate(&validation); err != nil {
 			return "", fmt.Errorf("spring target: %w", err)

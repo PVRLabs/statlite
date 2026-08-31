@@ -13,7 +13,8 @@ polling:
 
 targets:
   - name: "my-app"
-    actuator_base_url: "https://example.com/actuator"
+    type: "spring"
+    url: "https://example.com/actuator"
     auth:
       type: "basic"
       # Prefer environment variables so credentials are not stored in this file.

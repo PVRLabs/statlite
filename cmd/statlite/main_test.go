@@ -149,7 +149,7 @@ func TestRunInspectDispatchesWithoutLoadingConfig(t *testing.T) {
 	if !strings.Contains(output, "Detected: Spring Boot Actuator") {
 		t.Fatalf("stdout = %q, want inspection result", stdout.String())
 	}
-	if !strings.Contains(output, "----- BEGIN statlite.yaml -----") || !strings.Contains(output, "actuator_base_url: http://app.test/actuator") || !strings.Contains(output, "New setup: save only the YAML between the markers as statlite.yaml.") {
+	if !strings.Contains(output, "----- BEGIN statlite.yaml -----") || !strings.Contains(output, "url: http://app.test/actuator") || !strings.Contains(output, "New setup: save only the YAML between the markers as statlite.yaml.") {
 		t.Fatalf("stdout = %q, want suggested YAML and next step", output)
 	}
 	if stderr.Len() != 0 {
@@ -189,7 +189,7 @@ polling:
 targets:
     - name: app
       type: spring
-      actuator_base_url: https://example.test/service/actuator
+      url: https://example.test/service/actuator
 ----- END statlite.yaml -----
 
 Next:
@@ -274,7 +274,7 @@ func TestRunInspectFailuresUseExitOneAndPrintNoYAML(t *testing.T) {
 
 func TestRenderInspectionRejectsInvalidSuggestedConfig(t *testing.T) {
 	_, err := renderInspection(&inspect.Result{TargetType: inspect.TargetSpring})
-	if err == nil || !strings.Contains(err.Error(), "actuator_base_url is required") {
+	if err == nil || !strings.Contains(err.Error(), "url is required") {
 		t.Fatalf("renderInspection() error = %v, want config validation error", err)
 	}
 }
@@ -303,7 +303,7 @@ func assertSuggestedConfigLoads(t *testing.T, output string, targetType, endpoin
 	}
 	gotEndpoint := cfg.Targets[0].URL
 	if targetType == config.TargetTypeSpring {
-		gotEndpoint = cfg.Targets[0].ActuatorBaseURL
+		gotEndpoint = cfg.Targets[0].URL
 	}
 	if gotEndpoint != endpoint {
 		t.Fatalf("endpoint = %q, want %q", gotEndpoint, endpoint)

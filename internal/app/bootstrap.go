@@ -47,7 +47,7 @@ func newCollector(target config.TargetConfig, timeout time.Duration) (monitor.Co
 				Password: target.Auth.Password,
 			}
 		}
-		actuatorClient, err := collector.NewActuatorClient(target.ActuatorBaseURL, timeout, auth)
+		actuatorClient, err := collector.NewActuatorClient(target.URL, timeout, auth)
 		if err != nil {
 			return nil, fmt.Errorf("actuator client: %w", err)
 		}
