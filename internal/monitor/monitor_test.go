@@ -115,6 +115,23 @@ func TestPollNowDetectsRestartAfterMonitorRecreation(t *testing.T) {
 	}
 }
 
+func TestPollNowPreservesIncreasingCountersAcrossMonitorRecreation(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+	started := time.Date(2026, 7, 7, 9, 0, 0, 0, time.UTC)
+	first, err := newTestMonitor(t, store, &sequenceCollector{results: []collectResult{{result: successfulResult(started, 100, 10)}}}).PollNow(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := newTestMonitor(t, store, &sequenceCollector{results: []collectResult{{result: successfulResult(started, 150, 15)}}}).PollNow(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.AppRunID == nil || second.AppRunID == nil || *first.AppRunID != *second.AppRunID {
+		t.Fatalf("app run ids = %v, %v; want continuity across collector recreation", first.AppRunID, second.AppRunID)
+	}
+}
+
 func TestPollNowDetectsUptimeRestartAfterMonitorRecreation(t *testing.T) {
 	store := openTestStore(t)
 	defer store.Close()

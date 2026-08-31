@@ -4,11 +4,14 @@ package app
 
 import (
 	"fmt"
+	"net/url"
+	"path"
 	"time"
 
 	"github.com/pvrlabs/statlite/internal/collector"
 	"github.com/pvrlabs/statlite/internal/config"
 	"github.com/pvrlabs/statlite/internal/monitor"
+	"github.com/pvrlabs/statlite/internal/prometheus"
 	"github.com/pvrlabs/statlite/internal/storage"
 )
 
@@ -51,7 +54,19 @@ func newCollector(target config.TargetConfig, timeout time.Duration) (monitor.Co
 		if err != nil {
 			return nil, fmt.Errorf("actuator client: %w", err)
 		}
-		return collector.NewSpringActuatorCollector(target.Name, actuatorClient, target.CollectHostMetrics), nil
+		prometheusClient, err := prometheus.NewClient(timeout, prometheus.DefaultLimits, prometheusAuth(auth))
+		if err != nil {
+			return nil, fmt.Errorf("prometheus client: %w", err)
+		}
+		prometheusURL, err := springEndpoint(target.URL, "prometheus")
+		if err != nil {
+			return nil, fmt.Errorf("prometheus endpoint: %w", err)
+		}
+		source := target.MetricsSource
+		if source == "" {
+			source = config.SpringMetricsSourceAuto
+		}
+		return collector.NewSpringCollector(target.Name, actuatorClient, prometheusClient, prometheusURL, collector.SpringMetricsSource(source), target.CollectHostMetrics)
 	case config.TargetTypeStatliteMetrics:
 		client, err := collector.NewStatliteMetricsClient(target.URL, timeout)
 		if err != nil {
@@ -61,4 +76,22 @@ func newCollector(target config.TargetConfig, timeout time.Duration) (monitor.Co
 	default:
 		return nil, fmt.Errorf("unsupported target type %q", target.Type)
 	}
+}
+
+func prometheusAuth(auth *collector.BasicAuth) *prometheus.BasicAuth {
+	if auth == nil {
+		return nil
+	}
+	return &prometheus.BasicAuth{Username: auth.Username, Password: auth.Password}
+}
+
+func springEndpoint(base, endpoint string) (string, error) {
+	u, err := url.Parse(base)
+	if err != nil {
+		return "", err
+	}
+	u.Path = path.Join(u.Path, endpoint)
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String(), nil
 }

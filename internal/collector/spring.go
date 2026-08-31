@@ -12,13 +12,29 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/pvrlabs/statlite/internal/prometheus"
+)
+
+type SpringMetricsSource string
+
+const (
+	SpringMetricsSourceAuto       SpringMetricsSource = "auto"
+	SpringMetricsSourcePrometheus SpringMetricsSource = "prometheus"
+	SpringMetricsSourceActuator   SpringMetricsSource = "actuator"
 )
 
 type SpringActuatorCollector struct {
 	targetName         string
 	client             *ActuatorClient
 	collectHostMetrics bool
+	prometheusClient   *prometheus.Client
+	prometheusURL      string
+
+	mu             sync.Mutex
+	selectedSource SpringMetricsSource
 }
 
 type springPollSession struct {
@@ -138,10 +154,27 @@ func NewSpringActuatorCollector(targetName string, client *ActuatorClient, colle
 		targetName:         targetName,
 		client:             client,
 		collectHostMetrics: collectHostMetrics,
+		selectedSource:     SpringMetricsSourceActuator,
 	}
 }
 
+func NewSpringCollector(targetName string, client *ActuatorClient, prometheusClient *prometheus.Client, prometheusURL string, source SpringMetricsSource, collectHostMetrics bool) (*SpringActuatorCollector, error) {
+	if source != SpringMetricsSourceAuto && source != SpringMetricsSourcePrometheus && source != SpringMetricsSourceActuator {
+		return nil, fmt.Errorf("unsupported Spring metrics source %q", source)
+	}
+	collector := &SpringActuatorCollector{
+		targetName: targetName, client: client, collectHostMetrics: collectHostMetrics,
+		prometheusClient: prometheusClient, prometheusURL: prometheusURL,
+	}
+	if source != SpringMetricsSourceAuto {
+		collector.selectedSource = source
+	}
+	return collector, nil
+}
+
 func (c *SpringActuatorCollector) Collect(ctx context.Context) (*CollectionResult, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	started := time.Now().UTC()
 	result := &CollectionResult{
 		TargetName:    c.targetName,
@@ -166,6 +199,12 @@ func (c *SpringActuatorCollector) Collect(ctx context.Context) (*CollectionResul
 	result.HealthStatus = health.Status
 	result.DBHealthStatus = health.DBStatus()
 
+	c.collectMetrics(ctx, session, result)
+
+	return result, nil
+}
+
+func (c *SpringActuatorCollector) collectActuatorMetrics(ctx context.Context, session *springPollSession, result *CollectionResult) {
 	c.collectHTTP(ctx, session, result)
 	c.collectGauge(ctx, session, result, "jvm_heap_used_bytes", "jvm.memory.used", []string{"area:heap"}, "VALUE", "bytes")
 	c.collectGauge(ctx, session, result, "process_cpu_usage", "process.cpu.usage", nil, "VALUE", "ratio")
@@ -173,8 +212,6 @@ func (c *SpringActuatorCollector) Collect(ctx context.Context) (*CollectionResul
 		c.collectHostResources(ctx, session, result)
 	}
 	c.collectProcessStartTime(ctx, session, result)
-
-	return result, nil
 }
 
 func (c *SpringActuatorCollector) collectHostResources(ctx context.Context, session *springPollSession, result *CollectionResult) {

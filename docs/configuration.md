@@ -114,8 +114,12 @@ Spring configurations, but new configuration should use explicit
 `type: "spring"`.
 
 `metrics_source` accepts `auto`, `prometheus`, or `actuator` and defaults to
-`auto` when omitted. Source selection is implemented in the Spring production
-metrics rollout; this setting establishes its configuration contract.
+`auto` when omitted. `auto` prefers a compatible Spring Prometheus endpoint and
+falls back to Actuator metrics only when the endpoint is absent or returns a
+valid but incompatible exposition. Authentication, transient, malformed, and
+resource-limit failures are retried without changing sources. Once selected,
+the source remains fixed until the target collector is recreated. Health is
+always collected independently from the Actuator health endpoint.
 
 The former `actuator_base_url` field remains a deprecated compatibility alias.
 StatLite logs a warning and treats it as `url`. Configuring both fields is an
