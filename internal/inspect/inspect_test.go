@@ -141,6 +141,70 @@ func TestInspectorRejectsUnrelatedMalformedAndUnknownResponses(t *testing.T) {
 	}
 }
 
+func TestUntypedInspectorDoesNotRecognizeQuarkusPayload(t *testing.T) {
+	var paths []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		if r.URL.Path != "/q/metrics" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		fmt.Fprint(w, `http_server_requests_seconds_count{method="GET",outcome="SUCCESS",status="200",uri="/"} 2
+http_server_requests_seconds_sum{method="GET",outcome="SUCCESS",status="200",uri="/"} 0.5
+process_start_time_seconds 1770000000
+`)
+	}))
+	defer server.Close()
+
+	endpoint := server.URL + "/q/metrics"
+	_, err := Application(context.Background(), endpoint)
+	assertFailureKind(t, err, FailureUnrecognized)
+	if got := strings.Join(paths, ","); got != "/q/metrics/actuator/health,/q/metrics/statlite/metrics,/q/metrics" {
+		t.Fatalf("untyped paths = %q, want three existing logical probes", got)
+	}
+
+	result, err := Inspect(context.Background(), TargetQuarkus, endpoint)
+	if err != nil {
+		t.Fatalf("typed Inspect() error = %v", err)
+	}
+	if result.TargetType != TargetQuarkus || result.Endpoint != endpoint {
+		t.Fatalf("typed result = %#v, want Quarkus at exact endpoint", result)
+	}
+	if got := strings.Join(paths, ","); got != "/q/metrics/actuator/health,/q/metrics/statlite/metrics,/q/metrics,/q/metrics" {
+		t.Fatalf("all paths = %q, want three untyped probes followed by one typed scrape", got)
+	}
+}
+
+func TestUntypedInspectorDoesNotRecognizePrometheusExposition(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "generic Micrometer families", body: "jvm_memory_used_bytes{area=\"heap\"} 1024\nprocess_cpu_usage 0.25\n"},
+		{name: "unrelated OpenMetrics", body: "# TYPE exporter_jobs gauge\nexporter_jobs 3\n# EOF\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var paths []string
+			i := testInspector(func(req *http.Request) (int, string) {
+				paths = append(paths, req.URL.Path)
+				return http.StatusOK, tt.body
+			})
+			base, err := parseApplicationURL("http://app.test/metrics")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = i.application(context.Background(), base)
+			assertFailureKind(t, err, FailureUnrecognized)
+			if got := strings.Join(paths, ","); got != "/metrics/actuator/health,/metrics/statlite/metrics,/metrics" {
+				t.Fatalf("paths = %q, want unchanged fixed probe order", got)
+			}
+		})
+	}
+}
+
 func TestInspectorRejectsMultipleSupportedIntegrations(t *testing.T) {
 	var paths []string
 	i := testInspector(func(req *http.Request) (int, string) {
@@ -150,6 +214,9 @@ func TestInspectorRejectsMultipleSupportedIntegrations(t *testing.T) {
 			return http.StatusOK, `{"status":"UP"}`
 		case "/statlite/metrics":
 			return http.StatusOK, `{"schema":"statlite-metrics/v1","status":"UP"}`
+		case "/q/metrics":
+			t.Fatal("untyped inspection must not probe Quarkus metrics")
+			return 0, ""
 		default:
 			t.Fatalf("unexpected path %q", req.URL.Path)
 			return 0, ""
@@ -162,8 +229,8 @@ func TestInspectorRejectsMultipleSupportedIntegrations(t *testing.T) {
 
 	_, err = i.application(context.Background(), base)
 	assertFailureKind(t, err, FailureMultiple)
-	if len(paths) != 2 {
-		t.Fatalf("paths = %#v, want no capability probe after multiple match", paths)
+	if got := strings.Join(paths, ","); got != "/actuator/health,/statlite/metrics" {
+		t.Fatalf("paths = %q, want unchanged ambiguity handling with no Quarkus probe", got)
 	}
 }
 
