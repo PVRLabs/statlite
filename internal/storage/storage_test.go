@@ -865,14 +865,23 @@ func TestSeriesOmitsCounterDeltasOnResetAndAppRunChange(t *testing.T) {
 
 	saveSeriesPoll(t, store, firstRunID, time.Date(2026, 7, 7, 10, 0, 0, 0, time.UTC), map[string]float64{
 		"http_requests_total":             100,
+		"http_404_total":                  8,
+		"http_4xx_total":                  12,
+		"http_5xx_total":                  4,
 		"http_request_time_total_seconds": 20,
 	})
 	saveSeriesPoll(t, store, firstRunID, time.Date(2026, 7, 7, 10, 1, 0, 0, time.UTC), map[string]float64{
 		"http_requests_total":             90,
+		"http_404_total":                  1,
+		"http_4xx_total":                  2,
+		"http_5xx_total":                  1,
 		"http_request_time_total_seconds": 22,
 	})
 	saveSeriesPoll(t, store, secondRunID, time.Date(2026, 7, 7, 10, 2, 0, 0, time.UTC), map[string]float64{
 		"http_requests_total":             5,
+		"http_404_total":                  0,
+		"http_4xx_total":                  0,
+		"http_5xx_total":                  0,
 		"http_request_time_total_seconds": 1,
 	})
 
@@ -889,11 +898,17 @@ func TestSeriesOmitsCounterDeltasOnResetAndAppRunChange(t *testing.T) {
 	if series.Points[0].AverageLatencySeconds != nil {
 		t.Fatalf("reset latency = %v, want nil", *series.Points[0].AverageLatencySeconds)
 	}
+	if series.Points[0].HTTP404 != nil || series.Points[0].HTTP4xx != nil || series.Points[0].HTTP5xx != nil {
+		t.Fatalf("reset status deltas = (%v, %v, %v), want nil", series.Points[0].HTTP404, series.Points[0].HTTP4xx, series.Points[0].HTTP5xx)
+	}
 	if series.Points[1].Requests != nil {
 		t.Fatalf("new run requests delta = %v, want nil", *series.Points[1].Requests)
 	}
 	if series.Points[1].AverageLatencySeconds != nil {
 		t.Fatalf("new run latency = %v, want nil", *series.Points[1].AverageLatencySeconds)
+	}
+	if series.Points[1].HTTP404 != nil || series.Points[1].HTTP4xx != nil || series.Points[1].HTTP5xx != nil {
+		t.Fatalf("new run status deltas = (%v, %v, %v), want nil", series.Points[1].HTTP404, series.Points[1].HTTP4xx, series.Points[1].HTTP5xx)
 	}
 }
 
