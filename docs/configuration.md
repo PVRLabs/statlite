@@ -1,8 +1,9 @@
 # Configuration
 
-StatLite supports Spring Boot Actuator and the canonical fixed StatLite Metrics
-JSON profile for small applications that need basic health, traffic, latency,
-CPU, and runtime memory monitoring without a full observability stack.
+StatLite supports Spring Boot Actuator, Quarkus Micrometer metrics, and the
+canonical fixed StatLite Metrics JSON profile for small applications that need
+basic health, traffic, latency, CPU, and runtime memory monitoring without a full
+observability stack.
 StatLite is not a Prometheus/Grafana replacement.
 
 StatLite loads `statlite.yaml` by default. Override with `--config`:
@@ -14,7 +15,7 @@ statlite --config /etc/statlite/config.yaml
 ```
 
 See [`docs/integrations.md`](integrations.md) for the supported integration
-matrix. See `examples/` for starter templates (Actuator, StatLite Metrics, multi-target,
+matrix. See `examples/` for starter templates (Actuator, Quarkus, StatLite Metrics, multi-target,
 self-monitoring), `examples/python-fastapi-demo/` for a runnable FastAPI app,
 and `examples/spring-actuator-demo/` for a standalone Spring Boot demo app.
 
@@ -35,13 +36,29 @@ command; for a new setup, save the printed configuration as `statlite.yaml`.
 With an existing configuration, copy only the target entry into its `targets`
 list before running StatLite.
 
+Untyped inspection does not probe or identify Quarkus. A Quarkus metrics scrape
+uses generic Micrometer families, so its path and content type are not reliable
+framework evidence. Select the target explicitly and provide the exact
+exposition endpoint:
+
+```bash
+statlite inspect --type quarkus 'http://localhost:9000/q/metrics'
+```
+
+Typed Quarkus inspection performs one bounded Prometheus/OpenMetrics scrape and
+reports normalized capabilities. It accepts a complete or partial contract;
+invalid optional concepts are reported as warnings. It does not create monitor
+or storage state. Typed Quarkus inspection uses the supplied metrics endpoint
+as-is.
+
 > [!IMPORTANT]
-> Quote browser-pasted URLs, especially URLs containing `?` or `&`. Inspection
-> accepts only an absolute HTTP or HTTPS application URL without a query string,
-> fragment, or user information. It is bounded, read-only, and does not load
-> configuration, create SQLite state, or start monitoring. It does not support
-> authentication flags. Authentication-required, unreachable, timed-out,
-> malformed, unknown, or ambiguous responses produce an error without YAML.
+> Quote browser-pasted URLs, especially URLs containing `?` or `&`. Untyped
+> inspection requires a base HTTP or HTTPS URL without a query string or
+> fragment. It also rejects user information. It is bounded, read-only, and
+> does not load configuration, create SQLite state, or start monitoring. It does
+> not support authentication flags. Authentication-required, unreachable,
+> timed-out, malformed, unknown, or ambiguous responses produce an error without
+> YAML.
 
 ## Server
 
@@ -147,6 +164,34 @@ resulting CPU and disk values describe the execution environment visible to
 the Spring Boot process, which may be a container rather than the physical
 host.
 
+### Quarkus Micrometer metrics
+
+```yaml
+targets:
+  - name: "orders"
+    type: "quarkus"
+    url: "http://localhost:9000/q/metrics"
+```
+
+For Quarkus, `url` is the exact Prometheus/OpenMetrics exposition endpoint, not
+a management base URL. StatLite performs one bounded scrape per polling cycle
+and uses the poll time rather than exposition timestamps. The pinned contract
+is Quarkus 3.39.1 with Java 21 LTS and
+`quarkus-micrometer-registry-prometheus`.
+
+The adapter normalizes only these existing StatLite concepts: HTTP request
+count, request duration, 404/4xx/5xx counts, process CPU ratio, heap used bytes,
+process start time, and optional uptime. Request dimensions, histogram buckets,
+exemplars, timestamps, and unrelated metric families are discarded before
+persistence. HTTP meters can be absent while an idle application remains
+compatible when a finite CPU, heap, or process-start family is present.
+
+Quarkus targets do not request or infer application health, database health, or
+host resources. A successful scrape therefore leaves `health_status` and
+`db_health_status` unavailable, and host metrics are not populated. Missing
+optional concepts produce partial data and focused warnings; an endpoint without
+a usable required runtime family is incompatible.
+
 ### Basic Auth
 
 ```yaml
@@ -156,7 +201,10 @@ auth:
   password: "${STATLITE_ACTUATOR_PASSWORD}"
 ```
 
-Only `basic` is supported in the MVP. Prefer environment variables for credentials, so they are not stored in plaintext YAML. Export them before starting StatLite (or set them with your service manager):
+Only `basic` is supported in the MVP. The same `auth` block applies to Quarkus
+metrics endpoints as well as Spring endpoints. Prefer environment variables for
+credentials, so they are not stored in plaintext YAML. Export them before
+starting StatLite (or set them with your service manager):
 
 ```bash
 export STATLITE_ACTUATOR_USERNAME="admin"
@@ -241,6 +289,7 @@ Selected target and time range are stored in the query string, so you can bookma
 | `examples/actuator.yaml` | Single Spring Boot Actuator target with Basic Auth placeholders |
 | `examples/statlite.yaml` | Monitor another StatLite instance with `statlite-metrics` |
 | `examples/multi-target.yaml` | Illustrative multi-target mix (Actuator + StatLite Metrics + self) |
+| `examples/quarkus-metrics-demo/` | Pinned Quarkus Micrometer metrics fixture and traffic recipe |
 | `examples/python-fastapi-demo/` | Runnable FastAPI StatLite Metrics v1 demo |
 | `examples/spring-actuator-demo/` | Standalone Spring Boot demo app that emits Actuator and Micrometer metrics |
 

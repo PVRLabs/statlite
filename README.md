@@ -7,7 +7,8 @@
 
 A lightweight, self-hosted metrics dashboard with a small memory and operational
 footprint, designed for applications running on VPSs and small servers. A single
-Go binary monitors Spring Boot applications through Actuator and other
+Go binary monitors Spring Boot applications through Actuator, Quarkus applications
+through Micrometer metrics, and other
 applications that expose [a small, fixed JSON metrics
 endpoint](docs/statlite-metrics-v1.md), without requiring Prometheus or Grafana.
 It stores focused health, traffic, latency, CPU, memory, and optional host metrics
@@ -68,14 +69,22 @@ statlite inspect 'http://localhost:8080'
 
 The command checks the conventional Spring Boot Actuator and StatLite Metrics
 v1 paths, then prints the detected endpoint, available capabilities, a minimal
-configuration, and the next command. It is bounded and read-only: it does not
+configuration, and the next command. It does not probe Quarkus automatically,
+because a generic Micrometer scrape does not provide reliable framework identity.
+Use typed inspection with the exact metrics endpoint:
+
+```bash
+statlite inspect --type quarkus 'http://localhost:9000/q/metrics'
+```
+
+Inspection is bounded and read-only: it does not
 require or create
 `statlite.yaml`, open SQLite, or start monitoring.
 
 > [!IMPORTANT]
-> Quote browser-pasted URLs, especially URLs containing `?` or `&`. Inspection
-> requires a base HTTP or HTTPS URL, so remove any query string or fragment
-> first.
+> Quote browser-pasted URLs, especially URLs containing `?` or `&`. Untyped
+> inspection requires a base HTTP or HTTPS URL without a query string or
+> fragment.
 
 For a new Spring application, the successful output includes a complete
 minimal configuration:
@@ -106,7 +115,7 @@ statlite
 
 See [Configuration](docs/configuration.md) for discovery limits, authentication
 limitations, all settings, and manual target configuration. See [`examples/`](examples/)
-for Spring Boot, Python/FastAPI, self-monitoring, and multi-target configurations.
+for Spring Boot, Quarkus, Python/FastAPI, self-monitoring, and multi-target configurations.
 
 > [!IMPORTANT]
 > StatLite has no built-in dashboard or API authentication. Review the
@@ -117,6 +126,8 @@ for Spring Boot, Python/FastAPI, self-monitoring, and multi-target configuration
 
 - **Spring Boot Actuator:** Collects health, request, JVM, process, and optional
   host metrics from Actuator endpoints.
+- **Quarkus Micrometer:** Collects bounded request, latency, CPU, heap, process,
+  and restart concepts from the exact `/q/metrics` Prometheus/OpenMetrics endpoint.
 - **[StatLite Metrics v1](docs/statlite-metrics-v1.md):** A small, fixed JSON
   endpoint that applications in any language or framework can implement.
 - **StatLite self-monitoring:** StatLite can report its own health, traffic,

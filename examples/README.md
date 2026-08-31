@@ -24,6 +24,7 @@ go run ./cmd/statlite --config examples/actuator.yaml
 | Directory | What it shows |
 |-----------|---------------|
 | [spring-actuator-demo](spring-actuator-demo/) | Runnable Spring Boot app with Actuator and Micrometer metrics, traffic generator, and dashboard preview |
+| [quarkus-metrics-demo](quarkus-metrics-demo/) | Pinned Quarkus 3.39.1 Micrometer metrics fixture, contract captures, and traffic recipe |
 | [python-fastapi-demo](python-fastapi-demo/) | FastAPI app exposing `statlite-metrics/v1` with a copyable middleware helper and tests |
 
 Each demo directory has its own README with run and verification steps.

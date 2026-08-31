@@ -56,7 +56,7 @@ and retention cost, dashboard behavior, and long-term compatibility.
 
 ### Currently supported targets
 
-StatLite has two supported target types:
+StatLite has three supported target types:
 
 * `spring`: Spring Boot Actuator and a fixed set of Micrometer metrics. This
   is the default target type when `type` is omitted.
@@ -64,8 +64,11 @@ StatLite has two supported target types:
   for StatLite and external profile producers. See the
   [producer-facing specification](statlite-metrics-v1.md) for its endpoint
   contract.
-Spring and StatLite Metrics are application integrations. None of these
-boundaries is an arbitrary metrics API.
+* `quarkus`: Quarkus Micrometer Prometheus/OpenMetrics metrics at an exact
+  configured exposition endpoint. It normalizes a fixed request, latency,
+  process, heap, and restart vocabulary.
+Spring, Quarkus, and StatLite Metrics are application integrations. None of
+these boundaries is an arbitrary metrics API.
 
 ### Framework-first integration model
 
@@ -97,8 +100,8 @@ public target contracts.
 
 ## Deployment topology
 
-For a collocated deployment, configure application targets (`spring` or
-`statlite-metrics`) for application and process data, and `statlite-self`
+For a collocated deployment, configure application targets (`spring`, `quarkus`,
+or `statlite-metrics`) for application and process data, and `statlite-self`
 through `/statlite/metrics` to monitor StatLite itself. The self response also
 provides the local host CPU, memory, and SQLite-filesystem disk capacity, so
 one target presents StatLite's application, process, and host resources.
@@ -264,10 +267,9 @@ reliably recognizable Go runtime and process concepts. Generic Go does not
 imply application HTTP traffic, error, or latency support. Gin and Fiber are
 the first intended framework-specific Go targets and may extend the Go
 baseline with HTTP concepts only after their recommended instrumentation
-contracts are investigated and certified. Quarkus is likewise planned as a
-framework target backed internally by reusable Micrometer normalization.
+contracts are investigated and certified.
 
-`go`, `gin`, `fiber`, and `quarkus` are not currently supported target types.
-Their planned adapters may reuse bounded Prometheus/OpenMetrics parsing, but
-this direction does not imply generic Prometheus compatibility or authorize
-arbitrary metric ingestion.
+`go`, `gin`, and `fiber` are not currently supported target types. Their planned
+adapters may reuse bounded Prometheus/OpenMetrics parsing, but this direction
+does not imply generic Prometheus compatibility or authorize arbitrary metric
+ingestion.

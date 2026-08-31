@@ -16,3 +16,20 @@ The fixture deliberately emits successful, 404, other 4xx, and 5xx requests.
 Restart the process between scrapes to verify process identity and counter-reset
 handling. Raw captures belong in `contract/`; generated logs and Maven output
 are not committed.
+
+Configure the application with the exact management metrics endpoint:
+
+```yaml
+targets:
+  - name: orders
+    type: quarkus
+    url: http://localhost:9000/q/metrics
+```
+
+StatLite accepts the bounded Micrometer Prometheus/OpenMetrics contract and
+normalizes request count and duration, 404/4xx/5xx counts, process CPU, heap
+used, process start time, and optional uptime. HTTP meters are lazy, so an idle
+application can still be compatible through its runtime families. Quarkus
+targets do not provide application or database health fields and do not infer
+host resources. Use `statlite inspect --type quarkus` with the exact endpoint;
+untyped discovery intentionally does not probe `/q/metrics`.

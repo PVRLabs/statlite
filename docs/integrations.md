@@ -12,7 +12,7 @@ not a generic Prometheus scraper or metrics database.
 | Spring Boot 4.0.x | Supported | Actuator JSON; Micrometer Prometheus/OpenMetrics | Spring Boot Actuator | Both sources are collected through the `spring` target. |
 | Spring Boot Actuator | Supported | Actuator JSON | `/actuator` management base URL | Health, application request, JVM, process, and optional host concepts are normalized into StatLite's fixed vocabulary. |
 | Spring Micrometer Prometheus | Supported | Prometheus/OpenMetrics exposition | Configured Prometheus endpoint | This is a Spring source option, not a generic `prometheus` target. |
-| Quarkus 3.39.x | In development | Micrometer Prometheus/OpenMetrics exposition | `/q/metrics` | Collection is being added as the explicit `quarkus` target. The pinned fixture uses Java 21 LTS. |
+| Quarkus 3.39.x | Supported | Micrometer Prometheus/OpenMetrics exposition | Exact `/q/metrics` endpoint | Explicit `quarkus` target; the pinned fixture uses Java 21 LTS. Health and host metrics are not inferred. |
 | StatLite Metrics v1 | Supported | Fixed `statlite-metrics/v1` response | `/statlite/metrics` | Fixed producer contract for StatLite and compatible applications. |
 
 Support means that the integration has an owned endpoint and source contract,
@@ -31,12 +31,20 @@ source selection described in [configuration](configuration.md).
 
 ## Quarkus
 
-Quarkus support is being implemented as a framework-first `type: quarkus`
-target. Its `url` will be the exact metrics exposition endpoint, conventionally
+Quarkus is a framework-first `type: quarkus` target. Its `url` is the exact
+metrics exposition endpoint, conventionally
 `http://localhost:9000/q/metrics`, rather than a management base URL. The
-adapter will accept only the documented, bounded Quarkus/Micrometer contract;
-it will not persist arbitrary source dimensions or infer health or host metrics
+adapter accepts only the documented, bounded Quarkus/Micrometer contract; it
+does not persist arbitrary source dimensions or infer health or host metrics
 from a successful scrape.
+
+The normalized concepts are HTTP request count and duration, 404/4xx/5xx
+counts, process CPU, heap used, process start time, and optional uptime. HTTP
+meters are lazy, so an idle endpoint can be compatible with finite runtime
+families alone. Typed inspection is selected with
+`statlite inspect --type quarkus <metrics-endpoint>`; untyped discovery does not
+probe or claim Quarkus because generic Micrometer exposition does not prove
+framework identity. Basic Auth uses the shared `auth.type: basic` configuration.
 
 The public pinned fixture is
 [`examples/quarkus-metrics-demo/`](../examples/quarkus-metrics-demo/). It uses
