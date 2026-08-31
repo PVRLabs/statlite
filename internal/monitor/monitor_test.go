@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pvrlabs/statlite/internal/collector"
+	"github.com/pvrlabs/statlite/internal/prometheus"
 	"github.com/pvrlabs/statlite/internal/storage"
 )
 
@@ -79,6 +80,52 @@ func TestPollNowDetectsRestartWhenProcessStartTimeChanges(t *testing.T) {
 	}
 	if !hasEvent(second.Result.Events, EventTypeRestartDetected) {
 		t.Fatalf("events = %#v, want %s", second.Result.Events, EventTypeRestartDetected)
+	}
+}
+
+func TestPollNowDetectsQuarkusRestartWithoutNegativeCounterDelta(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	var scrape int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		scrape++
+		if scrape == 1 {
+			_, _ = w.Write([]byte("process_start_time_seconds 1770000000\nprocess_cpu_usage 0.2\nhttp_server_requests_seconds_count{method=\"GET\",outcome=\"SUCCESS\",status=\"200\"} 100\n"))
+			return
+		}
+		_, _ = w.Write([]byte("process_start_time_seconds 1770000060\nprocess_cpu_usage 0.1\nhttp_server_requests_seconds_count{method=\"GET\",outcome=\"SUCCESS\",status=\"200\"} 2\n"))
+	}))
+	defer server.Close()
+	client, err := prometheus.NewClient(time.Second, prometheus.DefaultLimits, nil)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	mon := newTestMonitor(t, store, collector.NewQuarkusCollector("app", server.URL, client))
+
+	first, err := mon.PollNow(context.Background())
+	if err != nil {
+		t.Fatalf("first PollNow() error = %v", err)
+	}
+	second, err := mon.PollNow(context.Background())
+	if err != nil {
+		t.Fatalf("second PollNow() error = %v", err)
+	}
+	if first.AppRunID == nil || second.AppRunID == nil || *first.AppRunID == *second.AppRunID {
+		t.Fatalf("app run ids = %v/%v, want distinct Quarkus runs", first.AppRunID, second.AppRunID)
+	}
+	if !hasEvent(second.Result.Events, EventTypeRestartDetected) {
+		t.Fatalf("events = %#v, want restart detection", second.Result.Events)
+	}
+	series, err := store.Series(context.Background(), "app", first.Result.PollStartedAt.Add(-time.Second), second.Result.PollFinishedAt.Add(time.Second))
+	if err != nil {
+		t.Fatalf("Series() error = %v", err)
+	}
+	for _, point := range series.Points {
+		if point.Requests != nil && *point.Requests < 0 {
+			t.Fatalf("requests delta = %v after Quarkus restart, want nonnegative", *point.Requests)
+		}
 	}
 }
 

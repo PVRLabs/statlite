@@ -35,9 +35,10 @@ func TestQuarkusCollectorUsesOneLogicalScrapeAndPreservesExactEndpoint(t *testin
 	if requests.Load() != 1 {
 		t.Fatalf("wire requests = %d, want one logical scrape with one request", requests.Load())
 	}
-	if result.HealthStatus != "" || result.DBHealthStatus != "" || len(result.Samples) != 0 {
-		t.Fatalf("result = %#v, want shell result without health or normalized samples", result)
+	if result.HealthStatus != "" || result.DBHealthStatus != "" {
+		t.Fatalf("result = %#v, want no inferred health", result)
 	}
+	assertQuarkusSamples(t, result.Samples, []MetricSample{{Key: "process_cpu_usage", Kind: MetricKindGauge, Value: 0.25, Unit: "ratio"}})
 }
 
 func TestQuarkusCollectorNormalizesCertifiedHTTPFamilies(t *testing.T) {
@@ -65,9 +66,89 @@ process_cpu_usage 0.25
 		{Key: "http_4xx_total", Kind: MetricKindCounter, Value: 5, Unit: "requests"},
 		{Key: "http_5xx_total", Kind: MetricKindCounter, Value: 4, Unit: "requests"},
 		{Key: "http_request_time_total_seconds", Kind: MetricKindCounter, Value: 2.75, Unit: "seconds"},
+		{Key: "process_cpu_usage", Kind: MetricKindGauge, Value: 0.25, Unit: "ratio"},
 	})
 	if len(result.Events) != 0 {
 		t.Fatalf("events = %#v, want none", result.Events)
+	}
+}
+
+func TestQuarkusCollectorNormalizesRuntimeIdentityAndOptionalConcepts(t *testing.T) {
+	body := `process_cpu_usage 0.25
+process_start_time_seconds 1770000000.5
+process_uptime_seconds 120.25
+jvm_memory_used_bytes{area="heap",id="eden"} 1000
+jvm_memory_used_bytes{id="old",area="heap"} 2000
+jvm_memory_used_bytes{area="nonheap",id="metaspace"} 9000
+jvm_memory_max_bytes{area="heap"} 999999
+system_cpu_usage 0.75
+system_memory_used_bytes 12345
+disk_total_bytes 54321
+`
+	result := collectQuarkusBody(t, body)
+
+	assertQuarkusSamples(t, result.Samples, []MetricSample{
+		{Key: "process_cpu_usage", Kind: MetricKindGauge, Value: 0.25, Unit: "ratio"},
+		{Key: "jvm_heap_used_bytes", Kind: MetricKindGauge, Value: 3000, Unit: "bytes"},
+		{Key: "process_start_time", Kind: MetricKindGauge, Value: 1770000000.5, Unit: "unix_seconds"},
+		{Key: "process_uptime", Kind: MetricKindGauge, Value: 120.25, Unit: "seconds"},
+	})
+	wantStart := time.Unix(1770000000, 500_000_000).UTC()
+	if result.ProcessStartTime == nil || !result.ProcessStartTime.Equal(wantStart) {
+		t.Fatalf("ProcessStartTime = %v, want %v", result.ProcessStartTime, wantStart)
+	}
+	if result.HealthStatus != "" || result.DBHealthStatus != "" || len(result.Events) != 0 {
+		t.Fatalf("result = %#v, want runtime samples without health or warnings", result)
+	}
+	for _, key := range []string{"jvm_heap_max_bytes", "host_cpu_usage", "host_memory_used_bytes", "host_disk_total_bytes"} {
+		if hasSample(result, key) {
+			t.Fatalf("samples = %#v, want %s omitted", result.Samples, key)
+		}
+	}
+}
+
+func TestQuarkusCollectorKeepsValidPartialRuntimeAndConsolidatesInvalidConcepts(t *testing.T) {
+	body := `process_cpu_usage 1.5
+process_start_time_seconds NaN
+process_uptime_seconds -1
+jvm_memory_used_bytes{area="heap",id="eden"} 2048
+`
+	result := collectQuarkusBody(t, body)
+
+	assertQuarkusSamples(t, result.Samples, []MetricSample{{Key: "jvm_heap_used_bytes", Kind: MetricKindGauge, Value: 2048, Unit: "bytes"}})
+	if result.ProcessStartTime != nil {
+		t.Fatalf("ProcessStartTime = %v, want nil", result.ProcessStartTime)
+	}
+	if len(result.Events) != 1 || result.Events[0] != (CollectorEvent{
+		Severity: EventSeverityWarning,
+		Type:     "metrics_partial",
+		Message:  "Quarkus metrics are partial; invalid concepts were omitted: process CPU, process start time, process uptime",
+	}) {
+		t.Fatalf("events = %#v, want one consolidated partial warning", result.Events)
+	}
+}
+
+func TestQuarkusCollectorProcessStartMustRoundTripThroughStoredRFC3339(t *testing.T) {
+	result := collectQuarkusBody(t, `process_start_time_seconds 253402300799
+`)
+	assertQuarkusSamples(t, result.Samples, []MetricSample{{Key: "process_start_time", Kind: MetricKindGauge, Value: 253402300799, Unit: "unix_seconds"}})
+	if result.ProcessStartTime == nil || result.ProcessStartTime.Year() != 9999 {
+		t.Fatalf("ProcessStartTime = %v, want storable year-9999 boundary", result.ProcessStartTime)
+	}
+
+	result = collectQuarkusBody(t, `process_start_time_seconds 253402300800
+jvm_memory_used_bytes{area="heap"} 1024
+`)
+	assertQuarkusSamples(t, result.Samples, []MetricSample{{Key: "jvm_heap_used_bytes", Kind: MetricKindGauge, Value: 1024, Unit: "bytes"}})
+	if result.ProcessStartTime != nil {
+		t.Fatalf("ProcessStartTime = %v, want out-of-range timestamp omitted", result.ProcessStartTime)
+	}
+	if len(result.Events) != 1 || result.Events[0] != (CollectorEvent{
+		Severity: EventSeverityWarning,
+		Type:     "metrics_partial",
+		Message:  "Quarkus metrics are partial; invalid concepts were omitted: process start time",
+	}) {
+		t.Fatalf("events = %#v, want partial-invalid process start warning", result.Events)
 	}
 }
 
@@ -83,7 +164,7 @@ func TestQuarkusCollectorHTTPStatusZeroRequiresCompleteAcceptedDimensions(t *tes
 			body: `http_server_requests_seconds_count{method="GET",outcome="SUCCESS",status="200"} 3
 process_cpu_usage 0.1
 `,
-			wantKeys: []string{"http_requests_total", "http_404_total", "http_4xx_total", "http_5xx_total"},
+			wantKeys: []string{"http_requests_total", "http_404_total", "http_4xx_total", "http_5xx_total", "process_cpu_usage"},
 		},
 		{
 			name: "missing status omits status concepts",
@@ -91,7 +172,7 @@ process_cpu_usage 0.1
 http_server_requests_seconds_count{method="GET",outcome="SUCCESS"} 2
 process_cpu_usage 0.1
 `,
-			wantKeys:   []string{"http_requests_total"},
+			wantKeys:   []string{"http_requests_total", "process_cpu_usage"},
 			wantEvents: []CollectorEvent{{Severity: EventSeverityWarning, Type: "metric_dimension_invalid", MetricKey: "http_requests_total", Message: "ignored http_server_requests_seconds_count series without valid method, outcome, and status dimensions and a finite nonnegative value; status counters are unavailable"}},
 		},
 		{
@@ -100,7 +181,7 @@ process_cpu_usage 0.1
 http_server_requests_seconds_count{method="GET",outcome="SERVER_ERROR",status="500"} NaN
 process_cpu_usage 0.1
 `,
-			wantKeys:   []string{"http_requests_total"},
+			wantKeys:   []string{"http_requests_total", "process_cpu_usage"},
 			wantEvents: []CollectorEvent{{Severity: EventSeverityWarning, Type: "metric_dimension_invalid", MetricKey: "http_requests_total", Message: "ignored http_server_requests_seconds_count series without valid method, outcome, and status dimensions and a finite nonnegative value; status counters are unavailable"}},
 		},
 		{
@@ -109,6 +190,7 @@ process_cpu_usage 0.1
 http_server_requests_seconds_sum{method="GET",status="200"} 9
 process_cpu_usage 0.1
 `,
+			wantKeys: []string{"process_cpu_usage"},
 			wantEvents: []CollectorEvent{
 				{Severity: EventSeverityWarning, Type: "metric_dimension_invalid", MetricKey: "http_requests_total", Message: "ignored http_server_requests_seconds_count series without valid method, outcome, and status dimensions and a finite nonnegative value; status counters are unavailable"},
 				{Severity: EventSeverityWarning, Type: "metric_dimension_invalid", MetricKey: "http_request_time_total_seconds", Message: "ignored http_server_requests_seconds_sum series without valid method, outcome, and status dimensions and a finite nonnegative value"},
@@ -205,8 +287,8 @@ http_server_requests_seconds_sum{method="GET",outcome="SERVER_ERROR",status="500
 process_cpu_usage 0.1
 `
 	result := collectQuarkusBody(t, body)
-	if len(result.Samples) != 0 {
-		t.Fatalf("samples = %#v, want no non-finite aggregates", result.Samples)
+	if got := sampleKeys(result.Samples); strings.Join(got, ",") != "process_cpu_usage" {
+		t.Fatalf("sample keys = %v, want only process CPU", got)
 	}
 	for _, key := range []string{"http_requests_total", "", "http_request_time_total_seconds"} {
 		if !hasQuarkusCollectorEvent(result.Events, "metric_aggregate_invalid", key) {
@@ -223,8 +305,8 @@ http_server_requests_seconds_sum{uri="/a",status="200",outcome="SUCCESS",method=
 process_cpu_usage 0.1
 `
 	result := collectQuarkusBody(t, body)
-	if len(result.Samples) != 0 {
-		t.Fatalf("samples = %#v, want duplicated HTTP families omitted", result.Samples)
+	if got := sampleKeys(result.Samples); strings.Join(got, ",") != "process_cpu_usage" {
+		t.Fatalf("sample keys = %v, want duplicated HTTP families omitted", got)
 	}
 	for _, key := range []string{"http_requests_total", "http_request_time_total_seconds"} {
 		if !hasQuarkusCollectorEvent(result.Events, "metric_series_duplicate", key) {
@@ -262,9 +344,10 @@ func TestQuarkusCollectorHTTPAggregationStateAndOutputStayBounded(t *testing.T) 
 		{Key: "http_404_total", Kind: MetricKindCounter, Value: 0, Unit: "requests"},
 		{Key: "http_4xx_total", Kind: MetricKindCounter, Value: 0, Unit: "requests"},
 		{Key: "http_5xx_total", Kind: MetricKindCounter, Value: 0, Unit: "requests"},
+		{Key: "process_cpu_usage", Kind: MetricKindGauge, Value: 0.1, Unit: "ratio"},
 	})
-	if len(result.Samples) != 4 || len(result.Events) != 0 {
-		t.Fatalf("result cardinality = %d samples, %d events; want 4 and 0", len(result.Samples), len(result.Events))
+	if len(result.Samples) != 5 || len(result.Events) != 0 {
+		t.Fatalf("result cardinality = %d samples, %d events; want 5 and 0", len(result.Samples), len(result.Events))
 	}
 }
 

@@ -1,5 +1,4 @@
-// This file validates Quarkus Prometheus/OpenMetrics scrapes before
-// Quarkus-specific normalization.
+// This file validates and normalizes Quarkus Prometheus/OpenMetrics scrapes.
 package collector
 
 import (
@@ -9,14 +8,16 @@ import (
 	"hash/fnv"
 	"math"
 	"math/bits"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pvrlabs/statlite/internal/prometheus"
 )
 
 // QuarkusCollector performs the single bounded exposition scrape owned by a
-// Quarkus polling cycle. Quarkus normalization is added separately.
+// Quarkus polling cycle.
 type QuarkusCollector struct {
 	targetName string
 	endpoint   string
@@ -50,6 +51,12 @@ type quarkusHTTPValues struct {
 
 type quarkusHTTPDimensionHash struct{ first, second uint64 }
 
+type quarkusRuntimeValues struct {
+	cpu, heap, processStart, uptime                             float64
+	sawCPU, sawHeap, sawProcessStart, sawUptime                 bool
+	invalidCPU, invalidHeap, invalidProcessStart, invalidUptime bool
+}
+
 // Count and sum each contribute at most the shared parser's default 10,000
 // aggregation identities. The combined cap remains fixed regardless of source
 // series count.
@@ -69,8 +76,8 @@ func (c *QuarkusCollector) Collect(ctx context.Context) (*CollectionResult, erro
 		return result, err
 	}
 
-	compatible := false
 	httpValues := quarkusHTTPValues{completeCountLabels: true}
+	runtimeValues := quarkusRuntimeValues{}
 	_, err := c.client.Scrape(ctx, c.endpoint, func(sample prometheus.Sample) error {
 		switch sample.Name {
 		case "http_server_requests_seconds_count":
@@ -80,16 +87,18 @@ func (c *QuarkusCollector) Collect(ctx context.Context) (*CollectionResult, erro
 			httpValues.acceptDuration(sample)
 			return nil
 		}
-		if math.IsNaN(sample.Value) || math.IsInf(sample.Value, 0) {
-			return nil
-		}
 		switch sample.Name {
-		case "process_cpu_usage", "process_start_time_seconds":
-			compatible = true
+		case "process_cpu_usage":
+			runtimeValues.acceptCPU(sample.Value)
+		case "process_start_time_seconds":
+			runtimeValues.acceptProcessStart(sample.Value)
+		case "process_uptime_seconds":
+			runtimeValues.acceptUptime(sample.Value)
 		case "jvm_memory_used_bytes":
 			for _, label := range sample.Labels {
 				if label.Name == "area" && label.Value == "heap" {
-					compatible = true
+					runtimeValues.acceptHeap(sample.Value)
+					break
 				}
 			}
 		}
@@ -100,13 +109,102 @@ func (c *QuarkusCollector) Collect(ctx context.Context) (*CollectionResult, erro
 		result.addEvent(EventSeverityError, "metrics_fetch_failed", "", wrapped.Error())
 		return result, wrapped
 	}
-	if !compatible {
+	if !runtimeValues.compatible() {
 		err := errors.New("Quarkus metrics endpoint does not expose a finite recognized runtime family")
 		result.addEvent(EventSeverityError, "metrics_source_incompatible", "", err.Error())
 		return result, err
 	}
 	httpValues.addTo(result)
+	runtimeValues.addTo(result)
+	addQuarkusPartialWarning(result, runtimeValues)
 	return result, nil
+}
+
+func (v quarkusRuntimeValues) compatible() bool {
+	return (v.sawCPU && !v.invalidCPU) || (v.sawHeap && !v.invalidHeap) || (v.sawProcessStart && !v.invalidProcessStart)
+}
+
+func (v *quarkusRuntimeValues) acceptCPU(value float64) bool {
+	if v.sawCPU || !finiteInRange(value, 0, 1) {
+		v.invalidCPU = true
+		return false
+	}
+	v.sawCPU, v.cpu = true, value
+	return true
+}
+
+func (v *quarkusRuntimeValues) acceptHeap(value float64) bool {
+	if !finiteNonnegative(value) {
+		v.invalidHeap = true
+		return false
+	}
+	var ok bool
+	v.heap, ok = addFinite(v.heap, value)
+	v.sawHeap = true
+	v.invalidHeap = v.invalidHeap || !ok
+	return ok
+}
+
+func (v *quarkusRuntimeValues) acceptProcessStart(value float64) bool {
+	if v.sawProcessStart || !finiteNonnegative(value) || value == 0 || !rfc3339RoundTripsUnixSeconds(value) {
+		v.invalidProcessStart = true
+		return false
+	}
+	v.sawProcessStart, v.processStart = true, value
+	return true
+}
+
+func rfc3339RoundTripsUnixSeconds(value float64) bool {
+	converted := unixSeconds(value)
+	formatted := converted.Format(time.RFC3339Nano)
+	parsed, err := time.Parse(time.RFC3339Nano, formatted)
+	return err == nil && parsed.Equal(converted)
+}
+
+func (v *quarkusRuntimeValues) acceptUptime(value float64) {
+	if v.sawUptime || !finiteNonnegative(value) {
+		v.invalidUptime = true
+		return
+	}
+	v.sawUptime, v.uptime = true, value
+}
+
+func (v quarkusRuntimeValues) addTo(result *CollectionResult) {
+	if v.sawCPU && !v.invalidCPU {
+		result.addSample("process_cpu_usage", MetricKindGauge, v.cpu, "ratio")
+	}
+	if v.sawHeap && !v.invalidHeap {
+		result.addSample("jvm_heap_used_bytes", MetricKindGauge, v.heap, "bytes")
+	}
+	if v.sawProcessStart && !v.invalidProcessStart {
+		result.addSample("process_start_time", MetricKindGauge, v.processStart, "unix_seconds")
+		started := unixSeconds(v.processStart)
+		result.ProcessStartTime = &started
+	}
+	if v.sawUptime && !v.invalidUptime {
+		result.addSample("process_uptime", MetricKindGauge, v.uptime, "seconds")
+	}
+}
+
+func addQuarkusPartialWarning(result *CollectionResult, runtime quarkusRuntimeValues) {
+	invalid := make([]string, 0, 4)
+	if runtime.invalidCPU {
+		invalid = append(invalid, "process CPU")
+	}
+	if runtime.invalidHeap {
+		invalid = append(invalid, "heap used")
+	}
+	if runtime.invalidProcessStart {
+		invalid = append(invalid, "process start time")
+	}
+	if runtime.invalidUptime {
+		invalid = append(invalid, "process uptime")
+	}
+	if len(invalid) == 0 {
+		return
+	}
+	slices.Sort(invalid)
+	result.addEvent(EventSeverityWarning, "metrics_partial", "", "Quarkus metrics are partial; invalid concepts were omitted: "+strings.Join(invalid, ", "))
 }
 
 func (v *quarkusHTTPValues) acceptCount(sample prometheus.Sample) {
