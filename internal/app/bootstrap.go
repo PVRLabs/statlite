@@ -73,9 +73,22 @@ func newCollector(target config.TargetConfig, timeout time.Duration) (monitor.Co
 			return nil, fmt.Errorf("statlite metrics client: %w", err)
 		}
 		return collector.NewStatliteMetricsCollector(target.Name, client), nil
+	case config.TargetTypeQuarkus:
+		client, err := prometheus.NewClient(timeout, prometheus.DefaultLimits, prometheusAuthConfig(target.Auth))
+		if err != nil {
+			return nil, fmt.Errorf("quarkus metrics client: %w", err)
+		}
+		return collector.NewQuarkusCollector(target.Name, target.URL, client), nil
 	default:
 		return nil, fmt.Errorf("unsupported target type %q", target.Type)
 	}
+}
+
+func prometheusAuthConfig(auth *config.AuthConfig) *prometheus.BasicAuth {
+	if auth == nil {
+		return nil
+	}
+	return &prometheus.BasicAuth{Username: auth.Username, Password: auth.Password}
 }
 
 func prometheusAuth(auth *collector.BasicAuth) *prometheus.BasicAuth {

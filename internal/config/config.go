@@ -14,6 +14,7 @@ import (
 
 const (
 	TargetTypeSpring          = "spring"
+	TargetTypeQuarkus         = "quarkus"
 	TargetTypeStatliteMetrics = "statlite-metrics"
 
 	SpringMetricsSourceAuto       = "auto"
@@ -51,6 +52,9 @@ type TargetConfig struct {
 	MetricsSource      string      `yaml:"metrics_source,omitempty"`
 	CollectHostMetrics bool        `yaml:"collect_host_metrics,omitempty"`
 	Auth               *AuthConfig `yaml:"auth,omitempty"`
+	actuatorURLSet     bool
+	metricsSourceSet   bool
+	collectHostSet     bool
 }
 
 type TargetDisplayMetadata struct {
@@ -127,6 +131,26 @@ func (s *StorageConfig) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+func (t *TargetConfig) UnmarshalYAML(value *yaml.Node) error {
+	type plainTargetConfig TargetConfig
+	var decoded plainTargetConfig
+	if err := value.Decode(&decoded); err != nil {
+		return err
+	}
+	*t = TargetConfig(decoded)
+	for i := 0; i+1 < len(value.Content); i += 2 {
+		switch value.Content[i].Value {
+		case "actuator_base_url":
+			t.actuatorURLSet = true
+		case "metrics_source":
+			t.metricsSourceSet = true
+		case "collect_host_metrics":
+			t.collectHostSet = true
+		}
+	}
+	return nil
+}
+
 func (c *Config) validate() error {
 	if c.Server.Listen == "" {
 		return fmt.Errorf("server.listen is required")
@@ -179,19 +203,33 @@ func (c *Config) validate() error {
 			} else if t.MetricsSource != SpringMetricsSourceAuto && t.MetricsSource != SpringMetricsSourcePrometheus && t.MetricsSource != SpringMetricsSourceActuator {
 				return fmt.Errorf("targets[%d].metrics_source: unsupported value %q (supported: auto, prometheus, actuator)", i, t.MetricsSource)
 			}
-		case TargetTypeStatliteMetrics:
+		case TargetTypeQuarkus, TargetTypeStatliteMetrics:
 			if t.URL == "" {
 				return fmt.Errorf("targets[%d].url is required for type %s", i, targetType)
+			}
+			if targetType == TargetTypeQuarkus {
+				if t.actuatorURLSet {
+					return fmt.Errorf("targets[%d].actuator_base_url is supported only for type spring", i)
+				}
+				if t.metricsSourceSet {
+					return fmt.Errorf("targets[%d].metrics_source is supported only for type spring", i)
+				}
+				if t.collectHostSet {
+					return fmt.Errorf("targets[%d].collect_host_metrics is supported only for type spring", i)
+				}
+				if err := validateQuarkusURL(t.URL); err != nil {
+					return fmt.Errorf("targets[%d].url for type quarkus: %w", i, err)
+				}
 			}
 			if t.MetricsSource != "" {
 				return fmt.Errorf("targets[%d].metrics_source is supported only for type spring", i)
 			}
 		default:
-			return fmt.Errorf("targets[%d].type: unsupported type %q (supported: spring, statlite-metrics)", i, targetType)
+			return fmt.Errorf("targets[%d].type: unsupported type %q (supported: spring, quarkus, statlite-metrics)", i, targetType)
 		}
 		if t.Auth != nil {
-			if targetType != TargetTypeSpring {
-				return fmt.Errorf("targets[%d].auth is currently supported only for type spring", i)
+			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus {
+				return fmt.Errorf("targets[%d].auth is currently supported only for type spring and quarkus", i)
 			}
 			if t.Auth.Type != "basic" {
 				return fmt.Errorf("targets[%d].auth.type: unsupported type %q (only 'basic' is supported)", i, t.Auth.Type)
@@ -206,6 +244,17 @@ func (c *Config) validate() error {
 		if t.CollectHostMetrics && targetType != TargetTypeSpring {
 			return fmt.Errorf("targets[%d].collect_host_metrics is supported only for type spring", i)
 		}
+	}
+	return nil
+}
+
+func validateQuarkusURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil {
+		return fmt.Errorf("must be an http or https URL without user info")
+	}
+	if u.Fragment != "" {
+		return fmt.Errorf("must not contain a fragment")
 	}
 	return nil
 }

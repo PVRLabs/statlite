@@ -21,6 +21,12 @@ func TestNewCollectorBuildsConfiguredTargetTypes(t *testing.T) {
 		wantTarget string
 	}{
 		{
+			name:       "quarkus",
+			target:     config.TargetConfig{Name: "orders", Type: config.TargetTypeQuarkus, URL: "https://example.com/q/metrics"},
+			wantType:   "quarkus",
+			wantTarget: "*collector.QuarkusCollector",
+		},
+		{
 			name:       "default spring",
 			target:     config.TargetConfig{Name: "spring", URL: "https://example.com/actuator"},
 			wantType:   "spring",

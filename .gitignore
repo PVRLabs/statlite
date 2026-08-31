@@ -17,3 +17,4 @@ AGENTS.local.md
 .DS_Store
 .badger-context
 .idea/
+.agent-logs/
