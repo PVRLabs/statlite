@@ -1,0 +1,9 @@
+# HELP process_cpu_usage The recent cpu usage of the process
+# TYPE process_cpu_usage gauge
+process_cpu_usage 0.125
+# HELP process_start_time_seconds Start time of the process since unix epoch
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1770000000
+# TYPE http_server_requests_seconds summary
+# TYPE jvm_memory_used_bytes gauge
+jvm_memory_used_bytes{area="heap",id="fixture"} 1000000

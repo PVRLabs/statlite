@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>xyz.pvrlabs</groupId>
+  <artifactId>quarkus-metrics-demo</artifactId>
+  <version>0.1.0</version>
+  <properties>
+    <compiler-plugin.version>3.14.0</compiler-plugin.version>
+    <maven.compiler.release>21</maven.compiler.release>
+    <quarkus.platform.version>3.39.1</quarkus.platform.version>
+  </properties>
+  <dependencyManagement>
+    <dependencies>
+      <dependency><groupId>io.quarkus.platform</groupId><artifactId>quarkus-bom</artifactId><version>${quarkus.platform.version}</version><type>pom</type><scope>import</scope></dependency>
+    </dependencies>
+  </dependencyManagement>
+  <dependencies>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-micrometer-registry-prometheus</artifactId></dependency>
+  </dependencies>
+  <build><plugins>
+    <plugin>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-maven-plugin</artifactId>
+      <version>${quarkus.platform.version}</version>
+      <extensions>true</extensions>
+      <executions><execution><goals><goal>build</goal></goals></execution></executions>
+    </plugin>
+    <plugin><artifactId>maven-compiler-plugin</artifactId><version>${compiler-plugin.version}</version></plugin>
+  </plugins></build>
+</project>

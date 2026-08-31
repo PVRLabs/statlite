@@ -1,0 +1,6 @@
+# TYPE http_server_requests_seconds summary
+http_server_requests_seconds_count{method="GET",outcome="SUCCESS",status="200",uri="/ok"} 1
+http_server_requests_seconds_count{method="GET",outcome="CLIENT_ERROR",status="404",uri="/missing"} 1
+http_server_requests_seconds_count{method="GET",outcome="CLIENT_ERROR",status="418",uri="/client-error"} 1
+http_server_requests_seconds_count{method="GET",outcome="SERVER_ERROR",status="500",uri="/server-error"} 1
+http_server_requests_seconds_sum{method="GET",outcome="SUCCESS",status="200",uri="/ok"} 0.001

@@ -13,7 +13,8 @@ StatLite loads `statlite.yaml` by default. Override with `--config`:
 statlite --config /etc/statlite/config.yaml
 ```
 
-See `examples/` for starter templates (Actuator, StatLite Metrics, multi-target,
+See [`docs/integrations.md`](integrations.md) for the supported integration
+matrix. See `examples/` for starter templates (Actuator, StatLite Metrics, multi-target,
 self-monitoring), `examples/python-fastapi-demo/` for a runnable FastAPI app,
 and `examples/spring-actuator-demo/` for a standalone Spring Boot demo app.
 
