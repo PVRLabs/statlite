@@ -12,7 +12,7 @@ not a generic Prometheus scraper or metrics database.
 | Spring Boot 4.0.x | Supported | Actuator JSON; Micrometer Prometheus/OpenMetrics | Spring Boot Actuator | Both sources are collected through the `spring` target. |
 | Spring Boot Actuator | Supported | Actuator JSON | `/actuator` management base URL | Health, application request, JVM, process, and optional host concepts are normalized into StatLite's fixed vocabulary. |
 | Spring Micrometer Prometheus | Supported | Prometheus/OpenMetrics exposition | Configured Prometheus endpoint | This is a Spring source option, not a generic `prometheus` target. |
-| Quarkus 3.39.x | Supported | Micrometer Prometheus/OpenMetrics exposition | Exact `/q/metrics` endpoint | Explicit `quarkus` target; the pinned fixture uses Java 21 LTS. Health and host metrics are not inferred. |
+| Quarkus 3.39.x | Supported | Micrometer Prometheus/OpenMetrics exposition | Conventional `/q/metrics` endpoint | Explicit `quarkus` target; the pinned fixture uses Java 21 LTS. Health and host metrics are not inferred. |
 | StatLite Metrics v1 | Supported | Fixed `statlite-metrics/v1` response | `/statlite/metrics` | Fixed producer contract for StatLite and compatible applications. |
 
 Support means that the integration has an owned endpoint and source contract,
@@ -41,10 +41,11 @@ from a successful scrape.
 The normalized concepts are HTTP request count and duration, 404/4xx/5xx
 counts, process CPU, heap used, process start time, and optional uptime. HTTP
 meters are lazy, so an idle endpoint can be compatible with finite runtime
-families alone. Typed inspection is selected with
-`statlite inspect --type quarkus <metrics-endpoint>`; untyped discovery does not
-probe or claim Quarkus because generic Micrometer exposition does not prove
-framework identity. Basic Auth uses the shared `auth.type: basic` configuration.
+families alone. Typed inspection accepts either an application base URL or an
+exact customized metrics endpoint. Untyped inspection probes only the
+established `/q/metrics` location; it does not identify arbitrary Micrometer
+exposition as Quarkus. Basic Auth uses the shared `auth.type: basic`
+configuration.
 
 The public pinned fixture is
 [`examples/quarkus-metrics-demo/`](../examples/quarkus-metrics-demo/). It uses

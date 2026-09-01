@@ -75,6 +75,16 @@ type Client struct {
 }
 
 func NewClient(timeout time.Duration, limits Limits, auth *BasicAuth) (*Client, error) {
+	return newClient(timeout, limits, auth, nil)
+}
+
+// NewClientWithTransport creates a client using transport while retaining the
+// same timeout, redirect, authentication, and parsing rules as NewClient.
+func NewClientWithTransport(timeout time.Duration, limits Limits, auth *BasicAuth, transport http.RoundTripper) (*Client, error) {
+	return newClient(timeout, limits, auth, transport)
+}
+
+func newClient(timeout time.Duration, limits Limits, auth *BasicAuth, transport http.RoundTripper) (*Client, error) {
 	if timeout <= 0 {
 		return nil, errors.New("Prometheus timeout must be positive")
 	}
@@ -82,7 +92,7 @@ func NewClient(timeout time.Duration, limits Limits, auth *BasicAuth) (*Client, 
 		return nil, err
 	}
 	c := &Client{limits: limits, auth: auth}
-	c.httpClient = &http.Client{Timeout: timeout, CheckRedirect: func(req *http.Request, via []*http.Request) error {
+	c.httpClient = &http.Client{Timeout: timeout, Transport: transport, CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) > limits.MaxRedirects {
 			return errors.New("Prometheus redirect limit exceeded")
 		}

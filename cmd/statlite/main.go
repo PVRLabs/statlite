@@ -237,7 +237,7 @@ samples in local SQLite, and serves a localhost dashboard.
 Usage:
   statlite [--config path]
   statlite inspect <application-url>
-  statlite inspect --type quarkus <metrics-endpoint-url>
+  statlite inspect --type quarkus <application-or-metrics-url>
   statlite --version
   statlite --help
 
@@ -260,12 +260,12 @@ Example:
 Probe a supported application endpoint and print an inspection summary.
 Inspection is read-only and does not require or create statlite.yaml.
 
-Use --type quarkus when the URL is the exact Quarkus Prometheus/OpenMetrics
-endpoint, such as http://localhost:9000/q/metrics.
+Use --type quarkus with a Quarkus application URL or an exact customized
+Prometheus/OpenMetrics endpoint. A base URL uses the conventional /q/metrics path.
 
 Quote the URL when pasting it from a browser, especially if it contains ? or &.
 Untyped inspection requires a base URL, so remove any query string or fragment first.
-Typed Quarkus inspection accepts the exact metrics endpoint URL.`)
+Typed Quarkus inspection accepts a base URL or exact metrics endpoint URL.`)
 }
 
 const configurationDocsURL = "https://github.com/PVRLabs/statlite/blob/main/docs/configuration.md"

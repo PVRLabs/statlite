@@ -55,6 +55,65 @@ process_uptime_seconds 12
 	}
 }
 
+func TestTypedQuarkusInspectionDiscoversConventionalEndpointFromBaseURL(t *testing.T) {
+	var path string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		fmt.Fprint(w, "process_cpu_usage 0.25\n")
+	}))
+	defer server.Close()
+
+	result, err := Inspect(context.Background(), TargetQuarkus, server.URL)
+	if err != nil {
+		t.Fatalf("Inspect() error = %v", err)
+	}
+	if path != "/q/metrics" || result.Endpoint != server.URL+"/q/metrics" {
+		t.Fatalf("path = %q, result = %#v, want discovered conventional endpoint", path, result)
+	}
+}
+
+func TestTypedQuarkusInspectionFallsBackFromContextRootToConventionalEndpoint(t *testing.T) {
+	var paths []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		if r.URL.Path == "/service/q/metrics" {
+			fmt.Fprint(w, "process_cpu_usage 0.25\n")
+			return
+		}
+		fmt.Fprint(w, "not metrics\n")
+	}))
+	defer server.Close()
+
+	result, err := Inspect(context.Background(), TargetQuarkus, server.URL+"/service")
+	if err != nil {
+		t.Fatalf("Inspect() error = %v", err)
+	}
+	if got := strings.Join(paths, ","); got != "/service,/service/q/metrics" {
+		t.Fatalf("paths = %q, want exact attempt followed by conventional endpoint", got)
+	}
+	if result.Endpoint != server.URL+"/service/q/metrics" {
+		t.Fatalf("endpoint = %q, want discovered context-root endpoint", result.Endpoint)
+	}
+}
+
+func TestTypedQuarkusInspectionDoesNotFallbackAfterHTTPFailure(t *testing.T) {
+	var paths []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		http.Error(w, "temporarily unavailable", http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	_, err := Inspect(context.Background(), TargetQuarkus, server.URL+"/service")
+	assertFailureKind(t, err, FailureIncomplete)
+	if got := strings.Join(paths, ","); got != "/service" {
+		t.Fatalf("paths = %q, want no conventional fallback after HTTP 503", got)
+	}
+}
+
 func TestTypedQuarkusInspectionReportsPartialCapabilitiesAndGeneratesNoProbeState(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
@@ -119,6 +178,17 @@ func TestTypedQuarkusInspectionRejectsUnsafeEndpointForms(t *testing.T) {
 				t.Fatalf("Inspect(%q) error = nil", raw)
 			}
 		})
+	}
+}
+
+func TestParseQuarkusEndpointPreservesCustomizedEndpointAndQuery(t *testing.T) {
+	const endpoint = "http://app.test/custom/metrics?scope=app"
+	got, err := parseQuarkusEndpoint(endpoint)
+	if err != nil {
+		t.Fatalf("parseQuarkusEndpoint() error = %v", err)
+	}
+	if got != endpoint {
+		t.Fatalf("endpoint = %q, want exact %q", got, endpoint)
 	}
 }
 

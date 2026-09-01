@@ -67,14 +67,14 @@ integration and print a minimal, runnable `statlite.yaml`:
 statlite inspect 'http://localhost:8080'
 ```
 
-The command checks the conventional Spring Boot Actuator and StatLite Metrics
-v1 paths, then prints the detected endpoint, available capabilities, a minimal
-configuration, and the next command. It does not probe Quarkus automatically,
-because a generic Micrometer scrape does not provide reliable framework identity.
-Use typed inspection with the exact metrics endpoint:
+The command checks the conventional Spring Boot Actuator, StatLite Metrics v1,
+and Quarkus paths, then prints the detected endpoint, available capabilities, a
+minimal configuration, and the next command. Quarkus discovery is limited to
+its established `/q/metrics` location and does not perform general Prometheus
+discovery. You can also select Quarkus explicitly using its application URL:
 
 ```bash
-statlite inspect --type quarkus 'http://localhost:9000/q/metrics'
+statlite inspect --type quarkus 'http://localhost:9000'
 ```
 
 Inspection is bounded and read-only: it does not

@@ -27,8 +27,8 @@ When you know an application's base URL but not its metrics endpoint, run:
 statlite inspect 'http://localhost:8080'
 ```
 
-Inspection probes the conventional `/actuator/health` and
-`/statlite/metrics` paths. A recognized Spring application gets a conditional
+Inspection probes the conventional `/actuator/health`, `/statlite/metrics`, and
+`/q/metrics` paths. A recognized Spring application gets a conditional
 `/actuator/metrics` capability check; if neither conventional integration is
 recognized, the supplied base URL is tried once as a direct StatLite Metrics
 fallback. The command prints a copyable minimal configuration and the next
@@ -36,20 +36,23 @@ command; for a new setup, save the printed configuration as `statlite.yaml`.
 With an existing configuration, copy only the target entry into its `targets`
 list before running StatLite.
 
-Untyped inspection does not probe or identify Quarkus. A Quarkus metrics scrape
-uses generic Micrometer families, so its path and content type are not reliable
-framework evidence. Select the target explicitly and provide the exact
-exposition endpoint:
+Quarkus discovery is limited to compatible metrics at its established
+`/q/metrics` location. It does not treat arbitrary Prometheus or Micrometer
+exposition as Quarkus. You can also select Quarkus explicitly using an
+application base URL:
 
 ```bash
-statlite inspect --type quarkus 'http://localhost:9000/q/metrics'
+statlite inspect --type quarkus 'http://localhost:9000'
 ```
 
-Typed Quarkus inspection performs one bounded Prometheus/OpenMetrics scrape and
-reports normalized capabilities. It accepts a complete or partial contract;
+Typed Quarkus inspection performs a bounded Prometheus/OpenMetrics inspection,
+using at most two scrapes when resolving a non-root application base URL. It
+reports normalized capabilities and accepts a complete or partial contract;
 invalid optional concepts are reported as warnings. It does not create monitor
-or storage state. Typed Quarkus inspection uses the supplied metrics endpoint
-as-is.
+or storage state. For a non-root, query-free URL, typed inspection first tries
+the supplied URL as an exact endpoint, then tries its conventional `/q/metrics`
+child after a conclusive miss. A URL with a query string is treated as an exact
+endpoint and preserved.
 
 > [!IMPORTANT]
 > Quote browser-pasted URLs, especially URLs containing `?` or `&`. Untyped

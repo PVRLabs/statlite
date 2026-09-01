@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pvrlabs/statlite/internal/collector"
+	"github.com/pvrlabs/statlite/internal/prometheus"
 )
 
 const (
@@ -147,6 +148,7 @@ func (i *inspector) application(parent context.Context, base *url.URL) (*Result,
 
 	healthURL := appendPath(base, "actuator/health")
 	statliteURL := appendPath(base, statliteMetricPath)
+	quarkusURL := appendPath(base, "q/metrics")
 	actuatorURL := appendPath(base, "actuator")
 
 	healthProbe := i.get(ctx, healthURL)
@@ -161,11 +163,25 @@ func (i *inspector) application(parent context.Context, base *url.URL) (*Result,
 	}
 	statliteProbe.body = nil
 
-	if springMatched && statliteMatched {
+	quarkusResult, quarkusErr := inspectQuarkusEndpoint(ctx, quarkusURL, i.client.Transport)
+	quarkusMatched := quarkusErr == nil
+
+	matchCount := 0
+	for _, matched := range []bool{springMatched, statliteMatched, quarkusMatched} {
+		if matched {
+			matchCount++
+		}
+	}
+	if matchCount > 1 {
 		return nil, &Failure{Kind: FailureMultiple, Err: errors.New("more than one supported integration was found")}
 	}
-	if failure := recognitionFailure(healthProbe, statliteProbe); failure != nil {
-		return nil, failure
+	if matchCount == 0 {
+		if failure := recognitionFailure(healthProbe, statliteProbe); failure != nil {
+			return nil, failure
+		}
+		if quarkusErr != nil && !isQuarkusConclusiveMiss(quarkusErr) {
+			return nil, quarkusErr
+		}
 	}
 
 	if springMatched {
@@ -190,6 +206,9 @@ func (i *inspector) application(parent context.Context, base *url.URL) (*Result,
 		}
 		return result, nil
 	}
+	if quarkusMatched {
+		return quarkusResult, nil
+	}
 
 	directProbe := i.get(ctx, base.String())
 	directMatched := recognizesStatliteMetrics(directProbe)
@@ -213,6 +232,11 @@ func (i *inspector) application(parent context.Context, base *url.URL) (*Result,
 		return nil, failure
 	}
 	return nil, &Failure{Kind: FailureUnrecognized, Err: errors.New("no supported integration was recognized")}
+}
+
+func isQuarkusMiss(err error) bool {
+	var scrapeErr *prometheus.Error
+	return errors.As(err, &scrapeErr) && (scrapeErr.Class == prometheus.FailureNotFound || scrapeErr.Class == prometheus.FailureContentType || scrapeErr.Class == prometheus.FailureMalformed)
 }
 
 func containsCapability(capabilities []string, want string) bool {
