@@ -2,8 +2,11 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -125,6 +128,145 @@ func TestNewCollectorPassesTimeoutToStatliteMetricsClient(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("Collect() did not honor the configured timeout")
 	}
+}
+
+func TestNewCollectorLegacyActuatorUserinfoUsesActuatorWithoutPrometheusProbe(t *testing.T) {
+	var prometheusRequests, actuatorRequests int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if user, password, ok := r.BasicAuth(); !ok || user != "user" || password != "secret" {
+			t.Errorf("basic auth = %q/%q/%v, want user/secret/true", user, password, ok)
+		}
+		switch r.URL.Path {
+		case "/actuator/health":
+			fmt.Fprint(w, `{"status":"UP"}`)
+		case "/actuator/prometheus":
+			prometheusRequests++
+			http.Error(w, "Prometheus must not be probed", http.StatusInternalServerError)
+		default:
+			actuatorRequests++
+			fmt.Fprint(w, `{"name":"metric","measurements":[{"statistic":"COUNT","value":1},{"statistic":"TOTAL_TIME","value":0}]}`)
+		}
+	}))
+	defer server.Close()
+
+	base := "http://user:secret@" + strings.TrimPrefix(server.URL, "http://") + "/actuator"
+	cfg := loadAppTestConfig(t, fmt.Sprintf("actuator_base_url: %q", base))
+	targetCollector, err := newCollector(cfg.Targets[0], time.Second)
+	if err != nil {
+		t.Fatalf("newCollector() error = %v", err)
+	}
+	if _, err := targetCollector.Collect(context.Background()); err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if prometheusRequests != 0 {
+		t.Fatalf("prometheus requests = %d, want 0", prometheusRequests)
+	}
+	if actuatorRequests == 0 {
+		t.Fatal("actuator metric requests = 0, want Actuator path")
+	}
+}
+
+func TestNewCollectorDeprecatedSpringAliasKeepsAutoPrometheusPreferenceAndFallback(t *testing.T) {
+	for _, prometheusAvailable := range []bool{true, false} {
+		t.Run(fmt.Sprintf("prometheus_available=%t", prometheusAvailable), func(t *testing.T) {
+			var prometheusRequests, actuatorRequests int
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/actuator/health":
+					fmt.Fprint(w, `{"status":"UP"}`)
+				case "/actuator/prometheus":
+					prometheusRequests++
+					if !prometheusAvailable {
+						http.Error(w, "missing", http.StatusNotFound)
+						return
+					}
+					w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+					fmt.Fprint(w, "process_start_time_seconds 1\nprocess_cpu_usage 0.1\n")
+				default:
+					actuatorRequests++
+					fmt.Fprint(w, `{"name":"metric","measurements":[{"statistic":"COUNT","value":1},{"statistic":"TOTAL_TIME","value":0}]}`)
+				}
+			}))
+			defer server.Close()
+
+			base := server.URL + "/actuator"
+			cfg := loadAppTestConfig(t, fmt.Sprintf("actuator_base_url: %q", base))
+			targetCollector, err := newCollector(cfg.Targets[0], time.Second)
+			if err != nil {
+				t.Fatalf("newCollector() error = %v", err)
+			}
+			if _, err := targetCollector.Collect(context.Background()); err != nil {
+				t.Fatalf("Collect() error = %v", err)
+			}
+			if prometheusRequests != 1 {
+				t.Fatalf("prometheus requests = %d, want 1", prometheusRequests)
+			}
+			if prometheusAvailable && actuatorRequests != 0 {
+				t.Fatalf("actuator metric requests = %d, want 0", actuatorRequests)
+			}
+			if !prometheusAvailable && actuatorRequests == 0 {
+				t.Fatal("actuator metric requests = 0, want fallback")
+			}
+		})
+	}
+}
+
+func TestNewCollectorCanonicalSpringURLUsesExplicitAuth(t *testing.T) {
+	var healthAuth, prometheusAuth bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, password, ok := r.BasicAuth()
+		if !ok || user != "user" || password != "secret" {
+			t.Errorf("basic auth = %q/%q/%v, want user/secret/true", user, password, ok)
+		}
+		switch r.URL.Path {
+		case "/actuator/health":
+			healthAuth = ok && user == "user" && password == "secret"
+			fmt.Fprint(w, `{"status":"UP"}`)
+		case "/actuator/prometheus":
+			prometheusAuth = ok && user == "user" && password == "secret"
+			w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+			fmt.Fprint(w, "process_start_time_seconds 1\nprocess_cpu_usage 0.1\n")
+		}
+	}))
+	defer server.Close()
+
+	url := server.URL + "/actuator"
+	cfg := loadAppTestConfig(t, fmt.Sprintf("url: %q\n    auth:\n      type: basic\n      username: user\n      password: secret", url))
+	targetCollector, err := newCollector(cfg.Targets[0], time.Second)
+	if err != nil {
+		t.Fatalf("newCollector() error = %v", err)
+	}
+	if _, err := targetCollector.Collect(context.Background()); err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if !healthAuth || !prometheusAuth {
+		t.Fatalf("explicit auth applied to health=%t prometheus=%t", healthAuth, prometheusAuth)
+	}
+}
+
+func loadAppTestConfig(t *testing.T, target string) *config.Config {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	content := fmt.Sprintf(`
+server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "./statlite.sqlite"
+polling:
+  interval: "30s"
+targets:
+  - name: "app"
+    type: spring
+    %s
+`, target)
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	return cfg
 }
 
 func typeName(value any) string {

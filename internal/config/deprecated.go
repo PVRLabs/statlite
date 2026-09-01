@@ -19,6 +19,7 @@ func (c *Config) upgradeDeprecatedTargets() {
 				continue
 			}
 			if target.ActuatorBaseURL != "" {
+				target.legacyActuatorUserinfo = urlHasUserinfo(target.ActuatorBaseURL)
 				target.URL = target.ActuatorBaseURL
 				target.ActuatorBaseURL = ""
 				c.deprecationWarnings = append(c.deprecationWarnings, fmt.Sprintf("targets[%d].actuator_base_url is deprecated; use url instead", i))

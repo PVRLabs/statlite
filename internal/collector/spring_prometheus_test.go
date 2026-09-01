@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -139,6 +140,59 @@ func TestSpringPrometheusOmitsStatusCountersWhenLabelsAreMissing(t *testing.T) {
 	}
 }
 
+func TestSpringPrometheusOmitsInvalidCountersWithoutDroppingValidConcepts(t *testing.T) {
+	for _, value := range []float64{-5, math.NaN(), math.Inf(1), math.Inf(-1)} {
+		t.Run(fmt.Sprintf("value=%v", value), func(t *testing.T) {
+			v := &springPrometheusValues{values: make(map[string]float64)}
+			if err := v.accept(prometheus.Sample{Name: "http_server_requests_seconds_count", Value: value, Labels: []prometheus.Label{{Name: "status", Value: "500"}}}, false); err != nil {
+				t.Fatal(err)
+			}
+			if err := v.accept(prometheus.Sample{Name: "http_server_requests_seconds_count", Value: 2, Labels: []prometheus.Label{{Name: "status", Value: "404"}}}, false); err != nil {
+				t.Fatal(err)
+			}
+			if err := v.accept(prometheus.Sample{Name: "http_server_requests_seconds_sum", Value: value}, false); err != nil {
+				t.Fatal(err)
+			}
+			if err := v.accept(prometheus.Sample{Name: "process_cpu_usage", Value: 0.25}, false); err != nil {
+				t.Fatal(err)
+			}
+
+			result := &CollectionResult{}
+			(&SpringActuatorCollector{}).addPrometheusSamples(result, v)
+			if hasSample(result, "http_requests_total") || hasSample(result, "http_5xx_total") || hasSample(result, "http_request_time_total_seconds") {
+				t.Fatalf("invalid counter samples were retained: %#v", result.Samples)
+			}
+			assertSample(t, result, "http_404_total", MetricKindCounter, 2, "requests")
+			assertSample(t, result, "http_4xx_total", MetricKindCounter, 2, "requests")
+			assertSample(t, result, "process_cpu_usage", MetricKindGauge, 0.25, "ratio")
+		})
+	}
+}
+
+func TestSpringPrometheusOmitsCounterAggregateOverflow(t *testing.T) {
+	v := &springPrometheusValues{values: make(map[string]float64)}
+	for _, sample := range []prometheus.Sample{
+		{Name: "http_server_requests_seconds_count", Value: 1e308, Labels: []prometheus.Label{{Name: "status", Value: "500"}}},
+		{Name: "http_server_requests_seconds_count", Value: 1e308, Labels: []prometheus.Label{{Name: "status", Value: "500"}}},
+		{Name: "http_server_requests_seconds_count", Value: 2, Labels: []prometheus.Label{{Name: "status", Value: "404"}}},
+	} {
+		if err := v.accept(sample, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	result := &CollectionResult{}
+	(&SpringActuatorCollector{}).addPrometheusSamples(result, v)
+	if hasSample(result, "http_requests_total") || hasSample(result, "http_5xx_total") {
+		t.Fatalf("overflowed counter samples were retained: %#v", result.Samples)
+	}
+	assertSample(t, result, "http_404_total", MetricKindCounter, 2, "requests")
+	assertSample(t, result, "http_4xx_total", MetricKindCounter, 2, "requests")
+	if countEvents(result, EventSeverityWarning, "metric_aggregate_invalid") != 2 {
+		t.Fatalf("events = %#v, want request and 5xx aggregate warnings", result.Events)
+	}
+}
+
 func TestSpringPrometheusRejectsOutOfRangeHostCPU(t *testing.T) {
 	for _, value := range []float64{-0.2, 1.5} {
 		result := &CollectionResult{}
@@ -173,6 +227,7 @@ func TestSpringAutoFallsBackOnlyOnDefinitiveResults(t *testing.T) {
 		{name: "absent", prometheusStatus: http.StatusNotFound, body: "missing", wantPrometheus: 1, wantActuator: 1},
 		{name: "valid incompatible", prometheusStatus: http.StatusOK, body: "unrelated_metric 1\n", contentType: "text/plain; version=0.0.4", wantPrometheus: 1, wantActuator: 1},
 		{name: "process start only is incompatible", prometheusStatus: http.StatusOK, body: "process_start_time_seconds 1\n", contentType: "text/plain; version=0.0.4", wantPrometheus: 1, wantActuator: 1},
+		{name: "invalid counter is incompatible", prometheusStatus: http.StatusOK, body: "process_start_time_seconds 1\nhttp_server_requests_seconds_count{status=\"200\"} -5\n", contentType: "text/plain; version=0.0.4", wantPrometheus: 1, wantActuator: 1},
 		{name: "malformed remains unresolved", prometheusStatus: http.StatusOK, body: "bad", contentType: "text/plain; version=0.0.4", wantPrometheus: 2},
 		{name: "auth remains unresolved", prometheusStatus: http.StatusUnauthorized, body: "denied", wantPrometheus: 2},
 		{name: "transient remains unresolved", prometheusStatus: http.StatusServiceUnavailable, body: "later", wantPrometheus: 2},

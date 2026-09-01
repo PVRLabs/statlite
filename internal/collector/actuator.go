@@ -107,6 +107,10 @@ func NewActuatorClient(baseURL string, timeout time.Duration, auth *BasicAuth) (
 	if parsed.Host == "" {
 		return nil, fmt.Errorf("actuator base URL must include a host")
 	}
+	if auth == nil && parsed.User != nil {
+		password, _ := parsed.User.Password()
+		auth = &BasicAuth{Username: parsed.User.Username(), Password: password}
+	}
 
 	return &ActuatorClient{
 		baseURL: parsed,

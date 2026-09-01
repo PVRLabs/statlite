@@ -54,6 +54,16 @@ func newCollector(target config.TargetConfig, timeout time.Duration) (monitor.Co
 		if err != nil {
 			return nil, fmt.Errorf("actuator client: %w", err)
 		}
+		source := target.MetricsSource
+		if source == "" {
+			source = config.SpringMetricsSourceAuto
+		}
+		if target.UsesLegacyActuatorURLUserinfo() {
+			source = config.SpringMetricsSourceActuator
+		}
+		if source == config.SpringMetricsSourceActuator {
+			return collector.NewSpringCollector(target.Name, actuatorClient, nil, "", collector.SpringMetricsSource(source), target.CollectHostMetrics)
+		}
 		prometheusClient, err := prometheus.NewClient(timeout, prometheus.DefaultLimits, prometheusAuth(auth))
 		if err != nil {
 			return nil, fmt.Errorf("prometheus client: %w", err)
@@ -61,10 +71,6 @@ func newCollector(target config.TargetConfig, timeout time.Duration) (monitor.Co
 		prometheusURL, err := springEndpoint(target.URL, "prometheus")
 		if err != nil {
 			return nil, fmt.Errorf("prometheus endpoint: %w", err)
-		}
-		source := target.MetricsSource
-		if source == "" {
-			source = config.SpringMetricsSourceAuto
 		}
 		return collector.NewSpringCollector(target.Name, actuatorClient, prometheusClient, prometheusURL, collector.SpringMetricsSource(source), target.CollectHostMetrics)
 	case config.TargetTypeStatliteMetrics:

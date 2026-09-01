@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
-	"math"
 	"math/bits"
 	"slices"
 	"strconv"
@@ -57,7 +56,9 @@ type quarkusHTTPValues struct {
 	matchingStates       int
 	matchingOverflow     bool
 	requestOverflow      bool
-	statusOverflow       bool
+	notFoundOverflow     bool
+	clientErrorsOverflow bool
+	serverErrorsOverflow bool
 	durationOverflow     bool
 	countDuplicate       bool
 	durationDuplicate    bool
@@ -195,7 +196,7 @@ func (v *quarkusRuntimeValues) acceptHeap(value float64) bool {
 		return false
 	}
 	var ok bool
-	v.heap, ok = addFinite(v.heap, value)
+	v.heap, ok = addFiniteNonnegative(v.heap, value)
 	v.sawHeap = true
 	v.invalidHeap = v.invalidHeap || !ok
 	return ok
@@ -283,22 +284,22 @@ func (v *quarkusHTTPValues) acceptCount(sample prometheus.Sample) {
 	}
 	v.sawCount = true
 	var added bool
-	v.requests, added = addFinite(v.requests, sample.Value)
+	v.requests, added = addFiniteNonnegative(v.requests, sample.Value)
 	if !added {
 		v.requestOverflow = true
 	}
 	v.addMatchingDimension(&v.countDimensions, dimension)
 	if code == 404 {
-		v.notFound, added = addFinite(v.notFound, sample.Value)
-		v.statusOverflow = v.statusOverflow || !added
+		v.notFound, added = addFiniteNonnegative(v.notFound, sample.Value)
+		v.notFoundOverflow = v.notFoundOverflow || !added
 	}
 	if code >= 400 && code <= 499 {
-		v.clientErrors, added = addFinite(v.clientErrors, sample.Value)
-		v.statusOverflow = v.statusOverflow || !added
+		v.clientErrors, added = addFiniteNonnegative(v.clientErrors, sample.Value)
+		v.clientErrorsOverflow = v.clientErrorsOverflow || !added
 	}
 	if code >= 500 {
-		v.serverErrors, added = addFinite(v.serverErrors, sample.Value)
-		v.statusOverflow = v.statusOverflow || !added
+		v.serverErrors, added = addFiniteNonnegative(v.serverErrors, sample.Value)
+		v.serverErrorsOverflow = v.serverErrorsOverflow || !added
 	}
 }
 
@@ -316,23 +317,11 @@ func (v *quarkusHTTPValues) acceptDuration(sample prometheus.Sample) {
 	}
 	v.sawDuration = true
 	var added bool
-	v.durationSeconds, added = addFinite(v.durationSeconds, sample.Value)
+	v.durationSeconds, added = addFiniteNonnegative(v.durationSeconds, sample.Value)
 	if !added {
 		v.durationOverflow = true
 	}
 	v.addMatchingDimension(&v.durationDimensions, dimension)
-}
-
-func finiteNonnegative(value float64) bool {
-	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0
-}
-
-func addFinite(total, value float64) (float64, bool) {
-	result := total + value
-	if math.IsInf(result, 0) || math.IsNaN(result) {
-		return total, false
-	}
-	return result, true
 }
 
 func (v *quarkusHTTPValues) addMatchingDimension(groups *map[quarkusHTTPDimensionHash]int, key quarkusHTTPDimensionHash) {
@@ -380,7 +369,7 @@ func hashHTTPDimensions(hash interface {
 }
 
 func (v *quarkusHTTPValues) durationMatchesCounts() bool {
-	if v.matchingOverflow || v.requestOverflow || v.durationOverflow || v.countDuplicate || v.durationDuplicate || !v.sawCount || !v.sawDuration || len(v.countDimensions) != len(v.durationDimensions) {
+	if v.matchingOverflow || v.durationOverflow || v.countDuplicate || v.durationDuplicate || !v.sawCount || !v.sawDuration || len(v.countDimensions) != len(v.durationDimensions) {
 		return false
 	}
 	for key, countSeries := range v.countDimensions {
@@ -410,10 +399,16 @@ func (v *quarkusHTTPValues) addTo(result *CollectionResult) {
 	if v.sawCount && !v.requestOverflow && !v.countDuplicate && !v.matchingOverflow {
 		result.addSample("http_requests_total", MetricKindCounter, v.requests, "requests")
 	}
-	if v.sawCount && v.completeCountLabels && !v.statusOverflow && !v.countDuplicate && !v.matchingOverflow {
-		result.addSample("http_404_total", MetricKindCounter, v.notFound, "requests")
-		result.addSample("http_4xx_total", MetricKindCounter, v.clientErrors, "requests")
-		result.addSample("http_5xx_total", MetricKindCounter, v.serverErrors, "requests")
+	if v.sawCount && v.completeCountLabels && !v.countDuplicate && !v.matchingOverflow {
+		if !v.notFoundOverflow {
+			result.addSample("http_404_total", MetricKindCounter, v.notFound, "requests")
+		}
+		if !v.clientErrorsOverflow {
+			result.addSample("http_4xx_total", MetricKindCounter, v.clientErrors, "requests")
+		}
+		if !v.serverErrorsOverflow {
+			result.addSample("http_5xx_total", MetricKindCounter, v.serverErrors, "requests")
+		}
 	}
 	durationMatches := v.durationMatchesCounts()
 	if durationMatches {
@@ -425,14 +420,23 @@ func (v *quarkusHTTPValues) addTo(result *CollectionResult) {
 	if v.incompleteSumLabel {
 		result.addEvent(EventSeverityWarning, "metric_dimension_invalid", "http_request_time_total_seconds", "ignored http_server_requests_seconds_sum series without valid method, outcome, and status dimensions and a finite nonnegative value")
 	}
-	if v.sawDuration && !durationMatches && !v.requestOverflow && !v.durationOverflow && !v.countDuplicate && !v.durationDuplicate && !v.matchingOverflow {
+	if v.sawDuration && !durationMatches && !v.durationOverflow && !v.countDuplicate && !v.durationDuplicate && !v.matchingOverflow {
 		result.addEvent(EventSeverityWarning, "metric_series_mismatch", "http_request_time_total_seconds", "omitted HTTP request duration because its accepted dimensions do not match request count series within the bounded matching state")
 	}
 	if v.requestOverflow {
 		result.addEvent(EventSeverityWarning, "metric_aggregate_invalid", "http_requests_total", "omitted HTTP request count because finite source values overflowed the normalized aggregate")
 	}
-	if v.statusOverflow {
-		result.addEvent(EventSeverityWarning, "metric_aggregate_invalid", "", "omitted HTTP status counters because finite source values overflowed a normalized status aggregate")
+	for _, status := range []struct {
+		key      string
+		overflow bool
+	}{
+		{key: "http_404_total", overflow: v.notFoundOverflow},
+		{key: "http_4xx_total", overflow: v.clientErrorsOverflow},
+		{key: "http_5xx_total", overflow: v.serverErrorsOverflow},
+	} {
+		if status.overflow {
+			result.addEvent(EventSeverityWarning, "metric_aggregate_invalid", status.key, fmt.Sprintf("omitted %s because finite source values overflowed the normalized aggregate", status.key))
+		}
 	}
 	if v.durationOverflow {
 		result.addEvent(EventSeverityWarning, "metric_aggregate_invalid", "http_request_time_total_seconds", "omitted HTTP request duration because finite source values overflowed the normalized aggregate")

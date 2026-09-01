@@ -45,16 +45,17 @@ type PollingConfig struct {
 }
 
 type TargetConfig struct {
-	Type               string      `yaml:"type,omitempty"`
-	Name               string      `yaml:"name"`
-	ActuatorBaseURL    string      `yaml:"actuator_base_url"`
-	URL                string      `yaml:"url"`
-	MetricsSource      string      `yaml:"metrics_source,omitempty"`
-	CollectHostMetrics bool        `yaml:"collect_host_metrics,omitempty"`
-	Auth               *AuthConfig `yaml:"auth,omitempty"`
-	actuatorURLSet     bool
-	metricsSourceSet   bool
-	collectHostSet     bool
+	Type                   string      `yaml:"type,omitempty"`
+	Name                   string      `yaml:"name"`
+	ActuatorBaseURL        string      `yaml:"actuator_base_url"`
+	URL                    string      `yaml:"url"`
+	MetricsSource          string      `yaml:"metrics_source,omitempty"`
+	CollectHostMetrics     bool        `yaml:"collect_host_metrics,omitempty"`
+	Auth                   *AuthConfig `yaml:"auth,omitempty"`
+	actuatorURLSet         bool
+	metricsSourceSet       bool
+	collectHostSet         bool
+	legacyActuatorUserinfo bool
 }
 
 type TargetDisplayMetadata struct {
@@ -198,10 +199,22 @@ func (c *Config) validate() error {
 			if t.URL == "" {
 				return fmt.Errorf("targets[%d].url is required for type spring", i)
 			}
+			if !t.legacyActuatorUserinfo && urlHasUserinfo(t.URL) {
+				return fmt.Errorf("targets[%d].url must not contain embedded credentials; use the explicit auth configuration instead", i)
+			}
 			if t.MetricsSource == "" {
 				c.Targets[i].MetricsSource = SpringMetricsSourceAuto
 			} else if t.MetricsSource != SpringMetricsSourceAuto && t.MetricsSource != SpringMetricsSourcePrometheus && t.MetricsSource != SpringMetricsSourceActuator {
 				return fmt.Errorf("targets[%d].metrics_source: unsupported value %q (supported: auto, prometheus, actuator)", i, t.MetricsSource)
+			}
+			if t.legacyActuatorUserinfo {
+				if t.Auth != nil {
+					return fmt.Errorf("targets[%d].auth cannot be combined with embedded credentials from deprecated actuator_base_url; use either the legacy URL credentials or url with explicit auth configuration", i)
+				}
+				if t.MetricsSource == SpringMetricsSourcePrometheus {
+					return fmt.Errorf("targets[%d].metrics_source: prometheus cannot be used with embedded credentials from deprecated actuator_base_url; use metrics_source: actuator or url with explicit auth configuration", i)
+				}
+				c.Targets[i].MetricsSource = SpringMetricsSourceActuator
 			}
 		case TargetTypeQuarkus, TargetTypeStatliteMetrics:
 			if t.URL == "" {
@@ -246,6 +259,18 @@ func (c *Config) validate() error {
 		}
 	}
 	return nil
+}
+
+func urlHasUserinfo(raw string) bool {
+	parsed, err := url.Parse(raw)
+	return err == nil && parsed.User != nil
+}
+
+// UsesLegacyActuatorURLUserinfo reports whether this Spring target came from
+// the deprecated actuator_base_url compatibility path with embedded
+// credentials. It is intentionally narrower than generic URL authentication.
+func (t TargetConfig) UsesLegacyActuatorURLUserinfo() bool {
+	return t.legacyActuatorUserinfo
 }
 
 func validateQuarkusURL(raw string) error {

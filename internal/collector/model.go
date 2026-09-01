@@ -2,7 +2,10 @@ package collector
 
 // This file defines the normalized collection result shared beyond collector adapters.
 
-import "time"
+import (
+	"math"
+	"time"
+)
 
 type MetricKind string
 
@@ -44,12 +47,30 @@ type CollectorEvent struct {
 }
 
 func (r *CollectionResult) addSample(key string, kind MetricKind, value float64, unit string) {
+	if kind == MetricKindCounter && !finiteNonnegative(value) {
+		return
+	}
 	r.Samples = append(r.Samples, MetricSample{
 		Key:   key,
 		Kind:  kind,
 		Value: value,
 		Unit:  unit,
 	})
+}
+
+func finiteNonnegative(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0
+}
+
+func addFiniteNonnegative(total, value float64) (float64, bool) {
+	if !finiteNonnegative(value) {
+		return total, false
+	}
+	result := total + value
+	if !finiteNonnegative(result) {
+		return total, false
+	}
+	return result, true
 }
 
 func (r *CollectionResult) addEvent(severity EventSeverity, eventType, metricKey, message string) {

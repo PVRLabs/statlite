@@ -134,14 +134,21 @@ Spring configurations, but new configuration should use explicit
 `metrics_source` accepts `auto`, `prometheus`, or `actuator` and defaults to
 `auto` when omitted. `auto` prefers a compatible Spring Prometheus endpoint and
 falls back to Actuator metrics only when the endpoint is absent or returns a
-valid but incompatible exposition. Authentication, transient, malformed, and
-resource-limit failures are retried without changing sources. Once selected,
-the source remains fixed until the target collector is recreated. Health is
-always collected independently from the Actuator health endpoint.
+valid but incompatible exposition. The compatibility exception is a
+credential-bearing `actuator_base_url`: omitted or explicit `auto` is forced to
+Actuator metrics, and `prometheus` is rejected. Authentication, transient,
+malformed, and resource-limit failures are retried without changing sources.
+Once selected, the source remains fixed until the target collector is
+recreated. Health is always collected independently from the Actuator health
+endpoint.
 
-The former `actuator_base_url` field remains a deprecated compatibility alias.
-StatLite logs a warning and treats it as `url`. Configuring both fields is an
-error, even when their values are identical.
+The former `actuator_base_url` field remains a deprecated compatibility alias
+and will be removed in a future breaking release. StatLite logs a warning and
+treats it as `url`. Embedded URL credentials remain supported only through
+this deprecated compatibility behavior. New configurations should use `url`
+with the explicit `auth` fields. Do not combine embedded credentials in the
+deprecated alias with an `auth` block. Configuring both URL fields is an error,
+even when their values are identical.
 
 Missing optional metrics are handled gracefully: values may appear as `null` or charts may show gaps instead of failing the whole poll.
 

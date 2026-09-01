@@ -287,13 +287,36 @@ http_server_requests_seconds_sum{method="GET",outcome="SERVER_ERROR",status="500
 process_cpu_usage 0.1
 `
 	result := collectQuarkusBody(t, body)
-	if got := sampleKeys(result.Samples); strings.Join(got, ",") != "process_cpu_usage" {
-		t.Fatalf("sample keys = %v, want only process CPU", got)
+	if got := sampleKeys(result.Samples); strings.Join(got, ",") != "http_404_total,http_4xx_total,process_cpu_usage" {
+		t.Fatalf("sample keys = %v, want unaffected status counters and process CPU", got)
 	}
-	for _, key := range []string{"http_requests_total", "", "http_request_time_total_seconds"} {
+	for _, key := range []string{"http_requests_total", "http_5xx_total", "http_request_time_total_seconds"} {
 		if !hasQuarkusCollectorEvent(result.Events, "metric_aggregate_invalid", key) {
 			t.Fatalf("events = %#v, want overflow diagnostic for %s", result.Events, key)
 		}
+	}
+}
+
+func TestQuarkusCollectorKeepsFiniteDurationWhenRequestTotalOverflows(t *testing.T) {
+	body := `http_server_requests_seconds_count{method="GET",outcome="SUCCESS",status="200",uri="/a"} 1e308
+http_server_requests_seconds_count{method="GET",outcome="SUCCESS",status="200",uri="/b"} 1e308
+http_server_requests_seconds_sum{method="GET",outcome="SUCCESS",status="200",uri="/a"} 1
+http_server_requests_seconds_sum{method="GET",outcome="SUCCESS",status="200",uri="/b"} 2
+process_cpu_usage 0.1
+`
+	result := collectQuarkusBody(t, body)
+	if hasSample(result, "http_requests_total") {
+		t.Fatalf("samples = %#v, overflowed request total must be omitted", result.Samples)
+	}
+	assertSample(t, result, "http_request_time_total_seconds", MetricKindCounter, 3, "seconds")
+	for _, key := range []string{"http_404_total", "http_4xx_total", "http_5xx_total"} {
+		assertSample(t, result, key, MetricKindCounter, 0, "requests")
+	}
+	if !hasQuarkusCollectorEvent(result.Events, "metric_aggregate_invalid", "http_requests_total") {
+		t.Fatalf("events = %#v, want request overflow diagnostic", result.Events)
+	}
+	if hasQuarkusCollectorEvent(result.Events, "metric_aggregate_invalid", "http_request_time_total_seconds") || hasQuarkusCollectorEvent(result.Events, "metric_series_mismatch", "http_request_time_total_seconds") {
+		t.Fatalf("events = %#v, finite matching duration must remain valid", result.Events)
 	}
 }
 

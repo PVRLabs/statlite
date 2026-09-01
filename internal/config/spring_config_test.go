@@ -59,12 +59,140 @@ targets:
 		t.Fatalf("Load() error = %v", err)
 	}
 	target := cfg.Targets[0]
-	if target.Type != TargetTypeSpring || target.URL != "https://user:secret@example.com/actuator" || target.ActuatorBaseURL != "" || target.MetricsSource != SpringMetricsSourceAuto {
+	if target.Type != TargetTypeSpring || target.URL != "https://user:secret@example.com/actuator" || target.ActuatorBaseURL != "" || target.MetricsSource != SpringMetricsSourceActuator || !target.UsesLegacyActuatorURLUserinfo() {
 		t.Fatalf("target = %#v, want migrated Spring target", target)
 	}
 	warnings := cfg.DeprecationWarnings()
 	if len(warnings) != 1 || !strings.Contains(warnings[0], "actuator_base_url is deprecated; use url instead") || strings.Contains(warnings[0], "secret") {
 		t.Fatalf("DeprecationWarnings() = %#v, want safe alias warning", warnings)
+	}
+}
+
+func TestLoadLegacySpringActuatorUserinfoSourceRules(t *testing.T) {
+	for _, source := range []string{"", SpringMetricsSourceAuto, SpringMetricsSourceActuator} {
+		t.Run("source="+source, func(t *testing.T) {
+			metricsSource := ""
+			if source != "" {
+				metricsSource = "\n    metrics_source: " + source
+			}
+			path := writeConfig(t, `
+server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "./statlite.sqlite"
+polling:
+  interval: "30s"
+targets:
+  - name: "app"
+    actuator_base_url: "https://user:secret@example.com/actuator"`+metricsSource+`
+`)
+			cfg, err := Load(path)
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if got := cfg.Targets[0].MetricsSource; got != SpringMetricsSourceActuator {
+				t.Fatalf("MetricsSource = %q, want actuator", got)
+			}
+		})
+	}
+
+	path := writeConfig(t, `
+server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "./statlite.sqlite"
+polling:
+  interval: "30s"
+targets:
+  - name: "app"
+    actuator_base_url: "https://user:secret@example.com/actuator"
+    metrics_source: prometheus
+`)
+	_, err := Load(path)
+	if err == nil || !strings.Contains(err.Error(), "prometheus cannot be used with embedded credentials from deprecated actuator_base_url") {
+		t.Fatalf("Load() error = %v, want clear legacy credential source error", err)
+	}
+}
+
+func TestLoadRejectsCanonicalSpringURLUserinfo(t *testing.T) {
+	path := writeConfig(t, `
+server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "./statlite.sqlite"
+polling:
+  interval: "30s"
+targets:
+  - name: "app"
+    url: "https://user:secret@example.com/actuator"
+`)
+	_, err := Load(path)
+	if err == nil || !strings.Contains(err.Error(), "url must not contain embedded credentials; use the explicit auth configuration instead") {
+		t.Fatalf("Load() error = %v, want actionable canonical URL credential error", err)
+	}
+}
+
+func TestLoadRejectsLegacySpringURLUserinfoWithExplicitAuth(t *testing.T) {
+	path := writeConfig(t, `
+server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "./statlite.sqlite"
+polling:
+  interval: "30s"
+targets:
+  - name: "app"
+    actuator_base_url: "https://legacy:secret@example.com/actuator"
+    auth:
+      type: basic
+      username: current
+      password: password
+`)
+	_, err := Load(path)
+	if err == nil || !strings.Contains(err.Error(), "auth cannot be combined with embedded credentials from deprecated actuator_base_url") {
+		t.Fatalf("Load() error = %v, want ambiguous credential configuration error", err)
+	}
+}
+
+func TestLoadAcceptsCanonicalSpringURLWithExplicitAuth(t *testing.T) {
+	path := writeConfig(t, `
+server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "./statlite.sqlite"
+polling:
+  interval: "30s"
+targets:
+  - name: "app"
+    url: "https://example.com/actuator"
+    auth:
+      type: basic
+      username: user
+      password: secret
+`)
+	if _, err := Load(path); err != nil {
+		t.Fatalf("Load() error = %v, want explicit auth configuration accepted", err)
+	}
+}
+
+func TestLoadDeprecatedSpringActuatorBaseURLWithoutUserinfoDefaultsAuto(t *testing.T) {
+	path := writeConfig(t, `
+server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "./statlite.sqlite"
+polling:
+  interval: "30s"
+targets:
+  - name: "app"
+    actuator_base_url: "https://example.com/actuator"
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Targets[0].MetricsSource != SpringMetricsSourceAuto || cfg.Targets[0].UsesLegacyActuatorURLUserinfo() {
+		t.Fatalf("target = %#v, want normal auto alias behavior", cfg.Targets[0])
 	}
 }
 

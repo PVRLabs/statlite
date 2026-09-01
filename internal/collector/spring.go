@@ -263,12 +263,12 @@ func (c *SpringActuatorCollector) collectHTTP(ctx context.Context, session *spri
 	}
 
 	if value, ok := metricMeasurement(metric, "COUNT"); ok {
-		result.addSample("http_requests_total", MetricKindCounter, value, "requests")
+		addSpringCounterSample(result, "http_requests_total", value, "requests")
 	} else {
 		result.addEvent(EventSeverityWarning, "metric_measurement_missing", "http_requests_total", "http.server.requests missing COUNT measurement")
 	}
 	if value, ok := metricMeasurement(metric, "TOTAL_TIME"); ok {
-		result.addSample("http_request_time_total_seconds", MetricKindCounter, value, "seconds")
+		addSpringCounterSample(result, "http_request_time_total_seconds", value, "seconds")
 	} else {
 		result.addEvent(EventSeverityWarning, "metric_measurement_missing", "http_request_time_total_seconds", "http.server.requests missing TOTAL_TIME measurement")
 	}
@@ -286,6 +286,7 @@ func (c *SpringActuatorCollector) collectHTTP(ctx context.Context, session *spri
 func (c *SpringActuatorCollector) collectHTTPStatusTotal(ctx context.Context, session *springPollSession, result *CollectionResult, key string, statuses []string) {
 	var total float64
 	var sawStatus bool
+	var invalidSource, overflow bool
 
 	for _, status := range statuses {
 		metric, err := session.FetchMetric(ctx, "http.server.requests", []string{"status:" + status})
@@ -299,10 +300,27 @@ func (c *SpringActuatorCollector) collectHTTPStatusTotal(ctx context.Context, se
 			result.addEvent(EventSeverityWarning, "metric_measurement_missing", key, fmt.Sprintf("http.server.requests status %s missing COUNT measurement", status))
 			continue
 		}
-		total += value
+		if !finiteNonnegative(value) {
+			invalidSource = true
+			continue
+		}
+		var added bool
+		total, added = addFiniteNonnegative(total, value)
+		if !added {
+			overflow = true
+			continue
+		}
 		sawStatus = true
 	}
 
+	if invalidSource {
+		result.addEvent(EventSeverityWarning, "metric_invalid", key, fmt.Sprintf("omitted %s because source values must be finite and non-negative", key))
+		return
+	}
+	if overflow {
+		result.addEvent(EventSeverityWarning, "metric_aggregate_invalid", key, fmt.Sprintf("omitted %s because finite source values overflowed the normalized aggregate", key))
+		return
+	}
 	if sawStatus {
 		result.addSample(key, MetricKindCounter, total, "requests")
 		return
@@ -310,6 +328,15 @@ func (c *SpringActuatorCollector) collectHTTPStatusTotal(ctx context.Context, se
 	if len(statuses) == 0 {
 		result.addSample(key, MetricKindCounter, 0, "requests")
 	}
+}
+
+func addSpringCounterSample(result *CollectionResult, key string, value float64, unit string) bool {
+	if !finiteNonnegative(value) {
+		result.addEvent(EventSeverityWarning, "metric_invalid", key, fmt.Sprintf("omitted %s because the source value must be finite and non-negative", key))
+		return false
+	}
+	result.addSample(key, MetricKindCounter, value, unit)
+	return true
 }
 
 func (c *SpringActuatorCollector) collectGauge(ctx context.Context, session *springPollSession, result *CollectionResult, key, actuatorName string, tags []string, statistic, unit string) {

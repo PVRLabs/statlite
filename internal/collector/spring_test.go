@@ -203,6 +203,46 @@ func TestSpringActuatorCollectorHandlesSparseMetricResponses(t *testing.T) {
 	}
 }
 
+func TestSpringActuatorCollectorOmitsInvalidCountersWithoutDroppingValidOnes(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/actuator/health":
+			writeActuatorJSON(t, w, map[string]string{"status": "UP"})
+		case r.URL.Path == "/actuator/metrics/http.server.requests" && r.URL.Query().Get("tag") == "":
+			writeActuatorJSON(t, w, metricBody("http.server.requests", "seconds", map[string]float64{
+				"COUNT":      10,
+				"TOTAL_TIME": -5,
+			}, map[string][]string{"status": {"404", "500", "501"}}))
+		case r.URL.Query().Get("tag") == "status:404":
+			writeActuatorJSON(t, w, metricBody("http.server.requests", "seconds", map[string]float64{"COUNT": -1}, nil))
+		case r.URL.Query().Get("tag") == "status:500", r.URL.Query().Get("tag") == "status:501":
+			writeActuatorJSON(t, w, metricBody("http.server.requests", "seconds", map[string]float64{"COUNT": 1e308}, nil))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client, err := NewActuatorClient(server.URL+"/actuator", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewActuatorClient() error = %v", err)
+	}
+	result, err := NewSpringActuatorCollector("app", client, false).Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+
+	assertSample(t, result, "http_requests_total", MetricKindCounter, 10, "requests")
+	for _, key := range []string{"http_request_time_total_seconds", "http_404_total", "http_4xx_total", "http_5xx_total"} {
+		if hasSample(result, key) {
+			t.Fatalf("invalid counter %s was retained: %#v", key, result.Samples)
+		}
+	}
+	if countEvents(result, EventSeverityWarning, "metric_invalid") != 3 || countEvents(result, EventSeverityWarning, "metric_aggregate_invalid") != 1 {
+		t.Fatalf("events = %#v, want invalid-source and aggregate-overflow diagnostics", result.Events)
+	}
+}
+
 func TestSpringActuatorCollectorKeepsSamplesOnPartialMetricFailures(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
