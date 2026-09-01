@@ -86,6 +86,23 @@ main {
   width: min(1440px, calc(100% - 32px));
   margin: 18px auto 28px;
 }
+.site-footer {
+  width: min(1440px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 0 0 20px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+.site-footer a {
+  color: var(--muted);
+  text-decoration: none;
+}
+.site-footer a:hover,
+.site-footer a:focus-visible {
+  color: var(--pvr-green);
+  text-decoration: underline;
+}
 .target-context {
   display: flex;
   flex-wrap: wrap;
@@ -523,6 +540,9 @@ pre {
     </div>
   </section>
 </main>
+<footer class="site-footer">
+  Using StatLite? <a href="https://github.com/PVRLabs/statlite" target="_blank" rel="noopener noreferrer">★ Star it on GitHub</a>
+</footer>
 <script src="{{dashboard_script_url}}" defer></script>
 </body>
 </html>
