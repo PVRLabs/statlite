@@ -209,6 +209,27 @@ test("renderPollStatus shows the latest poll state and a failed-poll summary", (
   }
 });
 
+test("footer summary reuses target health data without fetching", () => {
+  const originalDocument = global.document;
+  const document = dashboardDocument();
+  global.document = document;
+
+  try {
+    dashboard.renderFooterSummary([
+      { latest: { result: { health_status: "UP" } } },
+      { latest: { result: { health_status: "OK" } } },
+      { latest: { result: { health_status: "DOWN" } } },
+      {}
+    ], new Date("2026-09-02T12:34:56"));
+
+    assert.equal(document.getElementById("footer-targets").textContent, "4");
+    assert.equal(document.getElementById("footer-healthy").textContent, "2");
+    assert.match(document.getElementById("footer-refresh").textContent, /12:34:56/);
+  } finally {
+    global.document = originalDocument;
+  }
+});
+
 test("renderSeries applies capability visibility with a minimal DOM stub", () => {
   const elements = new Map();
   const document = {

@@ -541,7 +541,18 @@ pre {
   </section>
 </main>
 <footer class="site-footer">
-  Found StatLite useful? <a href="https://github.com/PVRLabs/statlite" target="_blank" rel="noopener noreferrer">★ Star it on GitHub</a>
+  <div class="footer-summary" aria-label="Dashboard summary">
+    <span>Targets: <span id="footer-targets">...</span></span>
+    <span class="footer-separator" aria-hidden="true">|</span>
+    <span>Health UP: <span id="footer-healthy">...</span></span>
+    <span class="footer-separator" aria-hidden="true">|</span>
+    <span>Last refresh: <span id="footer-refresh">...</span></span>
+  </div>
+  <div class="footer-project">
+    <span>{{dashboard_version}}</span>
+    <span class="footer-separator" aria-hidden="true">|</span>
+    <a href="https://github.com/PVRLabs/statlite" target="_blank" rel="noopener noreferrer">★ Star on GitHub</a>
+  </div>
 </footer>
 <script src="{{dashboard_script_url}}" defer></script>
 </body>

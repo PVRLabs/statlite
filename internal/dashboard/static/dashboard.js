@@ -288,6 +288,7 @@ function renderSummary(summary) {
   const selected = summary.selected_target || {};
   const targets = summary.targets || [];
   renderTargetContext(targets, selected);
+  renderFooterSummary(targets);
   setPill("health", result.health_status);
   setPill("db-health", result.db_health_status);
   setText("process-start", formatDateTime(result.process_start_time));
@@ -295,6 +296,16 @@ function renderSummary(summary) {
   setText("last-success", formatDateTime(monitor.last_successful_poll_at));
   setText("failures", String(monitor.consecutive_poll_failures || 0));
   renderPollStatus(monitor);
+}
+
+function renderFooterSummary(targets, now = new Date()) {
+  const healthy = targets.filter((target) => {
+    const health = (((target.latest || {}).result || {}).health_status) || "";
+    return statusTone(health) === "ok";
+  }).length;
+  setText("footer-targets", String(targets.length));
+  setText("footer-healthy", String(healthy));
+  setText("footer-refresh", now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
 }
 
 function renderPollStatus(monitor) {
@@ -616,6 +627,6 @@ function initDashboard() {
   refreshWhenVisible();
 }
 
-const dashboardTestHooks = { detectCapabilities, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, refresh, refreshWhenVisible, renderPollStatus, renderRangeSelection, renderSeries, shouldRenderSeries, state, targetTypeHelp, validDiskPoint };
+const dashboardTestHooks = { detectCapabilities, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, refresh, refreshWhenVisible, renderFooterSummary, renderPollStatus, renderRangeSelection, renderSeries, shouldRenderSeries, state, targetTypeHelp, validDiskPoint };
 if (typeof module !== "undefined" && module.exports) module.exports = dashboardTestHooks;
 if (typeof document !== "undefined") initDashboard();
