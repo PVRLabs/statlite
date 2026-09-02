@@ -626,6 +626,36 @@ func TestLatestSuccessfulSnapshotReturnsNoRowsForUnknownTarget(t *testing.T) {
 	}
 }
 
+func TestTrailingFailedPollsCapsLongFailureHistory(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	base := time.Date(2026, 7, 7, 10, 0, 0, 0, time.UTC)
+	for i := 0; i < trailingFailedPollLimit+5; i++ {
+		at := base.Add(time.Duration(i) * time.Second)
+		if _, err := store.SaveCollectionResult(context.Background(), &collector.CollectionResult{
+			TargetName:     "app",
+			PollStartedAt:  at,
+			PollFinishedAt: at.Add(time.Millisecond),
+			Events: []collector.CollectorEvent{{
+				Severity: collector.EventSeverityError,
+				Type:     "target_unreachable",
+				Message:  "connection refused",
+			}},
+		}); err != nil {
+			t.Fatalf("SaveCollectionResult(%d) error = %v", i, err)
+		}
+	}
+
+	got, err := store.TrailingFailedPolls(context.Background(), "app")
+	if err != nil {
+		t.Fatalf("TrailingFailedPolls() error = %v", err)
+	}
+	if got != trailingFailedPollLimit {
+		t.Fatalf("TrailingFailedPolls() = %d, want capped %d", got, trailingFailedPollLimit)
+	}
+}
+
 func TestEvents(t *testing.T) {
 	store := openTestStore(t)
 	defer store.Close()

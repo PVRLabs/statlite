@@ -67,6 +67,22 @@ func (m *Manager) Start(ctx context.Context) {
 	}
 }
 
+func (m *Manager) EnableNoPoll(ctx context.Context) (*time.Time, error) {
+	var newest *time.Time
+	for _, name := range m.order {
+		if err := m.targets[name].Monitor.EnableNoPoll(ctx); err != nil {
+			return nil, fmt.Errorf("target %q: load stored state: %w", name, err)
+		}
+		if snapshot := m.targets[name].Monitor.LatestSnapshot(); snapshot != nil {
+			finishedAt := snapshot.Result.PollFinishedAt.UTC()
+			if newest == nil || finishedAt.After(*newest) {
+				newest = &finishedAt
+			}
+		}
+	}
+	return newest, nil
+}
+
 func (m *Manager) Names() []string {
 	names := make([]string, len(m.order))
 	copy(names, m.order)

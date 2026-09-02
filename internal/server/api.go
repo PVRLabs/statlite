@@ -4,6 +4,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -39,6 +40,10 @@ func (s *Server) handleDebugPollNow(w http.ResponseWriter, r *http.Request) {
 
 	target := s.selectedTarget(r)
 	snapshot, err := target.Monitor.PollNow(r.Context())
+	if errors.Is(err, monitor.ErrPollingDisabled) {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 
 	status := http.StatusOK
 	if err != nil {
@@ -65,12 +70,12 @@ func (s *Server) handleSummary(w http.ResponseWriter, r *http.Request) {
 		Monitor:             target.Monitor.Status(),
 		Latest:              target.Monitor.LatestSnapshot(),
 		LatestRestartStatus: restartStatusNone,
-		Now:                 time.Now().UTC(),
+		Now:                 s.now(),
 	}
 	// Restart history is optional enrichment. Preserve the core in-memory
 	// summary when range parsing or its storage lookup fails, and report why the
 	// timestamp is absent so callers can distinguish failures from no restart.
-	if start, end, _, err := parseRange(r); err != nil {
+	if start, end, _, err := parseRangeAt(r, s.now()); err != nil {
 		resp.LatestRestartStatus = restartStatusInvalidRange
 	} else {
 		start, _, _ = s.clampToRetention(start)
@@ -106,7 +111,7 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	start, end, dashRange, err := parseRange(r)
+	start, end, dashRange, err := parseRangeAt(r, s.now())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -136,7 +141,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	start, end, _, err := parseRange(r)
+	start, end, _, err := parseRangeAt(r, s.now())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

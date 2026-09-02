@@ -21,6 +21,71 @@ func (s *Store) LatestSuccessfulSnapshot(ctx context.Context, targetName string)
 	return s.latestSnapshot(ctx, targetName, "ok")
 }
 
+func (s *Store) LatestFailedPollAt(ctx context.Context, targetName string) (*time.Time, error) {
+	if strings.TrimSpace(targetName) == "" {
+		return nil, fmt.Errorf("target name is required")
+	}
+	var finishedAt string
+	err := s.db.QueryRowContext(ctx, `
+SELECT p.finished_at
+FROM polls p
+JOIN targets t ON t.id = p.target_id
+WHERE t.name = ? AND p.status = 'error'
+ORDER BY p.started_at DESC, p.id DESC
+LIMIT 1
+`, targetName).Scan(&finishedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, sql.ErrNoRows
+	}
+	if err != nil {
+		return nil, fmt.Errorf("query latest failed poll: %w", err)
+	}
+	parsed, err := parseStoredTime(finishedAt)
+	if err != nil {
+		return nil, fmt.Errorf("parse failed poll finished_at: %w", err)
+	}
+	return &parsed, nil
+}
+
+const trailingFailedPollLimit = 100
+
+// TrailingFailedPolls returns the number of consecutive non-successful polls
+// among a target's newest polls. No-poll mode uses this bounded approximation
+// for dashboard status; longer failure streaks are capped at the lookup limit.
+func (s *Store) TrailingFailedPolls(ctx context.Context, targetName string) (int, error) {
+	if strings.TrimSpace(targetName) == "" {
+		return 0, fmt.Errorf("target name is required")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT p.status
+FROM polls p
+JOIN targets t ON t.id = p.target_id
+WHERE t.name = ?
+ORDER BY p.started_at DESC, p.id DESC
+LIMIT ?
+`, targetName, trailingFailedPollLimit)
+	if err != nil {
+		return 0, fmt.Errorf("query trailing failed polls: %w", err)
+	}
+	defer rows.Close()
+
+	count := 0
+	for rows.Next() {
+		var status string
+		if err := rows.Scan(&status); err != nil {
+			return 0, fmt.Errorf("scan trailing failed poll: %w", err)
+		}
+		if status == "ok" {
+			break
+		}
+		count++
+	}
+	if err := rows.Err(); err != nil {
+		return 0, fmt.Errorf("iterate trailing failed polls: %w", err)
+	}
+	return count, nil
+}
+
 func (s *Store) latestSnapshot(ctx context.Context, targetName, status string) (*Snapshot, error) {
 	if strings.TrimSpace(targetName) == "" {
 		return nil, fmt.Errorf("target name is required")

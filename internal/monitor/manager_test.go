@@ -159,6 +159,33 @@ func newTestManager(t *testing.T, alpha, beta *Monitor) *Manager {
 	return manager
 }
 
+func TestEnableNoPollReturnsNewestConfiguredTargetPollTime(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+	alphaAt := time.Date(2025, 2, 3, 4, 0, 0, 0, time.UTC)
+	betaAt := alphaAt.Add(2 * time.Hour)
+	for name, at := range map[string]time.Time{"alpha": alphaAt, "beta": betaAt} {
+		result := namedSuccessfulResult(name, at.Add(-time.Hour), 1, 1)
+		result.PollStartedAt = at.Add(-time.Second)
+		result.PollFinishedAt = at
+		if _, err := store.SaveCollectionResult(context.Background(), result); err != nil {
+			t.Fatalf("save %s: %v", name, err)
+		}
+	}
+	manager := newTestManager(t,
+		newNamedTestMonitor(t, "alpha", store, &sequenceCollector{}),
+		newNamedTestMonitor(t, "beta", store, &sequenceCollector{}),
+	)
+
+	got, err := manager.EnableNoPoll(context.Background())
+	if err != nil {
+		t.Fatalf("EnableNoPoll() error = %v", err)
+	}
+	if got == nil || !got.Equal(betaAt) {
+		t.Fatalf("effective now = %v, want %v", got, betaAt)
+	}
+}
+
 func newNamedTestMonitor(t *testing.T, name string, store *storage.Store, collector Collector) *Monitor {
 	t.Helper()
 	mon, err := New(name, collector, store, time.Hour)

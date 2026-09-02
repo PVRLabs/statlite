@@ -64,6 +64,87 @@ func TestServeUsesPreboundListener(t *testing.T) {
 	}
 }
 
+func TestDebugPollNowCannotBypassNoPoll(t *testing.T) {
+	store, err := storage.Open(t.Context(), t.TempDir()+"/statlite.sqlite")
+	if err != nil {
+		t.Fatalf("storage.Open() error = %v", err)
+	}
+	defer store.Close()
+	targetCollector := &countingCollector{}
+	mon := newServerTestMonitor(t, "app", store, targetCollector)
+	if err := mon.EnableNoPoll(t.Context()); err != nil {
+		t.Fatalf("EnableNoPoll() error = %v", err)
+	}
+
+	statlite := NewWithManager("127.0.0.1:0", mustSingleServerTestManager(t, mon))
+	testServer := httptest.NewServer(statlite.httpServer.Handler)
+	defer testServer.Close()
+	resp, err := http.Get(testServer.URL + "/debug/poll-now")
+	if err != nil {
+		t.Fatalf("poll-now request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("poll-now status = %d, want %d", resp.StatusCode, http.StatusConflict)
+	}
+	if targetCollector.calls.Load() != 0 {
+		t.Fatalf("target requests = %d, want 0", targetCollector.calls.Load())
+	}
+}
+
+func TestFrozenDashboardTimeControlsSummaryRangesAndRestartLookup(t *testing.T) {
+	store, err := storage.Open(t.Context(), t.TempDir()+"/statlite.sqlite")
+	if err != nil {
+		t.Fatalf("storage.Open() error = %v", err)
+	}
+	defer store.Close()
+	frozen := time.Date(2024, 3, 4, 12, 0, 0, 0, time.UTC)
+	pollAt := frozen.Add(-30 * time.Minute)
+	result := serverTestResult("app", pollAt, 10, 2, []collector.CollectorEvent{{
+		Severity: collector.EventSeverityWarning,
+		Type:     monitor.EventTypeRestartDetected,
+		Message:  "stored restart",
+	}})
+	if _, err := store.SaveCollectionResult(t.Context(), result); err != nil {
+		t.Fatalf("SaveCollectionResult() error = %v", err)
+	}
+	mon := newServerTestMonitor(t, "app", store, &countingCollector{})
+	if err := mon.EnableNoPoll(t.Context()); err != nil {
+		t.Fatalf("EnableNoPoll() error = %v", err)
+	}
+
+	statlite := NewWithManager("127.0.0.1:0", mustSingleServerTestManager(t, mon))
+	statlite.FreezeDashboardTime(frozen)
+	testServer := httptest.NewServer(statlite.httpServer.Handler)
+	defer testServer.Close()
+
+	resp, err := http.Get(testServer.URL + "/api/summary?range=1h")
+	if err != nil {
+		t.Fatalf("summary request: %v", err)
+	}
+	defer resp.Body.Close()
+	var summary SummaryResponse
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+		t.Fatalf("decode summary: %v", err)
+	}
+	if !summary.Now.Equal(frozen) || summary.LatestRestartStatus != restartStatusFound || summary.LatestRestart == nil {
+		t.Fatalf("summary = %#v, want frozen now and stored restart", summary)
+	}
+
+	seriesResp, err := http.Get(testServer.URL + "/api/series?range=1h")
+	if err != nil {
+		t.Fatalf("series request: %v", err)
+	}
+	defer seriesResp.Body.Close()
+	var series storage.Series
+	if err := json.NewDecoder(seriesResp.Body).Decode(&series); err != nil {
+		t.Fatalf("decode series: %v", err)
+	}
+	if !series.Start.Equal(frozen.Add(-time.Hour)) || !series.End.Equal(frozen) || len(series.Points) == 0 {
+		t.Fatalf("series = %#v, want frozen 1h range containing stored poll", series)
+	}
+}
+
 func TestRootServesDashboardPage(t *testing.T) {
 	statlite := New("127.0.0.1:0", nil)
 	server := httptest.NewServer(statlite.httpServer.Handler)
@@ -2259,6 +2340,15 @@ func (c *noopCollector) Collect(context.Context) (*collector.CollectionResult, e
 		PollStartedAt:  time.Now(),
 		PollFinishedAt: time.Now(),
 	}, nil
+}
+
+type countingCollector struct {
+	calls atomic.Int64
+}
+
+func (c *countingCollector) Collect(context.Context) (*collector.CollectionResult, error) {
+	c.calls.Add(1)
+	return nil, nil
 }
 
 func writeJSONForTest(t *testing.T, w http.ResponseWriter, value interface{}) {

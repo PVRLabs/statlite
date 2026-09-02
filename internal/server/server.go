@@ -52,6 +52,7 @@ type Server struct {
 	storageHealthy    func(context.Context) bool
 	storageAvailable  func() bool
 	storageInterval   time.Duration
+	now               func() time.Time
 	cpuMu             sync.Mutex
 	lastCPUAt         time.Time
 	lastCPUSeconds    float64
@@ -99,6 +100,7 @@ func NewWithManagerRetentionCutoffAndFilesystem(listen string, manager *monitor.
 		resourceInterval: resourceSnapshotInterval,
 		storageHealth:    initialStorageHealth(manager),
 		storageInterval:  storageHealthCheckInterval,
+		now:              func() time.Time { return time.Now().UTC() },
 	}
 	if manager != nil {
 		storageMonitor := manager.PrimaryMonitor()
@@ -130,6 +132,13 @@ func NewWithManagerRetentionCutoffAndFilesystem(listen string, manager *monitor.
 	}
 
 	return s
+}
+
+// FreezeDashboardTime makes dashboard ranges relative to a stored point in
+// time. It is intended for no-poll inspection mode.
+func (s *Server) FreezeDashboardTime(now time.Time) {
+	frozen := now.UTC()
+	s.now = func() time.Time { return frozen }
 }
 
 func monitorManagerForSingleTarget(mon *monitor.Monitor) (*monitor.Manager, error) {

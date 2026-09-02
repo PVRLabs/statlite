@@ -53,6 +53,124 @@ func TestPollNowTracksFailureStatusAndStoresFailedPoll(t *testing.T) {
 	}
 }
 
+func TestNoPollLoadsStoredStateAndPreventsCollection(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	result := successfulResult(time.Date(2026, 7, 7, 9, 0, 0, 0, time.UTC), 12, 3)
+	pollID, err := store.SaveCollectionResult(context.Background(), result)
+	if err != nil {
+		t.Fatalf("SaveCollectionResult() error = %v", err)
+	}
+	collector := newNotifyingSequenceCollector(nil)
+	mon := newTestMonitor(t, store, collector)
+
+	if err := mon.EnableNoPoll(context.Background()); err != nil {
+		t.Fatalf("EnableNoPoll() error = %v", err)
+	}
+	if _, err := mon.PollNow(context.Background()); !errors.Is(err, ErrPollingDisabled) {
+		t.Fatalf("PollNow() error = %v, want ErrPollingDisabled", err)
+	}
+
+	select {
+	case <-collector.calls:
+		t.Fatal("collector was called in no-poll mode")
+	case <-time.After(20 * time.Millisecond):
+	}
+	latest := mon.LatestSnapshot()
+	if latest == nil || latest.PollID != pollID || latest.Result.HealthStatus != "UP" {
+		t.Fatalf("LatestSnapshot() = %#v, want stored poll %d", latest, pollID)
+	}
+	status := mon.Status()
+	if status.LastStoredPollID != pollID || status.LastSuccessfulStoredPollID != pollID || status.LastSuccessfulPollAt == nil {
+		t.Fatalf("Status() = %#v, want stored successful poll %d", status, pollID)
+	}
+}
+
+func TestNoPollRestoresLatestSuccessAndTrailingFailures(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	started := time.Date(2026, 6, 1, 9, 0, 0, 0, time.UTC)
+	successID, err := store.SaveCollectionResult(context.Background(), uptimeResult(started, 10))
+	if err != nil {
+		t.Fatalf("save success: %v", err)
+	}
+	var latestID int64
+	for i := 1; i <= 2; i++ {
+		at := started.Add(time.Duration(i) * time.Minute)
+		latestID, err = store.SaveCollectionResult(context.Background(), &collector.CollectionResult{
+			TargetName:     "app",
+			PollStartedAt:  at,
+			PollFinishedAt: at.Add(time.Second),
+			Events: []collector.CollectorEvent{{
+				Severity: collector.EventSeverityError,
+				Type:     "target_unreachable",
+				Message:  "connection refused",
+			}},
+		})
+		if err != nil {
+			t.Fatalf("save failure %d: %v", i, err)
+		}
+	}
+
+	mon := newTestMonitor(t, store, newNotifyingSequenceCollector(nil))
+	if err := mon.EnableNoPoll(context.Background()); err != nil {
+		t.Fatalf("EnableNoPoll() error = %v", err)
+	}
+	status := mon.Status()
+	if status.LastStoredPollID != latestID || status.ConsecutivePollFailures != 2 {
+		t.Fatalf("Status() = %#v, want latest poll %d and 2 failures", status, latestID)
+	}
+	if status.LastSuccessfulStoredPollID != successID || status.LastSuccessfulPollAt == nil {
+		t.Fatalf("Status() = %#v, want stored success %d", status, successID)
+	}
+}
+
+func TestNoPollRestoresLastFailureAfterRecovery(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	started := time.Date(2026, 6, 2, 9, 0, 0, 0, time.UTC)
+	if _, err := store.SaveCollectionResult(context.Background(), uptimeResult(started, 10)); err != nil {
+		t.Fatalf("save initial success: %v", err)
+	}
+	failedAt := started.Add(time.Minute)
+	if _, err := store.SaveCollectionResult(context.Background(), &collector.CollectionResult{
+		TargetName:     "app",
+		PollStartedAt:  failedAt,
+		PollFinishedAt: failedAt.Add(time.Second),
+		Events: []collector.CollectorEvent{{
+			Severity: collector.EventSeverityError,
+			Type:     "target_unreachable",
+			Message:  "connection refused",
+		}},
+	}); err != nil {
+		t.Fatalf("save failure: %v", err)
+	}
+	recoveredAt := started.Add(2 * time.Minute)
+	recoveryID, err := store.SaveCollectionResult(context.Background(), uptimeResult(recoveredAt, 20))
+	if err != nil {
+		t.Fatalf("save recovery: %v", err)
+	}
+
+	mon := newTestMonitor(t, store, newNotifyingSequenceCollector(nil))
+	if err := mon.EnableNoPoll(context.Background()); err != nil {
+		t.Fatalf("EnableNoPoll() error = %v", err)
+	}
+	status := mon.Status()
+	if status.ConsecutivePollFailures != 0 {
+		t.Fatalf("ConsecutivePollFailures = %d, want 0", status.ConsecutivePollFailures)
+	}
+	if status.LastSuccessfulStoredPollID != recoveryID || status.LastSuccessfulPollAt == nil {
+		t.Fatalf("Status() = %#v, want recovery poll %d", status, recoveryID)
+	}
+	wantFailedAt := failedAt.Add(time.Second)
+	if status.LastFailedPollAt == nil || !status.LastFailedPollAt.Equal(wantFailedAt) {
+		t.Fatalf("LastFailedPollAt = %v, want %v", status.LastFailedPollAt, wantFailedAt)
+	}
+}
+
 func TestPollNowDetectsRestartWhenProcessStartTimeChanges(t *testing.T) {
 	store := openTestStore(t)
 	defer store.Close()

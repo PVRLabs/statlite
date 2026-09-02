@@ -14,6 +14,20 @@ StatLite loads `statlite.yaml` by default. Override with `--config`:
 statlite --config /etc/statlite/config.yaml
 ```
 
+Use `--no-poll` with the normal YAML configuration to serve the dashboard from
+existing SQLite history without contacting any configured target:
+
+```bash
+statlite --config /etc/statlite/config.yaml --no-poll
+```
+
+No-poll mode disables startup, periodic, and manual debug polling. It also
+skips retention cleanup so inspecting a copied or historical database does not
+delete older data, and it does not hide stored history outside the configured
+retention window. Dashboard time and preset ranges are frozen at the newest
+stored poll across the configured targets, or use the real current time when
+the database has no polls.
+
 See [`docs/integrations.md`](integrations.md) for the supported integration
 matrix. See `examples/` for starter templates (Actuator, Quarkus, StatLite Metrics, multi-target,
 self-monitoring), `examples/python-fastapi-demo/` for a runnable FastAPI app,

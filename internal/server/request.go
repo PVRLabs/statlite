@@ -62,8 +62,12 @@ func clearSeriesCounterFields(point *storage.SeriesPoint) {
 }
 
 func parseRange(r *http.Request) (time.Time, time.Time, DashboardRange, error) {
+	return parseRangeAt(r, time.Now().UTC())
+}
+
+func parseRangeAt(r *http.Request, now time.Time) (time.Time, time.Time, DashboardRange, error) {
 	query := r.URL.Query()
-	now := time.Now().UTC()
+	now = now.UTC()
 	if query.Get("start") != "" || query.Get("end") != "" {
 		start, err := parseQueryTime(query.Get("start"), "start")
 		if err != nil {

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pvrlabs/statlite/internal/collector"
@@ -25,6 +26,7 @@ type Monitor struct {
 	store                *storage.Store
 	interval             time.Duration
 	startupFollowUpDelay time.Duration
+	noPoll               atomic.Bool
 
 	pollMu sync.Mutex
 
@@ -35,6 +37,8 @@ type Monitor struct {
 }
 
 const defaultStartupFollowUpDelay = 3 * time.Second
+
+var ErrPollingDisabled = errors.New("polling is disabled by --no-poll")
 
 // EventTypeRestartDetected is recorded when detectAppRun observes a new app run.
 // Storage treats event types as opaque strings; this constant lives with the producer.
@@ -76,11 +80,61 @@ func (m *Monitor) Start(ctx context.Context) {
 	go m.loop(ctx)
 }
 
+// EnableNoPoll prevents all collection and restores the monitor's current
+// dashboard state from its most recent stored poll.
+func (m *Monitor) EnableNoPoll(ctx context.Context) error {
+	m.noPoll.Store(true)
+
+	snapshot, err := m.store.LatestSnapshot(ctx, m.targetName)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	successful, successfulErr := m.store.LatestSuccessfulSnapshot(ctx, m.targetName)
+	if successfulErr != nil && !errors.Is(successfulErr, sql.ErrNoRows) {
+		return successfulErr
+	}
+	failedPolls, err := m.store.TrailingFailedPolls(ctx, m.targetName)
+	if err != nil {
+		return err
+	}
+	lastFailedAt, failedErr := m.store.LatestFailedPollAt(ctx, m.targetName)
+	if failedErr != nil && !errors.Is(failedErr, sql.ErrNoRows) {
+		return failedErr
+	}
+
+	at := snapshot.Result.PollFinishedAt
+	m.statusMu.Lock()
+	defer m.statusMu.Unlock()
+	m.latest = snapshot
+	m.status.LastPollAt = &at
+	m.status.LastStoredPollID = snapshot.PollID
+	if successfulErr == nil {
+		successfulAt := successful.Result.PollFinishedAt
+		m.previous = successful
+		m.status.LastSuccessfulPollAt = &successfulAt
+		m.status.LastSuccessfulStoredPollID = successful.PollID
+	}
+	if failedErr == nil {
+		m.status.LastFailedPollAt = lastFailedAt
+	}
+	if snapshot.Status != "ok" {
+		m.status.ConsecutivePollFailures = failedPolls
+		m.status.LastPollErrorSummary = snapshot.ErrorSummary
+	}
+	return nil
+}
+
 func (m *Monitor) TargetName() string {
 	return m.targetName
 }
 
 func (m *Monitor) PollNow(ctx context.Context) (*storage.Snapshot, error) {
+	if m.noPoll.Load() {
+		return nil, ErrPollingDisabled
+	}
 	m.pollMu.Lock()
 	defer m.pollMu.Unlock()
 

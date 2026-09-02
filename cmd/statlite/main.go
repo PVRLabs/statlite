@@ -112,6 +112,7 @@ func runMonitor(args []string, stdout, stderr io.Writer) int {
 	}
 
 	configPath := monitorFlags.String("config", "statlite.yaml", "path to config file")
+	noPoll := monitorFlags.Bool("no-poll", false, "serve stored data without polling targets")
 	showVersion := monitorFlags.Bool("version", false, "print version and exit")
 	if err := monitorFlags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -169,8 +170,22 @@ func runMonitor(args []string, stdout, stderr io.Writer) int {
 		logger.Printf("monitor manager: %v", err)
 		return 1
 	}
+	var dashboardNow *time.Time
+	if *noPoll {
+		if dashboardNow, err = manager.EnableNoPoll(ctx); err != nil {
+			logger.Printf("monitor manager: %v", err)
+			return 1
+		}
+	}
 
-	srv := server.NewWithManagerRetentionCutoffAndFilesystem(cfg.Server.Listen, manager, cfg.Storage.RetentionDays, retentionCutoff.Current, cfg.Storage.SQLitePath)
+	serverRetentionDays := cfg.Storage.RetentionDays
+	if *noPoll {
+		serverRetentionDays = 0
+	}
+	srv := server.NewWithManagerRetentionCutoffAndFilesystem(cfg.Server.Listen, manager, serverRetentionDays, retentionCutoff.Current, cfg.Storage.SQLitePath)
+	if dashboardNow != nil {
+		srv.FreezeDashboardTime(*dashboardNow)
+	}
 	listener, err := srv.Listen()
 	if err != nil {
 		logger.Printf("server: %v", err)
@@ -182,7 +197,9 @@ func runMonitor(args []string, stdout, stderr io.Writer) int {
 	// poll can reach StatLite's own metrics endpoint. Keep cleanup ahead of
 	// serving HTTP so requests cannot observe partial startup initialization.
 	// Prune before starting monitor goroutines so the first poll only sees retained history.
-	storage.StartRetentionCleanup(ctx, store, cfg.Storage.RetentionDays, retentionCutoff.Set)
+	if !*noPoll {
+		storage.StartRetentionCleanup(ctx, store, cfg.Storage.RetentionDays, retentionCutoff.Set)
+	}
 
 	go func() {
 		<-ctx.Done()
@@ -202,7 +219,9 @@ func runMonitor(args []string, stdout, stderr io.Writer) int {
 		serveErr <- nil
 	}()
 
-	manager.Start(ctx)
+	if !*noPoll {
+		manager.Start(ctx)
+	}
 
 	if err := <-serveErr; err != nil {
 		logger.Printf("server: %v", err)
@@ -235,7 +254,7 @@ Polls Spring Boot Actuator and StatLite self-monitoring endpoints, stores
 samples in local SQLite, and serves a localhost dashboard.
 
 Usage:
-  statlite [--config path]
+  statlite [--config path] [--no-poll]
   statlite inspect <application-url>
   statlite inspect --type quarkus <application-or-metrics-url>
   statlite --version
@@ -243,6 +262,7 @@ Usage:
 
 Options:
   --config path   Config file (default: statlite.yaml)
+  --no-poll       Serve stored data without polling targets
   --version       Print version and exit
   --help          Show this help
 

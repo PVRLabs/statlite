@@ -96,6 +96,7 @@ func TestPrintHelp(t *testing.T) {
 		"Spring Boot Actuator",
 		"Usage:",
 		"statlite [--config path]",
+		"--no-poll",
 		"--version",
 		"--help",
 		"Docs: README.md, docs/configuration.md",
