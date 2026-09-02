@@ -143,7 +143,7 @@ func TestNewCollectorAllowsCustomQuarkusMetricsEndpointWithoutHealth(t *testing.
 	if err != nil {
 		t.Fatalf("Collect() error = %v", err)
 	}
-	if len(result.Samples) != 1 || result.HealthStatus != "UP" || len(result.Events) != 0 {
+	if len(result.Samples) != 1 || result.Samples[0].Key != "process_cpu_usage" || result.HealthStatus != "UP" || len(result.Events) != 0 {
 		t.Fatalf("result = %#v, want metrics-only custom endpoint reachability UP", result)
 	}
 }
