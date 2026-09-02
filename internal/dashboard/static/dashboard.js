@@ -31,7 +31,7 @@ const palette = {
 
 const lineStyle = {
   borderWidth: 3,
-  pointRadius: 2.5,
+  pointRadius: 2,
   pointHoverRadius: 5,
   pointHitRadius: 8
 };
