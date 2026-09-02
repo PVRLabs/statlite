@@ -35,8 +35,8 @@ func TestQuarkusCollectorUsesOneLogicalScrapeAndPreservesExactEndpoint(t *testin
 	if requests.Load() != 1 {
 		t.Fatalf("wire requests = %d, want one logical scrape with one request", requests.Load())
 	}
-	if result.HealthStatus != "" || result.DBHealthStatus != "" {
-		t.Fatalf("result = %#v, want no inferred health", result)
+	if result.HealthStatus != "UP" || result.DBHealthStatus != "UP" {
+		t.Fatalf("health = %q/%q, want UP/UP", result.HealthStatus, result.DBHealthStatus)
 	}
 	assertQuarkusSamples(t, result.Samples, []MetricSample{{Key: "process_cpu_usage", Kind: MetricKindGauge, Value: 0.25, Unit: "ratio"}})
 }
@@ -97,8 +97,8 @@ disk_total_bytes 54321
 	if result.ProcessStartTime == nil || !result.ProcessStartTime.Equal(wantStart) {
 		t.Fatalf("ProcessStartTime = %v, want %v", result.ProcessStartTime, wantStart)
 	}
-	if result.HealthStatus != "" || result.DBHealthStatus != "" || len(result.Events) != 0 {
-		t.Fatalf("result = %#v, want runtime samples without health or warnings", result)
+	if result.HealthStatus != "UP" || result.DBHealthStatus != "UP" || len(result.Events) != 0 {
+		t.Fatalf("result = %#v, want runtime samples with healthy application and database", result)
 	}
 	for _, key := range []string{"jvm_heap_max_bytes", "host_cpu_usage", "host_memory_used_bytes", "host_disk_total_bytes"} {
 		if hasSample(result, key) {
@@ -418,8 +418,228 @@ func TestQuarkusCollectorUsesBasicAuthAndRejectsIncompatibleScrape(t *testing.T)
 	if err == nil || !strings.Contains(err.Error(), "does not expose") {
 		t.Fatalf("Collect() error = %v, want incompatible error", err)
 	}
-	if len(result.Events) != 1 || result.Events[0].Type != "metrics_source_incompatible" || result.HealthStatus != "" {
-		t.Fatalf("result = %#v, want focused incompatible event without health", result)
+	if len(result.Events) != 1 || result.Events[0].Type != "metrics_source_incompatible" || result.HealthStatus != "UP" || result.DBHealthStatus != "UP" {
+		t.Fatalf("result = %#v, want focused incompatible event with collected health", result)
+	}
+}
+
+func TestQuarkusCollectorPreservesMetricsWhenHealthFails(t *testing.T) {
+	metricsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		_, _ = w.Write([]byte("process_cpu_usage 0.25\n"))
+	}))
+	defer metricsServer.Close()
+	healthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "temporarily unavailable", http.StatusBadGateway)
+	}))
+	defer healthServer.Close()
+
+	client, err := prometheus.NewClient(time.Second, prometheus.DefaultLimits, nil)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	healthClient, err := NewQuarkusHealthClient(healthServer.URL, time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewQuarkusHealthClient() error = %v", err)
+	}
+	result, err := NewQuarkusCollector("orders", metricsServer.URL, client, healthClient).Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() error = %v, want successful metrics poll", err)
+	}
+	if len(result.Samples) != 1 || result.Samples[0].Key != "process_cpu_usage" {
+		t.Fatalf("samples = %#v, want preserved process metric", result.Samples)
+	}
+	if result.HealthStatus != "" || result.DBHealthStatus != "" {
+		t.Fatalf("health = %q/%q, want unavailable", result.HealthStatus, result.DBHealthStatus)
+	}
+	if len(result.Events) != 1 || result.Events[0].Type != "health_fetch_failed" || result.Events[0].Severity != EventSeverityWarning {
+		t.Fatalf("events = %#v, want focused health warning", result.Events)
+	}
+}
+
+func TestQuarkusCollectorSupportsMetricsWithoutHealthCapability(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		_, _ = w.Write([]byte("process_cpu_usage 0.25\n"))
+	}))
+	defer server.Close()
+	client, err := prometheus.NewClient(time.Second, prometheus.DefaultLimits, nil)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	result, err := NewQuarkusCollector("orders", server.URL, client, nil).Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if len(result.Samples) != 1 || len(result.Events) != 0 || result.HealthStatus != "UP" {
+		t.Fatalf("result = %#v, want metrics-only reachable UP", result)
+	}
+}
+
+func TestQuarkusCollectorTreatsMissingDerivedHealthAsReachable(t *testing.T) {
+	metricsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		_, _ = w.Write([]byte("process_cpu_usage 0.25\n"))
+	}))
+	defer metricsServer.Close()
+	healthServer := httptest.NewServer(http.NotFoundHandler())
+	defer healthServer.Close()
+	client, err := prometheus.NewClient(time.Second, prometheus.DefaultLimits, nil)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	healthClient, err := NewQuarkusHealthClient(healthServer.URL, time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewQuarkusHealthClient() error = %v", err)
+	}
+	healthClient.TreatNotFoundAsOptional()
+	result, err := NewQuarkusCollector("orders", metricsServer.URL, client, healthClient).Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if result.HealthStatus != "UP" || result.DBHealthStatus != "" || len(result.Events) != 0 {
+		t.Fatalf("result = %#v, want quiet reachable UP without database status", result)
+	}
+}
+
+func TestQuarkusCollectorCachesMissingDerivedHealthUntilRestart(t *testing.T) {
+	var healthRequests int
+	processStart := "process_start_time_seconds 1000\n"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/q/metrics":
+			w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+			_, _ = w.Write([]byte("process_cpu_usage 0.25\n" + processStart))
+		case "/q/health":
+			healthRequests++
+			http.NotFound(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	client, err := prometheus.NewClient(time.Second, prometheus.DefaultLimits, nil)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	healthClient, err := NewQuarkusHealthClient(server.URL+"/q/health", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewQuarkusHealthClient() error = %v", err)
+	}
+	healthClient.TreatNotFoundAsOptional()
+	c := NewQuarkusCollector("orders", server.URL+"/q/metrics", client, healthClient)
+	for i := 0; i < 2; i++ {
+		result, err := c.Collect(context.Background())
+		if err != nil || result.HealthStatus != "UP" || len(result.Events) != 0 {
+			t.Fatalf("Collect() #%d = (%#v, %v), want quiet UP", i+1, result, err)
+		}
+	}
+	if healthRequests != 1 {
+		t.Fatalf("health requests after cached absence = %d, want 1", healthRequests)
+	}
+	processStart = "process_start_time_seconds 2000\n"
+	result, err := c.Collect(context.Background())
+	if err != nil || result.HealthStatus != "UP" {
+		t.Fatalf("Collect() after restart = (%#v, %v), want reprobed UP fallback", result, err)
+	}
+	if healthRequests != 2 {
+		t.Fatalf("health requests after restart = %d, want 2", healthRequests)
+	}
+}
+
+func TestQuarkusCollectorDoesNotCacheMissingHealthAfterMetricsFailure(t *testing.T) {
+	metricsRequests := 0
+	healthRequests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/q/metrics":
+			metricsRequests++
+			if metricsRequests == 1 {
+				http.Error(w, "temporary metrics failure", http.StatusBadGateway)
+				return
+			}
+			w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+			_, _ = w.Write([]byte("process_cpu_usage 0.25\nprocess_start_time_seconds 1000\n"))
+		case "/q/health":
+			healthRequests++
+			if healthRequests == 1 {
+				http.NotFound(w, r)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"UP","checks":[]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	client, err := prometheus.NewClient(time.Second, prometheus.DefaultLimits, nil)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	healthClient, err := NewQuarkusHealthClient(server.URL+"/q/health", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewQuarkusHealthClient() error = %v", err)
+	}
+	healthClient.TreatNotFoundAsOptional()
+	c := NewQuarkusCollector("orders", server.URL+"/q/metrics", client, healthClient)
+	first, err := c.Collect(context.Background())
+	if err == nil || first.HealthStatus != "" {
+		t.Fatalf("first Collect() = (%#v, %v), want failed metrics and no health fallback", first, err)
+	}
+	second, err := c.Collect(context.Background())
+	if err != nil || second.HealthStatus != "UP" {
+		t.Fatalf("second Collect() = (%#v, %v), want health rediscovery", second, err)
+	}
+	if healthRequests != 2 {
+		t.Fatalf("health requests = %d, want retry after failed metrics poll", healthRequests)
+	}
+}
+
+func TestQuarkusCollectorWarnsWhenKnownHealthCapabilityDisappears(t *testing.T) {
+	healthRequests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/q/metrics":
+			w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+			_, _ = w.Write([]byte("process_cpu_usage 0.25\nprocess_start_time_seconds 1000\n"))
+		case "/q/health":
+			healthRequests++
+			if healthRequests == 2 {
+				http.NotFound(w, r)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"UP","checks":[]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	client, err := prometheus.NewClient(time.Second, prometheus.DefaultLimits, nil)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	healthClient, err := NewQuarkusHealthClient(server.URL+"/q/health", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewQuarkusHealthClient() error = %v", err)
+	}
+	healthClient.TreatNotFoundAsOptional()
+	c := NewQuarkusCollector("orders", server.URL+"/q/metrics", client, healthClient)
+	first, err := c.Collect(context.Background())
+	if err != nil || first.HealthStatus != "UP" || len(first.Events) != 0 {
+		t.Fatalf("first Collect() = (%#v, %v), want authoritative UP", first, err)
+	}
+	second, err := c.Collect(context.Background())
+	if err != nil || second.HealthStatus != "" || len(second.Events) != 1 || second.Events[0].Type != "health_fetch_failed" {
+		t.Fatalf("second Collect() = (%#v, %v), want retryable health warning", second, err)
+	}
+	third, err := c.Collect(context.Background())
+	if err != nil || third.HealthStatus != "UP" || len(third.Events) != 0 {
+		t.Fatalf("third Collect() = (%#v, %v), want health recovery", third, err)
+	}
+	if healthRequests != 3 {
+		t.Fatalf("health requests = %d, want retry after known capability failure", healthRequests)
 	}
 }
 
@@ -429,7 +649,16 @@ func newTestQuarkusCollector(t *testing.T, endpoint string, auth *prometheus.Bas
 	if err != nil {
 		t.Fatalf("NewClient() error = %v", err)
 	}
-	return NewQuarkusCollector("orders", endpoint, client)
+	healthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"UP","checks":[{"name":"Database connections health check","status":"UP","data":{"<default>":"UP"}}]}`))
+	}))
+	t.Cleanup(healthServer.Close)
+	healthClient, err := NewQuarkusHealthClient(healthServer.URL, time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewQuarkusHealthClient() error = %v", err)
+	}
+	return NewQuarkusCollector("orders", endpoint, client, healthClient)
 }
 
 func collectQuarkusBody(t *testing.T, body string) *CollectionResult {

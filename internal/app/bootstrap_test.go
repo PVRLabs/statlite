@@ -76,6 +76,119 @@ func TestNewCollectorRejectsInvalidStatliteMetricsURL(t *testing.T) {
 	}
 }
 
+func TestNewCollectorDerivesQuarkusHealthEndpointAndSharesAuth(t *testing.T) {
+	var metricsRequests, healthRequests int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, password, ok := r.BasicAuth()
+		if !ok || user != "user" || password != "secret" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		switch r.URL.Path {
+		case "/q/metrics":
+			metricsRequests++
+			w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+			_, _ = w.Write([]byte("process_cpu_usage 0.25\n"))
+		case "/q/health":
+			healthRequests++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"UP","checks":[{"name":"Database connections health check","status":"UP"}]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	targetCollector, err := newCollector(config.TargetConfig{
+		Name: "orders",
+		Type: config.TargetTypeQuarkus,
+		URL:  server.URL + "/q/metrics",
+		Auth: &config.AuthConfig{Type: "basic", Username: "user", Password: "secret"},
+	}, time.Second)
+	if err != nil {
+		t.Fatalf("newCollector() error = %v", err)
+	}
+	result, err := targetCollector.Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if metricsRequests != 1 || healthRequests != 1 {
+		t.Fatalf("requests = metrics:%d health:%d, want 1/1", metricsRequests, healthRequests)
+	}
+	if result.HealthStatus != "UP" || result.DBHealthStatus != "UP" {
+		t.Fatalf("health = %q/%q, want UP/UP", result.HealthStatus, result.DBHealthStatus)
+	}
+}
+
+func TestNewCollectorAllowsCustomQuarkusMetricsEndpointWithoutHealth(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/manage/prom" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		_, _ = w.Write([]byte("process_cpu_usage 0.25\n"))
+	}))
+	defer server.Close()
+
+	targetCollector, err := newCollector(config.TargetConfig{
+		Name: "orders",
+		Type: config.TargetTypeQuarkus,
+		URL:  server.URL + "/manage/prom",
+	}, time.Second)
+	if err != nil {
+		t.Fatalf("newCollector() error = %v", err)
+	}
+	result, err := targetCollector.Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if len(result.Samples) != 1 || result.HealthStatus != "UP" || len(result.Events) != 0 {
+		t.Fatalf("result = %#v, want metrics-only custom endpoint reachability UP", result)
+	}
+}
+
+func TestNewCollectorUsesExplicitQuarkusHealthURL(t *testing.T) {
+	var healthRequests int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, password, ok := r.BasicAuth()
+		if !ok || user != "user" || password != "secret" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		switch r.URL.Path {
+		case "/manage/prom":
+			w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+			_, _ = w.Write([]byte("process_cpu_usage 0.25\n"))
+		case "/manage/health":
+			healthRequests++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"UP","checks":[{"name":"Database connections health check","status":"UP"}]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	targetCollector, err := newCollector(config.TargetConfig{
+		Name:      "orders",
+		Type:      config.TargetTypeQuarkus,
+		URL:       server.URL + "/manage/prom",
+		HealthURL: server.URL + "/manage/health",
+		Auth:      &config.AuthConfig{Type: "basic", Username: "user", Password: "secret"},
+	}, time.Second)
+	if err != nil {
+		t.Fatalf("newCollector() error = %v", err)
+	}
+	result, err := targetCollector.Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if healthRequests != 1 || result.HealthStatus != "UP" || result.DBHealthStatus != "UP" {
+		t.Fatalf("health requests/status = %d %q/%q, want 1 UP/UP", healthRequests, result.HealthStatus, result.DBHealthStatus)
+	}
+}
+
 func TestNewCollectorRejectsUnsupportedTargetType(t *testing.T) {
 	_, err := newCollector(config.TargetConfig{Name: "unknown", Type: "unknown"}, time.Second)
 	if err == nil {

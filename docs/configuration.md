@@ -143,7 +143,9 @@ Actuator metrics, and `prometheus` is rejected. Authentication, transient,
 malformed, and resource-limit failures are retried without changing sources.
 Once selected, the source remains fixed until the target collector is
 recreated. Health is always collected independently from the Actuator health
-endpoint.
+endpoint. The current Spring collector treats a health-fetch failure as a
+failed poll before metrics collection; changing that established behavior is a
+separate implementation change.
 
 The former `actuator_base_url` field remains a deprecated compatibility alias
 and will be removed in a future breaking release. StatLite logs a warning and
@@ -183,11 +185,44 @@ targets:
     url: "http://localhost:9000/q/metrics"
 ```
 
-For Quarkus, `url` is the exact Prometheus/OpenMetrics exposition endpoint, not
-a management base URL. StatLite performs one bounded scrape per polling cycle
-and uses the poll time rather than exposition timestamps. The pinned contract
-is Quarkus 3.39.1 with Java 21 LTS and
-`quarkus-micrometer-registry-prometheus`.
+For Quarkus, `url` is the conventional `/q/metrics` Prometheus/OpenMetrics
+endpoint, not a management base URL. StatLite derives the aggregate SmallRye
+Health endpoint by replacing `/q/metrics` with `/q/health` on the same origin
+and context path when the conventional capability is available. It performs
+one bounded health request and one bounded metrics scrape per polling cycle
+when health is configured or conventionally available, and uses the poll time
+rather than exposition timestamps. The pinned fixture includes Quarkus 3.39.1
+with Java 21 LTS, `quarkus-micrometer-registry-prometheus`, and the optional
+`quarkus-smallrye-health` extension.
+
+Health collection is best-effort and independent from metrics collection. If
+the derived `/q/health` endpoint is absent, aggregate framework health is
+unavailable, but a successful metrics scrape reports application reachability
+as health `UP`; database health remains unavailable without a datasource
+check. The absent capability is quiet and does not produce a recurring
+warning. A known or explicitly configured endpoint that returns an invalid or
+failed response may produce a focused warning without discarding valid
+metrics. Exact custom metrics paths remain supported; when the path is not a
+conventional `/q/metrics` path, StatLite does not infer a health endpoint.
+Customized Quarkus layouts can provide an exact optional override:
+
+```yaml
+targets:
+  - name: "orders"
+    type: "quarkus"
+    url: "http://localhost:9000/manage/prom"
+    health_url: "http://localhost:9000/manage/health"
+```
+
+`health_url` is optional and accepted only for Quarkus targets. The target's
+Basic Auth configuration applies to both metrics and health requests.
+
+If the derived `/q/health` endpoint returns `404`, StatLite treats SmallRye
+Health as absent, keeps the metrics poll quiet, and reports health as `UP`
+based on application reachability through the successful metrics scrape. That
+absence is cached for the collector session. Health discovery resumes when the
+observed process-start identity changes, when that identity is available, or
+when the collector is recreated.
 
 The adapter normalizes only these existing StatLite concepts: HTTP request
 count, request duration, 404/4xx/5xx counts, process CPU ratio, heap used bytes,
@@ -196,11 +231,12 @@ exemplars, timestamps, and unrelated metric families are discarded before
 persistence. HTTP meters can be absent while an idle application remains
 compatible when a finite CPU, heap, or process-start family is present.
 
-Quarkus targets do not request or infer application health, database health, or
-host resources. A successful scrape therefore leaves `health_status` and
-`db_health_status` unavailable, and host metrics are not populated. Missing
-optional concepts produce partial data and focused warnings; an endpoint without
-a usable required runtime family is incompatible.
+When published, Quarkus targets normalize overall SmallRye Health status and
+aggregate Quarkus datasource health checks into `db_health_status`. Database
+health stays unavailable when the application publishes no datasource check.
+Host resources are not inferred or populated. Missing optional concepts produce
+partial data; an endpoint without a usable required runtime family is
+incompatible.
 
 ### Basic Auth
 
@@ -212,7 +248,7 @@ auth:
 ```
 
 Only `basic` is supported in the MVP. The same `auth` block applies to Quarkus
-metrics endpoints as well as Spring endpoints. Prefer environment variables for
+metrics and health endpoints as well as Spring endpoints. Prefer environment variables for
 credentials, so they are not stored in plaintext YAML. Export them before
 starting StatLite (or set them with your service manager):
 

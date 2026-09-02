@@ -84,7 +84,24 @@ func newCollector(target config.TargetConfig, timeout time.Duration) (monitor.Co
 		if err != nil {
 			return nil, fmt.Errorf("quarkus metrics client: %w", err)
 		}
-		return collector.NewQuarkusCollector(target.Name, target.URL, client), nil
+		healthURL := target.HealthURL
+		if healthURL == "" {
+			healthURL, err = config.DefaultQuarkusHealthURL(target.URL)
+			if err != nil {
+				return nil, fmt.Errorf("quarkus health URL: %w", err)
+			}
+		}
+		var healthClient *collector.QuarkusHealthClient
+		if healthURL != "" {
+			healthClient, err = collector.NewQuarkusHealthClient(healthURL, timeout, collectorAuthConfig(target.Auth))
+			if err != nil {
+				return nil, fmt.Errorf("quarkus health client: %w", err)
+			}
+			if target.HealthURL == "" {
+				healthClient.TreatNotFoundAsOptional()
+			}
+		}
+		return collector.NewQuarkusCollector(target.Name, target.URL, client, healthClient), nil
 	default:
 		return nil, fmt.Errorf("unsupported target type %q", target.Type)
 	}
@@ -95,6 +112,13 @@ func prometheusAuthConfig(auth *config.AuthConfig) *prometheus.BasicAuth {
 		return nil
 	}
 	return &prometheus.BasicAuth{Username: auth.Username, Password: auth.Password}
+}
+
+func collectorAuthConfig(auth *config.AuthConfig) *collector.BasicAuth {
+	if auth == nil {
+		return nil
+	}
+	return &collector.BasicAuth{Username: auth.Username, Password: auth.Password}
 }
 
 func prometheusAuth(auth *collector.BasicAuth) *prometheus.BasicAuth {

@@ -88,7 +88,12 @@ func TestPollNowDetectsQuarkusRestartWithoutNegativeCounterDelta(t *testing.T) {
 	defer store.Close()
 
 	var scrape int
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"UP","checks":[{"name":"Database connections health check","status":"UP"}]}`))
+			return
+		}
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 		scrape++
 		if scrape == 1 {
@@ -102,7 +107,11 @@ func TestPollNowDetectsQuarkusRestartWithoutNegativeCounterDelta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClient() error = %v", err)
 	}
-	mon := newTestMonitor(t, store, collector.NewQuarkusCollector("app", server.URL, client))
+	healthClient, err := collector.NewQuarkusHealthClient(server.URL+"/health", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewQuarkusHealthClient() error = %v", err)
+	}
+	mon := newTestMonitor(t, store, collector.NewQuarkusCollector("app", server.URL, client, healthClient))
 
 	first, err := mon.PollNow(context.Background())
 	if err != nil {

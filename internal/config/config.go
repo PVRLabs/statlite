@@ -49,12 +49,14 @@ type TargetConfig struct {
 	Name                   string      `yaml:"name"`
 	ActuatorBaseURL        string      `yaml:"actuator_base_url"`
 	URL                    string      `yaml:"url"`
+	HealthURL              string      `yaml:"health_url,omitempty"`
 	MetricsSource          string      `yaml:"metrics_source,omitempty"`
 	CollectHostMetrics     bool        `yaml:"collect_host_metrics,omitempty"`
 	Auth                   *AuthConfig `yaml:"auth,omitempty"`
 	actuatorURLSet         bool
 	metricsSourceSet       bool
 	collectHostSet         bool
+	healthURLSet           bool
 	legacyActuatorUserinfo bool
 }
 
@@ -147,6 +149,8 @@ func (t *TargetConfig) UnmarshalYAML(value *yaml.Node) error {
 			t.metricsSourceSet = true
 		case "collect_host_metrics":
 			t.collectHostSet = true
+		case "health_url":
+			t.healthURLSet = true
 		}
 	}
 	return nil
@@ -233,6 +237,11 @@ func (c *Config) validate() error {
 				if err := validateQuarkusURL(t.URL); err != nil {
 					return fmt.Errorf("targets[%d].url for type quarkus: %w", i, err)
 				}
+				if t.HealthURL != "" {
+					if err := validateQuarkusURL(t.HealthURL); err != nil {
+						return fmt.Errorf("targets[%d].health_url for type quarkus: %w", i, err)
+					}
+				}
 			}
 			if t.MetricsSource != "" {
 				return fmt.Errorf("targets[%d].metrics_source is supported only for type spring", i)
@@ -256,6 +265,9 @@ func (c *Config) validate() error {
 		}
 		if t.CollectHostMetrics && targetType != TargetTypeSpring {
 			return fmt.Errorf("targets[%d].collect_host_metrics is supported only for type spring", i)
+		}
+		if t.healthURLSet && targetType != TargetTypeQuarkus {
+			return fmt.Errorf("targets[%d].health_url is supported only for type quarkus", i)
 		}
 	}
 	return nil
@@ -282,6 +294,24 @@ func validateQuarkusURL(raw string) error {
 		return fmt.Errorf("must not contain a fragment")
 	}
 	return nil
+}
+
+// DefaultQuarkusHealthURL derives Quarkus's conventional aggregate SmallRye
+// Health endpoint from its conventional metrics endpoint.
+func DefaultQuarkusHealthURL(metricsURL string) (string, error) {
+	u, err := url.Parse(metricsURL)
+	if err != nil {
+		return "", fmt.Errorf("parsing metrics URL: %w", err)
+	}
+	trimmedPath := strings.TrimSuffix(u.Path, "/")
+	if !strings.HasSuffix(trimmedPath, "/q/metrics") {
+		return "", nil
+	}
+	u.Path = strings.TrimSuffix(trimmedPath, "/q/metrics") + "/q/health"
+	u.RawPath = ""
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String(), nil
 }
 
 func (t TargetConfig) DisplayMetadata() TargetDisplayMetadata {

@@ -128,6 +128,7 @@ for Spring Boot, Quarkus, Python/FastAPI, self-monitoring, and multi-target conf
   host metrics from Actuator endpoints.
 - **Quarkus Micrometer:** Collects bounded request, latency, CPU, heap, process,
   and restart concepts from the exact `/q/metrics` Prometheus/OpenMetrics endpoint.
+  SmallRye Health is an optional capability when the application publishes it.
 - **[StatLite Metrics v1](docs/statlite-metrics-v1.md):** A small, fixed JSON
   endpoint that applications in any language or framework can implement.
 - **StatLite self-monitoring:** StatLite can report its own health, traffic,

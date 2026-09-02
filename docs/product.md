@@ -98,6 +98,34 @@ fixed producer contract for applications that choose to integrate directly. It
 does not make third-party metric standards or arbitrary producer schemas into
 public target contracts.
 
+### Optional health capabilities
+
+Application health and dependency or database health are optional target
+capabilities. A target does not need to expose health to be a valid StatLite
+integration, and metrics collection must not fail merely because a framework
+has no health endpoint or health extension installed. A fixed producer
+contract may define its own required status field, but that is not a universal
+health prerequisite for target validity.
+
+When a framework provides a reliable conventional health endpoint, its adapter
+should use it automatically where practical. Framework conventions are the
+default; an explicit health endpoint is an optional override for customized
+layouts, not a requirement for normal setups. An absent capability is normal:
+the corresponding status remains unavailable without noisy recurring warnings.
+If a known or configured endpoint fails, StatLite may record a focused warning
+for that poll while retaining independently valid metrics.
+
+A real health response is authoritative for application or dependency health.
+StatLite must not infer database or dependency health from generic process or
+metrics reachability. A successful metrics scrape can establish collection
+reachability or liveness, but is not equivalent to framework aggregate health
+unless that behavior is explicitly defined for the target. Spring Boot
+Actuator health is normally an established part of the `spring` integration;
+SmallRye Health for Quarkus and health endpoints for future Go or other
+framework targets remain optional capabilities. The current Spring collector
+retains its established health-fetch behavior; making Spring health optional
+for collection is a separate implementation change.
+
 ## Deployment topology
 
 For a collocated deployment, configure application targets (`spring`, `quarkus`,

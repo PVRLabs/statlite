@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pvrlabs/statlite/internal/prometheus"
@@ -18,10 +19,22 @@ import (
 // QuarkusCollector performs the single bounded exposition scrape owned by a
 // Quarkus polling cycle.
 type QuarkusCollector struct {
-	targetName string
-	endpoint   string
-	client     *prometheus.Client
+	targetName             string
+	endpoint               string
+	client                 *prometheus.Client
+	healthClient           *QuarkusHealthClient
+	healthStateMu          sync.Mutex
+	healthCapability       quarkusHealthCapability
+	healthProcessStartTime *time.Time
 }
+
+type quarkusHealthCapability uint8
+
+const (
+	quarkusHealthUnknown quarkusHealthCapability = iota
+	quarkusHealthAvailable
+	quarkusHealthAbsent
+)
 
 var ErrQuarkusIncompatible = errors.New("Quarkus metrics endpoint does not expose a finite recognized runtime family")
 
@@ -77,12 +90,12 @@ type quarkusRuntimeValues struct {
 // series count.
 const quarkusHTTPMatchingStateLimit = 20_000
 
-func NewQuarkusCollector(targetName, endpoint string, client *prometheus.Client) *QuarkusCollector {
-	return &QuarkusCollector{targetName: targetName, endpoint: endpoint, client: client}
+func NewQuarkusCollector(targetName, endpoint string, client *prometheus.Client, healthClient *QuarkusHealthClient) *QuarkusCollector {
+	return &QuarkusCollector{targetName: targetName, endpoint: endpoint, client: client, healthClient: healthClient}
 }
 
 func InspectQuarkus(ctx context.Context, endpoint string, client *prometheus.Client) (*QuarkusInspection, error) {
-	evaluation, err := NewQuarkusCollector("", endpoint, client).evaluate(ctx)
+	evaluation, err := NewQuarkusCollector("", endpoint, client, nil).evaluate(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -111,20 +124,91 @@ func (c *QuarkusCollector) Collect(ctx context.Context) (*CollectionResult, erro
 		result.addEvent(EventSeverityError, "collector_not_configured", "", err.Error())
 		return result, err
 	}
-
-	evaluation, err := c.evaluate(ctx)
-	if err != nil {
-		if errors.Is(err, ErrQuarkusIncompatible) {
-			result.addEvent(EventSeverityError, "metrics_source_incompatible", "", err.Error())
+	evaluation, metricsErr := c.evaluate(ctx)
+	if metricsErr != nil {
+		if errors.Is(metricsErr, ErrQuarkusIncompatible) {
+			result.addEvent(EventSeverityError, "metrics_source_incompatible", "", metricsErr.Error())
 		} else {
-			result.addEvent(EventSeverityError, "metrics_fetch_failed", "", err.Error())
+			result.addEvent(EventSeverityError, "metrics_fetch_failed", "", metricsErr.Error())
 		}
-		return result, err
+	} else {
+		result.Samples = evaluation.samples
+		result.Events = append(result.Events, evaluation.events...)
+		result.ProcessStartTime = evaluation.processStartTime
 	}
-	result.Samples = evaluation.samples
-	result.Events = evaluation.events
-	result.ProcessStartTime = evaluation.processStartTime
-	return result, nil
+
+	if c.healthClient != nil {
+		if c.shouldProbeHealth(result.ProcessStartTime) {
+			health, err := c.healthClient.Fetch(ctx)
+			if err != nil {
+				if c.healthClient.notFoundOptional && errors.Is(err, ErrQuarkusHealthNotFound) && c.health404IsOptional() {
+					if metricsErr == nil {
+						c.markHealthAbsent(result.ProcessStartTime)
+						// A successful conventional metrics scrape proves basic
+						// application reachability when SmallRye Health is absent.
+						result.HealthStatus = "UP"
+					}
+				} else {
+					result.addEvent(EventSeverityWarning, "health_fetch_failed", "", err.Error())
+				}
+			} else {
+				result.HealthStatus = health.Status
+				result.DBHealthStatus = health.DBStatus()
+				c.markHealthAvailable(result.ProcessStartTime)
+			}
+		} else if metricsErr == nil {
+			// A cached absent derived endpoint still has a reachable application.
+			result.HealthStatus = "UP"
+		}
+	} else if metricsErr == nil {
+		// Custom metrics-only targets have no authoritative health capability,
+		// but a successful metrics scrape proves basic application reachability.
+		result.HealthStatus = "UP"
+	}
+	return result, metricsErr
+}
+
+func (c *QuarkusCollector) shouldProbeHealth(processStartTime *time.Time) bool {
+	c.healthStateMu.Lock()
+	defer c.healthStateMu.Unlock()
+	if processStartTime != nil {
+		if c.healthProcessStartTime != nil && !processStartTime.Equal(*c.healthProcessStartTime) {
+			c.healthCapability = quarkusHealthUnknown
+		}
+		c.healthProcessStartTime = cloneTime(processStartTime)
+	}
+	if c.healthCapability == quarkusHealthAbsent {
+		return false
+	}
+	return true
+}
+
+func (c *QuarkusCollector) markHealthAbsent(processStartTime *time.Time) {
+	c.healthStateMu.Lock()
+	defer c.healthStateMu.Unlock()
+	c.healthCapability = quarkusHealthAbsent
+	c.healthProcessStartTime = cloneTime(processStartTime)
+}
+
+func (c *QuarkusCollector) health404IsOptional() bool {
+	c.healthStateMu.Lock()
+	defer c.healthStateMu.Unlock()
+	return c.healthCapability == quarkusHealthUnknown
+}
+
+func (c *QuarkusCollector) markHealthAvailable(processStartTime *time.Time) {
+	c.healthStateMu.Lock()
+	defer c.healthStateMu.Unlock()
+	c.healthCapability = quarkusHealthAvailable
+	c.healthProcessStartTime = cloneTime(processStartTime)
+}
+
+func cloneTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 func (c *QuarkusCollector) evaluate(ctx context.Context) (*quarkusEvaluation, error) {
