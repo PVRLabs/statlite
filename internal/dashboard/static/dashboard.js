@@ -299,12 +299,12 @@ function renderSummary(summary) {
 }
 
 function renderFooterSummary(targets, now = new Date()) {
-  const healthy = targets.filter((target) => {
+  const ok = targets.filter((target) => {
     const health = (((target.latest || {}).result || {}).health_status) || "";
     return statusTone(health) === "ok";
   }).length;
   setText("footer-targets", String(targets.length));
-  setText("footer-healthy", String(healthy));
+  setText("footer-up", String(ok));
   setText("footer-refresh", now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
 }
 

@@ -223,7 +223,7 @@ test("footer summary reuses target health data without fetching", () => {
     ], new Date("2026-09-02T12:34:56"));
 
     assert.equal(document.getElementById("footer-targets").textContent, "4");
-    assert.equal(document.getElementById("footer-healthy").textContent, "2");
+    assert.equal(document.getElementById("footer-up").textContent, "2");
     assert.match(document.getElementById("footer-refresh").textContent, /12:34:56/);
   } finally {
     global.document = originalDocument;

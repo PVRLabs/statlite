@@ -70,12 +70,6 @@ header {
   font-weight: 700;
   letter-spacing: 0.04em;
 }
-.brand-version {
-  color: var(--muted);
-  font-size: 10px;
-  line-height: 1.1;
-  letter-spacing: 0.04em;
-}
 .brand-stat {
   color: var(--pvr-green);
 }
@@ -90,9 +84,22 @@ main {
   width: min(1440px, calc(100% - 32px));
   margin: 0 auto;
   padding: 0 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
   color: var(--muted);
   font-size: 12px;
-  text-align: center;
+}
+.footer-summary,
+.footer-project {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.footer-separator {
+  color: var(--panel-border);
 }
 .site-footer a {
   color: var(--muted);
@@ -440,7 +447,7 @@ pre {
   .event { grid-template-columns: 1fr; gap: 3px; }
 }
 @media (max-width: 520px) {
-  main, .bar { width: min(100% - 20px, 1440px); }
+  main, .bar, .site-footer { width: min(100% - 20px, 1440px); }
   .target-context { align-items: flex-start; flex-direction: column; }
   .target-picker { width: 100%; }
   .target-select { max-width: 100%; width: 100%; }
@@ -448,6 +455,7 @@ pre {
   .chart { padding: 12px; }
   .chart-head { align-items: flex-start; flex-direction: column; gap: 4px; }
   .note { text-align: left; }
+  .site-footer { align-items: flex-start; flex-direction: column; }
 }
 </style>
 </head>
@@ -457,7 +465,6 @@ pre {
     <div class="brand">
       <img src="/static/statlite-icon.png" alt="" class="brand-icon">
       <span class="brand-wordmark"><span class="brand-stat">Stat</span><span class="brand-lite">Lite</span></span>
-      <span class="brand-version">{{dashboard_version}}</span>
     </div>
     <div class="range" role="group" aria-label="Time range">
       <button type="button" data-range="1h" class="active" aria-pressed="true">1h</button>
@@ -544,7 +551,7 @@ pre {
   <div class="footer-summary" aria-label="Dashboard summary">
     <span>Targets: <span id="footer-targets">...</span></span>
     <span class="footer-separator" aria-hidden="true">|</span>
-    <span>Health UP: <span id="footer-healthy">...</span></span>
+    <span>UP: <span id="footer-up">...</span></span>
     <span class="footer-separator" aria-hidden="true">|</span>
     <span>Last refresh: <span id="footer-refresh">...</span></span>
   </div>

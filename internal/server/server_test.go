@@ -172,7 +172,7 @@ func TestRootServesDashboardPage(t *testing.T) {
 		`<span>` + version.Version + `</span>`,
 		`★ Star on GitHub`,
 		`id="footer-targets"`,
-		`id="footer-healthy"`,
+		`id="footer-up"`,
 		`id="footer-refresh"`,
 		"Current status",
 		`aria-label="Target"`,
