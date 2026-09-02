@@ -230,6 +230,49 @@ test("footer summary reuses target health data without fetching", () => {
   }
 });
 
+test("three identical events are folded across interleaved failures", () => {
+  const first = { timestamp: "2026-09-02T10:57:46Z", severity: "error", type: "metrics_fetch_failed", message: "connection refused" };
+  const second = { ...first, timestamp: "2026-09-02T10:57:16Z" };
+  const third = { ...first, timestamp: "2026-09-02T10:56:46Z" };
+  const warning = { timestamp: "2026-09-02T10:56:16Z", severity: "warning", type: "health_fetch_failed", message: "connection refused" };
+  const warning2 = { ...warning, timestamp: "2026-09-02T10:55:46Z" };
+  const warning3 = { ...warning, timestamp: "2026-09-02T10:55:16Z" };
+
+  assert.deepEqual(dashboard.foldRepeatedEvents([first, warning, second, warning2, third, warning3]), [
+    [first, second, third],
+    [warning, warning2, warning3]
+  ]);
+});
+
+test("one or two identical events remain in chronological order", () => {
+  const first = { severity: "error", type: "metrics_fetch_failed", message: "connection refused" };
+  const warning = { severity: "warning", type: "health_fetch_failed", message: "connection refused" };
+  const second = { ...first };
+
+  assert.deepEqual(dashboard.foldRepeatedEvents([first, warning, second]), [[first], [warning], [second]]);
+});
+
+test("event folding includes metric keys in event identity", () => {
+  const first = { severity: "warning", type: "metric_warning", metric_key: "cpu", message: "missing" };
+  const second = { ...first, metric_key: "memory" };
+
+  assert.deepEqual(dashboard.foldRepeatedEvents([first, second, first]), [[first], [second], [first]]);
+});
+
+test("open event groups are retained by event identity before rerendering", () => {
+  const root = {
+    querySelectorAll(selector) {
+      assert.equal(selector, ".event-group[open]");
+      return [
+        { dataset: { eventKey: "metrics-error" } },
+        { dataset: { eventKey: "health-error" } }
+      ];
+    }
+  };
+
+  assert.deepEqual([...dashboard.openEventGroupKeys(root)], ["metrics-error", "health-error"]);
+});
+
 test("renderSeries applies capability visibility with a minimal DOM stub", () => {
   const elements = new Map();
   const document = {

@@ -406,7 +406,45 @@ main {
   padding: 9px 0;
   border-top: 1px solid var(--panel-border);
 }
-.event:first-child { border-top: 0; }
+.events > .event:first-child,
+.events > .event-group:first-child > .event { border-top: 0; }
+.event-group > summary {
+  cursor: pointer;
+  list-style: none;
+  padding-left: 18px;
+  position: relative;
+}
+.event-group > summary::-webkit-details-marker { display: none; }
+.event-group > summary::before {
+  color: var(--pvr-green);
+  content: "\25B8";
+  left: 0;
+  position: absolute;
+  transition: transform 0.12s ease;
+}
+.event-group[open] > summary::before {
+  transform: rotate(90deg);
+}
+.event-count {
+  margin-top: 4px;
+  color: var(--pvr-green);
+  font-size: 12px;
+}
+.event-action {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.event-action-collapse { display: none; }
+.event-group[open] .event-action-expand { display: none; }
+.event-group[open] .event-action-collapse { display: inline; }
+.event-group > summary:hover .event-action,
+.event-group > summary:focus-visible .event-action {
+  text-decoration-thickness: 2px;
+}
+.event-occurrences {
+  margin-left: 18px;
+}
 .event-time, .event-kind {
   color: var(--muted);
   font-size: 12px;

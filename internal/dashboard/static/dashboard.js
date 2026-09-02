@@ -481,20 +481,80 @@ function updateChart(chart, labels, values) {
 
 function renderEvents(events) {
   const root = document.getElementById("events");
+  const openGroupKeys = openEventGroupKeys(root);
   root.innerHTML = "";
   if (!events || events.length === 0) {
     root.innerHTML = '<div class="empty">No recent events</div>';
     return;
   }
-  events.forEach((event) => {
-    const row = document.createElement("div");
-    row.className = "event";
-    row.innerHTML = '<div class="event-time"></div><div class="event-kind"></div><div class="event-message"></div>';
-    row.children[0].textContent = formatDateTime(event.timestamp);
-    row.children[1].textContent = event.severity + " / " + event.type;
-    row.children[2].textContent = event.metric_key ? event.metric_key + ": " + event.message : event.message;
-    root.appendChild(row);
+  foldRepeatedEvents(events).forEach((group) => {
+    if (group.length === 1) {
+      root.appendChild(createEventRow(group[0]));
+      return;
+    }
+
+    const details = document.createElement("details");
+    details.className = "event-group";
+    details.dataset.eventKey = eventKey(group[0]);
+    details.open = openGroupKeys.has(details.dataset.eventKey);
+    const summary = createEventRow(group[0], "summary");
+    const count = document.createElement("div");
+    count.className = "event-count";
+    count.textContent = "\u00d7" + group.length + " occurrences \u00b7 ";
+    const expand = document.createElement("span");
+    expand.className = "event-action event-action-expand";
+    expand.textContent = "Expand";
+    count.appendChild(expand);
+    const collapse = document.createElement("span");
+    collapse.className = "event-action event-action-collapse";
+    collapse.textContent = "Collapse";
+    count.appendChild(collapse);
+    summary.children[2].appendChild(count);
+    details.appendChild(summary);
+
+    const occurrences = document.createElement("div");
+    occurrences.className = "event-occurrences";
+    group.slice(1).forEach((event) => occurrences.appendChild(createEventRow(event)));
+    details.appendChild(occurrences);
+    root.appendChild(details);
   });
+}
+
+function openEventGroupKeys(root) {
+  return new Set(Array.from(root.querySelectorAll(".event-group[open]"), (group) => group.dataset.eventKey));
+}
+
+function foldRepeatedEvents(events) {
+  const eventsByKey = new Map();
+  events.forEach((event) => {
+    const key = eventKey(event);
+    if (!eventsByKey.has(key)) eventsByKey.set(key, []);
+    eventsByKey.get(key).push(event);
+  });
+
+  const renderedKeys = new Set();
+  return events.flatMap((event) => {
+    const key = eventKey(event);
+    const matches = eventsByKey.get(key);
+    if (matches.length < 3) return [[event]];
+    if (renderedKeys.has(key)) return [];
+    renderedKeys.add(key);
+    return [matches];
+  });
+}
+
+function eventKey(event) {
+  return JSON.stringify([event.severity, event.type, event.metric_key, event.message].map((value) => [typeof value, value]));
+}
+
+function createEventRow(event, elementName = "div") {
+  const row = document.createElement(elementName);
+  row.className = "event";
+  row.innerHTML = '<div class="event-time"></div><div class="event-kind"></div><div class="event-message"></div>';
+  row.children[0].textContent = formatDateTime(event.timestamp);
+  row.children[1].textContent = event.severity + " / " + event.type;
+  row.children[2].textContent = event.metric_key ? event.metric_key + ": " + event.message : event.message;
+  return row;
 }
 
 function renderError(error) {
@@ -627,6 +687,6 @@ function initDashboard() {
   refreshWhenVisible();
 }
 
-const dashboardTestHooks = { detectCapabilities, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, refresh, refreshWhenVisible, renderFooterSummary, renderPollStatus, renderRangeSelection, renderSeries, shouldRenderSeries, state, targetTypeHelp, validDiskPoint };
+const dashboardTestHooks = { detectCapabilities, foldRepeatedEvents, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, openEventGroupKeys, refresh, refreshWhenVisible, renderFooterSummary, renderPollStatus, renderRangeSelection, renderSeries, shouldRenderSeries, state, targetTypeHelp, validDiskPoint };
 if (typeof module !== "undefined" && module.exports) module.exports = dashboardTestHooks;
 if (typeof document !== "undefined") initDashboard();
