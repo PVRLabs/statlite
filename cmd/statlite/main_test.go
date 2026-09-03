@@ -79,10 +79,25 @@ func TestPrintVersion(t *testing.T) {
 }
 
 func TestStartupMessage(t *testing.T) {
-	got := startupMessage("0.0.0.0:9090", 3)
-	want := "StatLite starting: version=" + version.Version + " listen=0.0.0.0:9090 targets=3"
+	databasePath := filepath.Join(t.TempDir(), "statlite.sqlite")
+	got := startupMessage("0.0.0.0:9090", 3, databasePath)
+	want := `StatLite starting: version=` + version.Version + ` listen=0.0.0.0:9090 targets=3 database="` + databasePath + `"`
 	if got != want {
 		t.Fatalf("startupMessage() = %q, want %q", got, want)
+	}
+}
+
+func TestNoPollStartupMessages(t *testing.T) {
+	got := noPollStartupMessages(true)
+	want := []string{"Polling disabled (--no-poll); serving stored data only"}
+	if len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("noPollStartupMessages() = %q, want %q", got, want)
+	}
+
+	got = noPollStartupMessages(false)
+	want = append(want, "WARNING: polling disabled (--no-poll), but the database contains no stored polls; the dashboard will be empty")
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("noPollStartupMessages() = %q, want %q", got, want)
 	}
 }
 

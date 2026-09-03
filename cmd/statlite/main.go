@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -176,6 +177,9 @@ func runMonitor(args []string, stdout, stderr io.Writer) int {
 			logger.Printf("monitor manager: %v", err)
 			return 1
 		}
+		for _, message := range noPollStartupMessages(dashboardNow != nil) {
+			logger.Print(message)
+		}
 	}
 
 	serverRetentionDays := cfg.Storage.RetentionDays
@@ -191,7 +195,7 @@ func runMonitor(args []string, stdout, stderr io.Writer) int {
 		logger.Printf("server: %v", err)
 		return 1
 	}
-	logger.Print(startupMessage(cfg.Server.Listen, len(manager.Names())))
+	logger.Print(startupMessage(cfg.Server.Listen, len(manager.Names()), cfg.Storage.SQLitePath))
 
 	// The listener is bound before starting monitor goroutines so the first
 	// poll can reach StatLite's own metrics endpoint. Keep cleanup ahead of
@@ -243,8 +247,20 @@ func printVersion(w io.Writer) {
 	fmt.Fprintf(w, "statlite %s\n", version.Version)
 }
 
-func startupMessage(listen string, targets int) string {
-	return fmt.Sprintf("StatLite starting: version=%s listen=%s targets=%d", version.Version, listen, targets)
+func startupMessage(listen string, targets int, sqlitePath string) string {
+	databasePath, err := filepath.Abs(sqlitePath)
+	if err != nil {
+		databasePath = filepath.Clean(sqlitePath)
+	}
+	return fmt.Sprintf("StatLite starting: version=%s listen=%s targets=%d database=%q", version.Version, listen, targets, databasePath)
+}
+
+func noPollStartupMessages(hasStoredPoll bool) []string {
+	messages := []string{"Polling disabled (--no-poll); serving stored data only"}
+	if !hasStoredPoll {
+		messages = append(messages, "WARNING: polling disabled (--no-poll), but the database contains no stored polls; the dashboard will be empty")
+	}
+	return messages
 }
 
 func printHelp(w io.Writer) {
