@@ -60,27 +60,52 @@ locations, source builds, and server-wide Linux setup.
 
 ## Configure an application
 
-Inspect an application's base URL to generate a minimal configuration:
+To monitor a Spring Boot application, create a minimal `statlite.yaml`:
+
+```yaml
+server:
+  listen: "127.0.0.1:9090"
+
+storage:
+  sqlite_path: "./statlite.sqlite"
+
+polling:
+  interval: "30s"
+
+targets:
+  - name: "app"
+    type: "spring"
+    url: "http://localhost:8080/actuator"
+```
+
+For a new setup, save the configuration as `statlite.yaml`. If you already
+have a configuration, copy only the target entry into its `targets` list. Then
+run:
+
+```bash
+statlite
+```
+
+Alternatively, inspect a running application's base URL to generate the
+configuration:
 
 ```bash
 statlite inspect 'http://localhost:8080'
 ```
 
-For Quarkus, select the type and supply either its application base URL or exact
-metrics URL:
+For other supported frameworks, select the type explicitly when needed:
 
 ```bash
 statlite inspect --type quarkus 'http://localhost:9000'
 ```
 
-Save the printed configuration as `statlite.yaml`, then run `statlite`. For an
-existing configuration, copy only the generated target entry into its `targets`
-list.
+Inspection checks conventional supported endpoints and is bounded and
+read-only. For untyped discovery, start with a base HTTP or HTTPS URL without a
+query string or fragment.
 
-Inspection is bounded and read-only. See
-[Configuration](docs/configuration.md) for supported URL forms, inspection
-limits, manual configuration, and `--no-poll` mode for viewing existing history.
-See [`examples/`](examples/) for complete configurations.
+See [Configuration](docs/configuration.md) for exact endpoint forms, discovery
+limits, authentication limitations, all settings, and manual target
+configuration. See [`examples/`](examples/) for complete configurations.
 
 > [!IMPORTANT]
 > StatLite has no built-in dashboard or API authentication. Review the

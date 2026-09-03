@@ -6,6 +6,33 @@ basic health, traffic, latency, CPU, and runtime memory monitoring without a ful
 observability stack.
 StatLite is not a Prometheus/Grafana replacement.
 
+## Basic configuration
+
+Create `statlite.yaml` in the directory where you run StatLite:
+
+```yaml
+server:
+  listen: "127.0.0.1:9090"
+
+storage:
+  sqlite_path: "./statlite.sqlite"
+
+polling:
+  interval: "30s"
+
+targets:
+  - name: "my-app"
+    type: "spring"
+    url: "https://example.com/actuator"
+```
+
+Run `statlite`, then open <http://127.0.0.1:9090>. This configuration monitors
+one Spring Boot application, stores its history in a local SQLite database, and
+polls it every 30 seconds.
+
+The sections below explain target discovery, alternate configuration paths,
+authentication, retention, polling, and other options.
+
 StatLite loads `statlite.yaml` by default. Override with `--config`:
 
 ```bash
@@ -13,20 +40,6 @@ StatLite loads `statlite.yaml` by default. Override with `--config`:
 # or, with an installed binary:
 statlite --config /etc/statlite/config.yaml
 ```
-
-Use `--no-poll` with the normal YAML configuration to serve the dashboard from
-existing SQLite history without contacting any configured target:
-
-```bash
-statlite --config /etc/statlite/config.yaml --no-poll
-```
-
-No-poll mode disables startup, periodic, and manual debug polling. It also
-skips retention cleanup so inspecting a copied or historical database does not
-delete older data, and it does not hide stored history outside the configured
-retention window. Dashboard time and preset ranges are frozen at the newest
-stored poll across the configured targets, or use the real current time when
-the database has no polls.
 
 See [`docs/integrations.md`](integrations.md) for the supported integration
 matrix. See `examples/` for starter templates (Actuator, Quarkus, StatLite Metrics, multi-target,
@@ -346,3 +359,17 @@ Selected target and time range are stored in the query string, so you can bookma
 ## Systemd
 
 A starter unit is in [statlite.service.example](statlite.service.example). Point `ExecStart` at your binary and config path. Installers do not install this unit automatically.
+
+## View existing history without polling
+
+Use `--no-poll` with a normal YAML configuration to serve the dashboard from
+existing SQLite history without contacting any configured target:
+
+```bash
+statlite --config /etc/statlite/config.yaml --no-poll
+```
+
+This mode disables startup, periodic, and manual debug polling. It also skips
+retention cleanup, shows stored history outside the configured retention
+window, and freezes dashboard time ranges at the newest stored poll. When the
+database has no polls, the dashboard uses the current time instead.
