@@ -154,23 +154,14 @@ Spring configurations, but new configuration should use explicit
 `metrics_source` accepts `auto`, `prometheus`, or `actuator` and defaults to
 `auto` when omitted. `auto` prefers a compatible Spring Prometheus endpoint and
 falls back to Actuator metrics only when the endpoint is absent or returns a
-valid but incompatible exposition. The compatibility exception is a
-credential-bearing `actuator_base_url`: omitted or explicit `auto` is forced to
-Actuator metrics, and `prometheus` is rejected. Authentication, transient,
-malformed, and resource-limit failures are retried without changing sources.
-Once selected, the source remains fixed until the target collector is
-recreated. Health is always collected independently from the Actuator health
-endpoint. The current Spring collector treats a health-fetch failure as a
-failed poll before metrics collection; changing that established behavior is a
-separate implementation change.
+valid but incompatible exposition. Authentication, transient, malformed, and
+resource-limit failures are retried without changing sources. Once selected,
+the source remains fixed until the target collector is recreated. Health is
+always collected independently from the Actuator health endpoint.
 
-The former `actuator_base_url` field remains a deprecated compatibility alias
-and will be removed in a future breaking release. StatLite logs a warning and
-treats it as `url`. Embedded URL credentials remain supported only through
-this deprecated compatibility behavior. New configurations should use `url`
-with the explicit `auth` fields. Do not combine embedded credentials in the
-deprecated alias with an `auth` block. Configuring both URL fields is an error,
-even when their values are identical.
+`actuator_base_url` is deprecated; use `url`. See
+[Deprecations and compatibility](deprecations.md#actuator_base_url) for its
+temporary compatibility behavior.
 
 Missing optional metrics are handled gracefully: values may appear as `null` or charts may show gaps instead of failing the whole poll.
 
@@ -264,7 +255,7 @@ auth:
   password: "${STATLITE_ACTUATOR_PASSWORD}"
 ```
 
-Only `basic` is supported in the MVP. The same `auth` block applies to Quarkus
+Only `basic` is supported. The same `auth` block applies to Quarkus
 metrics and health endpoints as well as Spring endpoints. Prefer environment variables for
 credentials, so they are not stored in plaintext YAML. Export them before
 starting StatLite (or set them with your service manager):
@@ -300,10 +291,9 @@ targets:
 same profile is also available to supported external application integrations;
 it is not a general metrics protocol.
 
-For compatibility, an older `type: "statlite"` target is migrated at startup
-to `type: "statlite-metrics"` and its URL path is changed to
-`/statlite/metrics`. StatLite logs a deprecation warning; update the
-configuration before a future release removes this migration.
+`type: "statlite"` is deprecated; use `type: "statlite-metrics"`. See
+[Deprecations and compatibility](deprecations.md#target-type-statlite) for the
+temporary startup migration.
 
 ### StatLite Metrics v1
 

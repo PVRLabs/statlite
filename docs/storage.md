@@ -40,6 +40,8 @@ remain compatible with both the legacy and implicit-UTC representations, and
 existing rows are not migrated. Mixed old and new values within the same second
 can therefore have historical ordering or range-boundary edge cases. StatLite
 knowingly accepts those cases instead of normalizing queries or rewriting data.
+See [Deprecations and compatibility](deprecations.md#timestamp-text-ending-in-z)
+for how this legacy data support is tracked.
 
 Timestamps used as logical identity may retain their established representation
 to preserve equality with existing rows. In particular,
