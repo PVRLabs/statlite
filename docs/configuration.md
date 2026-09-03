@@ -99,7 +99,15 @@ storage:
   retention_days: 90
 ```
 
-`sqlite_path` must be writable by the StatLite process. Runtime SQLite files (`*.sqlite`, `*.sqlite-shm`, `*.sqlite-wal`) should not be committed.
+`sqlite_path` must be writable by the StatLite process.
+
+> [!NOTE]
+> Relative `sqlite_path` values currently resolve from the directory where
+> StatLite is started, not from the directory containing `statlite.yaml`. Use
+> an absolute path for deployments.
+
+Runtime SQLite files (`*.sqlite`, `*.sqlite-shm`, `*.sqlite-wal`) should not be
+committed.
 
 ### Retention
 
