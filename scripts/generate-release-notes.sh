@@ -56,30 +56,9 @@ OTHER="$WORK/other"
 
 while IFS= read -r line; do
   commit_msg=$(echo "$line" | sed 's/^[0-9a-f]\{7,40\} //')
-  issue=$(echo "$commit_msg" | sed -nE 's/.*(#[0-9]+).*/\1/p' | tail -1)
   desc=$(echo "$commit_msg" | sed -E 's/[[:space:]]*\([^)]*#[0-9]+\)[[:space:]]*$//' | sed -E 's/[[:space:]]*[(]?#[0-9]+[)]?[[:space:]]*$//' | sed -E 's/^[[:space:]]*#[0-9]+[): -]*//' | sed 's/^[[:space:]]*//')
-
-  if [ -n "$issue" ]; then
-    echo "$desc" >> "$WORK/$issue"
-  else
-    echo "$desc" >> "$OTHER"
-  fi
+  echo "$desc" >> "$OTHER"
 done <<< "$COMMITS"
-
-for f in "$WORK"/#*; do
-  [ -f "$f" ] || continue
-  num=$(echo "$(basename "$f")" | sed 's/^#//')
-  echo "$num $f"
-done | sort -n | while IFS=' ' read -r num path; do
-  issue="#$num"
-  first=$(head -1 "$path")
-  title=$(echo "$first" | sed -E 's/^(feat|fix|docs|chore|refactor|test|ci|perf|style|build|revert)(\([^)]+\))?:\s*//i' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-  echo "**$issue — $title**"
-  while IFS= read -r item; do
-    echo "* $item"
-  done < "$path"
-  echo
-done
 
 if [ -s "$OTHER" ]; then
   echo "**Other**"
