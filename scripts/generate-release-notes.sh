@@ -57,7 +57,7 @@ OTHER="$WORK/other"
 while IFS= read -r line; do
   commit_msg=$(echo "$line" | sed 's/^[0-9a-f]\{7,40\} //')
   issue=$(echo "$commit_msg" | sed -nE 's/.*(#[0-9]+).*/\1/p' | tail -1)
-  desc=$(echo "$commit_msg" | sed -E 's/[[:space:]]*[(]?#[0-9]+[)]?[[:space:]]*$//' | sed -E 's/^[[:space:]]*#[0-9]+[): -]*//' | sed 's/^[[:space:]]*//')
+  desc=$(echo "$commit_msg" | sed -E 's/[[:space:]]*\([^)]*#[0-9]+\)[[:space:]]*$//' | sed -E 's/[[:space:]]*[(]?#[0-9]+[)]?[[:space:]]*$//' | sed -E 's/^[[:space:]]*#[0-9]+[): -]*//' | sed 's/^[[:space:]]*//')
 
   if [ -n "$issue" ]; then
     echo "$desc" >> "$WORK/$issue"
