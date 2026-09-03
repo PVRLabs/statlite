@@ -3,6 +3,26 @@
 This file summarizes the main user-facing changes in each StatLite release.
 Detailed release notes are generated on GitHub from the commit history.
 
+## v0.4.0 (unreleased)
+
+- Added Quarkus monitoring through a bounded Micrometer
+  Prometheus/OpenMetrics contract, with normalized HTTP, JVM, process, and
+  restart metrics plus optional SmallRye Health and datasource status.
+- Added `statlite inspect --type quarkus` for application base URLs and exact
+  metrics endpoints. Conservative untyped inspection also recognizes Quarkus
+  at its conventional `/q/metrics` location.
+- Added Spring Micrometer Prometheus collection. Spring targets now use `url`,
+  can select `auto`, `prometheus`, or `actuator` with `metrics_source`, and
+  default to automatic compatible-source selection. The former
+  `actuator_base_url` field remains available as a deprecated compatibility
+  alias.
+- Added `--no-poll` mode for viewing existing or copied SQLite history without
+  contacting targets, applying retention cleanup, or advancing dashboard time
+  beyond the newest stored poll.
+- Added SQLite schema version tracking and tightened bounded metric parsing,
+  normalization, event folding, idle-application handling, and dashboard status
+  presentation.
+
 ## v0.3.0 — 2026-08-19
 
 - Added `statlite inspect <application-url>` to discover supported Spring Boot

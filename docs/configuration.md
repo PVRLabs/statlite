@@ -35,47 +35,37 @@ and `examples/spring-actuator-demo/` for a standalone Spring Boot demo app.
 
 ## Discover a target with `inspect`
 
-When you know an application's base URL but not its metrics endpoint, run:
+Start with an application's base URL:
 
 ```bash
 statlite inspect 'http://localhost:8080'
 ```
 
-Inspection probes the conventional `/actuator/health`, `/statlite/metrics`, and
-`/q/metrics` paths. A recognized Spring application gets a conditional
-`/actuator/metrics` capability check; if neither conventional integration is
-recognized, the supplied base URL is tried once as a direct StatLite Metrics
-fallback. The command prints a copyable minimal configuration and the next
-command; for a new setup, save the printed configuration as `statlite.yaml`.
-With an existing configuration, copy only the target entry into its `targets`
-list before running StatLite.
-
-Quarkus discovery is limited to compatible metrics at its established
-`/q/metrics` location. It does not treat arbitrary Prometheus or Micrometer
-exposition as Quarkus. You can also select Quarkus explicitly using an
-application base URL:
+Untyped inspection recognizes Spring, StatLite Metrics v1, and Quarkus at their
+conventional paths. It also accepts a direct StatLite Metrics v1 URL. To inspect
+a Quarkus application base URL or an exact Quarkus metrics URL, select the type:
 
 ```bash
 statlite inspect --type quarkus 'http://localhost:9000'
+statlite inspect --type quarkus 'http://localhost:9000/q/metrics'
 ```
 
-Typed Quarkus inspection performs a bounded Prometheus/OpenMetrics inspection,
-using at most two scrapes when resolving a non-root application base URL. It
-reports normalized capabilities and accepts a complete or partial contract;
-invalid optional concepts are reported as warnings. It does not create monitor
-or storage state. For a non-root, query-free URL, typed inspection first tries
-the supplied URL as an exact endpoint, then tries its conventional `/q/metrics`
-child after a conclusive miss. A URL with a query string is treated as an exact
-endpoint and preserved.
+Typed Quarkus inspection accepts only StatLite's bounded Quarkus contract, not
+arbitrary Prometheus or Micrometer exposition. A root application URL resolves
+to `/q/metrics`. A non-root URL is tried first as an exact endpoint and then,
+after a conclusive miss, with `/q/metrics` appended. A URL containing a query
+string is always an exact endpoint and is preserved.
+
+On success, `inspect` prints the recognized capabilities, a minimal
+configuration, and the next command. Save the configuration as `statlite.yaml`
+for a new setup, or copy only its target entry into an existing `targets` list.
 
 > [!IMPORTANT]
-> Quote browser-pasted URLs, especially URLs containing `?` or `&`. Untyped
-> inspection requires a base HTTP or HTTPS URL without a query string or
-> fragment. It also rejects user information. It is bounded, read-only, and
-> does not load configuration, create SQLite state, or start monitoring. It does
-> not support authentication flags. Authentication-required, unreachable,
-> timed-out, malformed, unknown, or ambiguous responses produce an error without
-> YAML.
+> Quote URLs containing `?` or `&`. Untyped inspection does not accept a query
+> string. All inspection is bounded and read-only: it does not load
+> configuration, create state, start monitoring, or accept authentication
+> options. Invalid, unreachable, unrecognized, or ambiguous targets fail without
+> printing configuration.
 
 ## Server
 

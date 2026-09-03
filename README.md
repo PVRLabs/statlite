@@ -7,8 +7,8 @@
 
 A lightweight, self-hosted metrics dashboard with a small memory and operational
 footprint, designed for applications running on VPSs and small servers. A single
-Go binary monitors Spring Boot applications through Actuator, Quarkus applications
-through Micrometer metrics, and other
+Go binary monitors Spring Boot applications through Actuator JSON or Micrometer
+Prometheus metrics, Quarkus applications through Micrometer metrics, and other
 applications that expose [a small, fixed JSON metrics
 endpoint](docs/statlite-metrics-v1.md), without requiring Prometheus or Grafana.
 It stores focused health, traffic, latency, CPU, memory, and optional host metrics
@@ -60,62 +60,27 @@ locations, source builds, and server-wide Linux setup.
 
 ## Configure an application
 
-Start with an application's base URL. StatLite can identify a supported
-integration and print a minimal, runnable `statlite.yaml`:
+Inspect an application's base URL to generate a minimal configuration:
 
 ```bash
 statlite inspect 'http://localhost:8080'
 ```
 
-The command checks the conventional Spring Boot Actuator, StatLite Metrics v1,
-and Quarkus paths, then prints the detected endpoint, available capabilities, a
-minimal configuration, and the next command. Quarkus discovery is limited to
-its established `/q/metrics` location and does not perform general Prometheus
-discovery. You can also select Quarkus explicitly using its application URL:
+For Quarkus, select the type and supply either its application base URL or exact
+metrics URL:
 
 ```bash
 statlite inspect --type quarkus 'http://localhost:9000'
 ```
 
-Inspection is bounded and read-only: it does not
-require or create
-`statlite.yaml`, open SQLite, or start monitoring.
+Save the printed configuration as `statlite.yaml`, then run `statlite`. For an
+existing configuration, copy only the generated target entry into its `targets`
+list.
 
-> [!IMPORTANT]
-> Quote browser-pasted URLs, especially URLs containing `?` or `&`. Untyped
-> inspection requires a base HTTP or HTTPS URL without a query string or
-> fragment.
-
-For a new Spring application, the successful output includes a complete
-minimal configuration:
-
-```yaml
-server:
-  listen: "127.0.0.1:9090"
-
-storage:
-  sqlite_path: "./statlite.sqlite"
-
-polling:
-  interval: "30s"
-
-targets:
-  - name: "app"
-    type: "spring"
-    url: "http://localhost:8080/actuator"
-```
-
-For a new setup, save the configuration as `statlite.yaml`. If you already
-have a configuration, copy only the target entry into its `targets` list. Then
-run:
-
-```bash
-statlite
-```
-
-See [Configuration](docs/configuration.md) for discovery limits, authentication
-limitations, all settings, and manual target configuration. See [`examples/`](examples/)
-for Spring Boot, Quarkus, Python/FastAPI, self-monitoring, and multi-target configurations.
+Inspection is bounded and read-only. See
+[Configuration](docs/configuration.md) for supported URL forms, inspection
+limits, manual configuration, and `--no-poll` mode for viewing existing history.
+See [`examples/`](examples/) for complete configurations.
 
 > [!IMPORTANT]
 > StatLite has no built-in dashboard or API authentication. Review the
@@ -124,24 +89,27 @@ for Spring Boot, Quarkus, Python/FastAPI, self-monitoring, and multi-target conf
 
 ## Supported metric sources
 
-- **Spring Boot Actuator:** Collects health, request, JVM, process, and optional
-  host metrics from Actuator endpoints.
+- **Spring Boot:** Collects health through Actuator and automatically selects a
+  compatible Micrometer Prometheus endpoint or Actuator JSON for request, JVM,
+  process, and optional host metrics.
 - **Quarkus Micrometer:** Collects bounded request, latency, CPU, heap, process,
-  and restart concepts from the exact `/q/metrics` Prometheus/OpenMetrics endpoint.
-  SmallRye Health is an optional capability when the application publishes it.
+  and restart concepts from an exact Prometheus/OpenMetrics endpoint. SmallRye
+  Health is an optional capability when the application publishes it.
 - **[StatLite Metrics v1](docs/statlite-metrics-v1.md):** A small, fixed JSON
   endpoint that applications in any language or framework can implement.
 - **StatLite self-monitoring:** StatLite can report its own health, traffic,
   process, and host metrics.
 
-Depending on the integration, StatLite can also collect CPU, memory, and disk
-metrics for the environment running the application.
+Use a `statlite-self` target for host metrics where StatLite runs. Spring
+targets can optionally collect host CPU and disk metrics for a remote
+application's environment.
 
 ## Documentation
 
 - [Installation](docs/install.md)
 - [Docker](docs/docker.md)
 - [Configuration](docs/configuration.md)
+- [Supported integrations](docs/integrations.md)
 - [Monitoring on resource-constrained servers](docs/low-resource-monitoring.md)
 - [StatLite Metrics v1](docs/statlite-metrics-v1.md)
 - [systemd deployment](docs/systemd.md)
