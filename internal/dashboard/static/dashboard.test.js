@@ -13,6 +13,13 @@ test("targetTypeHelp describes the StatLite Metrics application format", () => {
   );
 });
 
+test("targetTypeHelp describes the Quarkus metrics endpoint", () => {
+  assert.equal(
+    dashboard.targetTypeHelp("quarkus"),
+    "Monitors a Quarkus application through its Prometheus/OpenMetrics endpoint."
+  );
+});
+
 test("periodic refresh keeps charts for a transient empty series", () => {
   dashboard.state.renderedSeriesQuery = "?target=app&range=1h";
 

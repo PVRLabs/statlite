@@ -595,6 +595,8 @@ function targetTypeHelp(value) {
   switch (String(value || "").toLowerCase()) {
   case "spring":
     return "Monitors a Spring Boot application through its Actuator endpoint.";
+  case "quarkus":
+    return "Monitors a Quarkus application through its Prometheus/OpenMetrics endpoint.";
   case "statlite-metrics":
     return "Monitors an app that exposes metrics in StatLite’s standard format.";
   default:

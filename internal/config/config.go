@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	// When adding a target type, also update targetTypeHelp in the dashboard.
 	TargetTypeSpring          = "spring"
 	TargetTypeQuarkus         = "quarkus"
 	TargetTypeStatliteMetrics = "statlite-metrics"
