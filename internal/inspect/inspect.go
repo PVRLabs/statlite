@@ -186,8 +186,7 @@ func (i *inspector) application(parent context.Context, base *url.URL) (*Result,
 
 	if springMatched {
 		result := &Result{TargetType: TargetSpring, Endpoint: actuatorURL, Capabilities: []string{"health"}}
-		metricsProbe := i.get(ctx, appendPath(base, "actuator/metrics"))
-		if recognizesSpringMetricsIndex(metricsProbe) {
+		if i.springMetricsAvailable(ctx, base) {
 			result.Capabilities = append(result.Capabilities, "metrics")
 		} else {
 			result.Warnings = append(result.Warnings, "metrics are unavailable")
@@ -232,6 +231,21 @@ func (i *inspector) application(parent context.Context, base *url.URL) (*Result,
 		return nil, failure
 	}
 	return nil, &Failure{Kind: FailureUnrecognized, Err: errors.New("no supported integration was recognized")}
+}
+
+func (i *inspector) springMetricsAvailable(ctx context.Context, base *url.URL) bool {
+	client, err := prometheus.NewClientWithTransport(i.timeout, prometheus.DefaultLimits, nil, i.client.Transport)
+	if err != nil {
+		return false
+	}
+	compatible, err := collector.InspectSpringPrometheus(ctx, appendPath(base, "actuator/prometheus"), client)
+	if compatible {
+		return true
+	}
+	if err != nil && !collector.SpringPrometheusDefinitelyAbsent(err) {
+		return false
+	}
+	return recognizesSpringMetricsIndex(i.get(ctx, appendPath(base, "actuator/metrics")))
 }
 
 func isQuarkusMiss(err error) bool {

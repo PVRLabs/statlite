@@ -20,6 +20,19 @@ type springPrometheusValues struct {
 	counterOverflows          map[string]bool
 }
 
+// InspectSpringPrometheus applies the same bounded scrape and compatibility
+// contract used by Spring metrics_source auto selection.
+func InspectSpringPrometheus(ctx context.Context, endpoint string, client *prometheus.Client) (bool, error) {
+	v := &springPrometheusValues{values: make(map[string]float64)}
+	_, err := client.Scrape(ctx, endpoint, func(sample prometheus.Sample) error {
+		return v.accept(sample, false)
+	})
+	if err != nil {
+		return false, err
+	}
+	return v.compatible(), nil
+}
+
 func (c *SpringActuatorCollector) collectMetrics(ctx context.Context, session *springPollSession, result *CollectionResult) bool {
 	source := c.selectedSource
 	if source == SpringMetricsSourceActuator {
@@ -45,7 +58,7 @@ func (c *SpringActuatorCollector) collectMetrics(ctx context.Context, session *s
 		c.addPrometheusSamples(result, values)
 		return true
 	}
-	if err == nil || prometheusDefinitelyAbsent(err) {
+	if err == nil || SpringPrometheusDefinitelyAbsent(err) {
 		c.selectedSource = SpringMetricsSourceActuator
 		c.collectActuatorMetrics(ctx, session, result)
 		return true
@@ -226,7 +239,9 @@ func (c *SpringActuatorCollector) addPrometheusSamples(result *CollectionResult,
 	}
 }
 
-func prometheusDefinitelyAbsent(err error) bool {
+// SpringPrometheusDefinitelyAbsent reports the only scrape failure that lets
+// Spring auto selection fall back to Actuator metrics.
+func SpringPrometheusDefinitelyAbsent(err error) bool {
 	var scrapeErr *prometheus.Error
 	return errors.As(err, &scrapeErr) && scrapeErr.Class == prometheus.FailureNotFound
 }

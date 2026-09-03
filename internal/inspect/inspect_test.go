@@ -29,6 +29,8 @@ func TestInspectorRecognizesSpringUsingConventionalPaths(t *testing.T) {
 			return http.StatusNotFound, `{"error":"not found"}`
 		case "/service/q/metrics":
 			return http.StatusNotFound, "missing"
+		case "/service/actuator/prometheus":
+			return http.StatusNotFound, "missing"
 		case "/service/actuator/metrics":
 			return http.StatusOK, `{"names":["jvm.memory.used"]}`
 		default:
@@ -48,8 +50,91 @@ func TestInspectorRecognizesSpringUsingConventionalPaths(t *testing.T) {
 	if result.TargetType != TargetSpring || result.Endpoint != "http://app.test/service/actuator" {
 		t.Fatalf("result = %#v", result)
 	}
-	if got := strings.Join(paths, ","); got != "/service/actuator/health,/service/statlite/metrics,/service/q/metrics,/service/actuator/metrics" {
+	if got := strings.Join(paths, ","); got != "/service/actuator/health,/service/statlite/metrics,/service/q/metrics,/service/actuator/prometheus,/service/actuator/metrics" {
 		t.Fatalf("paths = %q", got)
+	}
+}
+
+func TestInspectorSpringMetricsSourceSelection(t *testing.T) {
+	tests := []struct {
+		name             string
+		prometheusStatus int
+		prometheusBody   string
+		wantActuator     bool
+		wantMetrics      bool
+	}{
+		{
+			name:             "compatible Prometheus is preferred",
+			prometheusStatus: http.StatusOK,
+			prometheusBody:   "process_start_time_seconds 1\njvm_memory_used_bytes{area=\"heap\"} 2\n",
+			wantMetrics:      true,
+		},
+		{
+			name:             "absent Prometheus falls back",
+			prometheusStatus: http.StatusNotFound,
+			prometheusBody:   "missing",
+			wantActuator:     true,
+			wantMetrics:      true,
+		},
+		{
+			name:             "valid incompatible Prometheus falls back",
+			prometheusStatus: http.StatusOK,
+			prometheusBody:   "unrelated_metric 1\n",
+			wantActuator:     true,
+			wantMetrics:      true,
+		},
+		{
+			name:             "authentication does not fall back",
+			prometheusStatus: http.StatusUnauthorized,
+			prometheusBody:   "private",
+		},
+		{
+			name:             "transient failure does not fall back",
+			prometheusStatus: http.StatusServiceUnavailable,
+			prometheusBody:   "retry later",
+		},
+		{
+			name:             "malformed exposition does not fall back",
+			prometheusStatus: http.StatusOK,
+			prometheusBody:   "not a metric",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var actuatorCalled bool
+			i := testInspector(func(req *http.Request) (int, string) {
+				switch req.URL.Path {
+				case "/actuator/health":
+					return http.StatusOK, `{"status":"UP"}`
+				case "/statlite/metrics", "/q/metrics":
+					return http.StatusNotFound, "missing"
+				case "/actuator/prometheus":
+					return tt.prometheusStatus, tt.prometheusBody
+				case "/actuator/metrics":
+					actuatorCalled = true
+					return http.StatusOK, `{"names":["jvm.memory.used"]}`
+				default:
+					t.Fatalf("unexpected path %q", req.URL.Path)
+					return 0, ""
+				}
+			})
+			base, err := parseApplicationURL("http://app.test")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			result, err := i.application(context.Background(), base)
+			if err != nil {
+				t.Fatalf("application() error = %v", err)
+			}
+			if actuatorCalled != tt.wantActuator {
+				t.Fatalf("Actuator metrics called = %v, want %v", actuatorCalled, tt.wantActuator)
+			}
+			if got := containsCapability(result.Capabilities, "metrics"); got != tt.wantMetrics {
+				t.Fatalf("metrics capability = %v, want %v; result = %#v", got, tt.wantMetrics, result)
+			}
+		})
 	}
 }
 
@@ -61,6 +146,8 @@ func TestInspectorRecognizesPartialSpringHealth(t *testing.T) {
 		case "/statlite/metrics":
 			return http.StatusNotFound, "missing"
 		case "/q/metrics":
+			return http.StatusNotFound, "missing"
+		case "/actuator/prometheus":
 			return http.StatusNotFound, "missing"
 		case "/actuator/metrics":
 			return http.StatusForbidden, "private"
@@ -287,6 +374,8 @@ func TestInspectorIgnoresUnrelatedQuarkusFailureAfterSpringMatch(t *testing.T) {
 			return http.StatusUnauthorized, "unauthorized"
 		case "/actuator/metrics":
 			return http.StatusOK, `{"names":[]}`
+		case "/actuator/prometheus":
+			return http.StatusNotFound, "missing"
 		default:
 			t.Fatalf("unexpected path %q", req.URL.Path)
 			return 0, ""
@@ -515,6 +604,8 @@ func TestInspectorReturnsSpringWhenMetricsCapabilityProbeTimesOut(t *testing.T) 
 				}, nil
 			case "/q/metrics":
 				return &http.Response{StatusCode: http.StatusNotFound, Header: http.Header{"Content-Type": {"text/plain"}}, Body: io.NopCloser(strings.NewReader("missing")), Request: req}, nil
+			case "/actuator/prometheus":
+				return testHTTPResponse(req, http.StatusNotFound, "missing"), nil
 			case "/actuator/metrics":
 				<-req.Context().Done()
 				return nil, req.Context().Err()
@@ -625,6 +716,8 @@ func TestInspectorFollowsBoundedRedirectsAndKeepsConfiguredEndpoint(t *testing.T
 			fmt.Fprint(w, `{"status":"UP"}`)
 		case "/service/statlite/metrics":
 			w.WriteHeader(http.StatusNotFound)
+		case "/service/actuator/prometheus":
+			w.WriteHeader(http.StatusNotFound)
 		case "/service/actuator/metrics":
 			http.Redirect(w, r, "/moved-metrics", http.StatusTemporaryRedirect)
 		case "/moved-metrics":
@@ -642,7 +735,7 @@ func TestInspectorFollowsBoundedRedirectsAndKeepsConfiguredEndpoint(t *testing.T
 	if result.Endpoint != server.URL+"/service/actuator" {
 		t.Fatalf("endpoint = %q, want original configured endpoint", result.Endpoint)
 	}
-	if got := strings.Join(paths, ","); got != "/service/actuator/health,/moved-health,/service/statlite/metrics,/service/q/metrics,/service/actuator/metrics,/moved-metrics" {
+	if got := strings.Join(paths, ","); got != "/service/actuator/health,/moved-health,/service/statlite/metrics,/service/q/metrics,/service/actuator/prometheus,/service/actuator/metrics,/moved-metrics" {
 		t.Fatalf("wire paths = %q", got)
 	}
 }
