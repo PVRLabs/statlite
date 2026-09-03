@@ -33,9 +33,12 @@ application can still be compatible through its runtime families. Quarkus
 targets may provide application health through the optional SmallRye Health
 extension. Database health is available when the application publishes a
 datasource health check; this metrics-only fixture does not configure a
-datasource. Quarkus targets do not infer host resources. Use
-`statlite inspect --type quarkus` with the exact endpoint;
-untyped discovery intentionally does not probe `/q/metrics`.
+datasource. Quarkus targets do not infer host resources. Untyped
+`statlite inspect` may discover Quarkus by probing the conventional `/q/metrics`
+location relative to the supplied application base URL, but it does not
+classify arbitrary Prometheus or Micrometer endpoints as Quarkus. Use
+`statlite inspect --type quarkus` for explicit framework-aware inspection,
+including custom or exact endpoints and endpoint resolution from a base URL.
 
 For a conventional Quarkus metrics URL ending in `/q/metrics`, StatLite derives
 the sibling `/q/health` endpoint when SmallRye Health is available. Health
