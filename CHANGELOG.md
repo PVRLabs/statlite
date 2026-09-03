@@ -21,7 +21,9 @@ Detailed release notes are generated on GitHub from the commit history.
   beyond the newest stored poll.
 - Added SQLite schema version tracking and tightened bounded metric parsing,
   normalization, event folding, idle-application handling, and dashboard status
-  presentation.
+  presentation. Dashboard target guidance and startup diagnostics were also
+  improved, including the resolved SQLite database path and clearer `--no-poll`
+  status messages.
 
 ## v0.3.0 — 2026-08-19
 
