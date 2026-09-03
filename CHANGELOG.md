@@ -3,7 +3,7 @@
 This file summarizes the main user-facing changes in each StatLite release.
 Detailed release notes are generated on GitHub from the commit history.
 
-## v0.4.0 (unreleased)
+## v0.4.0 — 2026-09-03
 
 - Added Quarkus monitoring through a bounded Micrometer
   Prometheus/OpenMetrics contract, with normalized HTTP, JVM, process, and
