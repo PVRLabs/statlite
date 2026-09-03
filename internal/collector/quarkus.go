@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pvrlabs/statlite/internal/config"
 	"github.com/pvrlabs/statlite/internal/prometheus"
 )
 
@@ -275,7 +276,7 @@ func isQuarkusHTTPMetricsEndpoint(raw string) bool {
 	if err != nil {
 		return false
 	}
-	return strings.TrimRight(parsed.Path, "/") == "/q/metrics"
+	return config.IsConventionalQuarkusMetricsPath(parsed.Path)
 }
 
 func prependQuarkusNoTrafficSamples(samples []MetricSample) []MetricSample {

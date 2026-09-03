@@ -43,6 +43,58 @@ func TestQuarkusCollectorUsesOneLogicalScrapeAndPreservesExactEndpoint(t *testin
 	))
 }
 
+func TestQuarkusCollectorUsesIdleHTTPZerosForContextPrefixedConventionalPath(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/service/q/metrics":
+			w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+			_, _ = w.Write([]byte("process_cpu_usage 0.25\n"))
+		case "/service/q/health":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"UP"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client, err := prometheus.NewClient(time.Second, prometheus.DefaultLimits, nil)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	healthClient, err := NewQuarkusHealthClient(server.URL+"/service/q/health", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewQuarkusHealthClient() error = %v", err)
+	}
+	result, err := NewQuarkusCollector("orders", server.URL+"/service/q/metrics", client, healthClient).Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	assertQuarkusSamples(t, result.Samples, quarkusNoTrafficSamples(
+		MetricSample{Key: "process_cpu_usage", Kind: MetricKindGauge, Value: 0.25, Unit: "ratio"},
+	))
+}
+
+func TestQuarkusCollectorDoesNotUseIdleHTTPZerosForCustomMetricsPath(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		_, _ = w.Write([]byte("process_cpu_usage 0.25\n"))
+	}))
+	defer server.Close()
+
+	client, err := prometheus.NewClient(time.Second, prometheus.DefaultLimits, nil)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	result, err := NewQuarkusCollector("orders", server.URL+"/manage/prom", client, nil).Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	assertQuarkusSamples(t, result.Samples, []MetricSample{
+		{Key: "process_cpu_usage", Kind: MetricKindGauge, Value: 0.25, Unit: "ratio"},
+	})
+}
+
 func TestQuarkusCollectorNormalizesCertifiedHTTPFamilies(t *testing.T) {
 	body := `
 # TYPE http_server_requests_seconds summary

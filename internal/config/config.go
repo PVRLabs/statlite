@@ -303,15 +303,22 @@ func DefaultQuarkusHealthURL(metricsURL string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("parsing metrics URL: %w", err)
 	}
-	trimmedPath := strings.TrimSuffix(u.Path, "/")
-	if !strings.HasSuffix(trimmedPath, "/q/metrics") {
+	if !IsConventionalQuarkusMetricsPath(u.Path) {
 		return "", nil
 	}
+	trimmedPath := strings.TrimRight(u.Path, "/")
 	u.Path = strings.TrimSuffix(trimmedPath, "/q/metrics") + "/q/health"
 	u.RawPath = ""
 	u.RawQuery = ""
 	u.Fragment = ""
 	return u.String(), nil
+}
+
+// IsConventionalQuarkusMetricsPath reports whether a normalized URL path uses
+// Quarkus's conventional metrics suffix, including an optional application
+// context path and trailing slash.
+func IsConventionalQuarkusMetricsPath(rawPath string) bool {
+	return strings.HasSuffix(strings.TrimRight(rawPath, "/"), "/q/metrics")
 }
 
 func (t TargetConfig) DisplayMetadata() TargetDisplayMetadata {
