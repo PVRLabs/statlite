@@ -104,8 +104,8 @@ function buildCharts() {
   });
   state.charts.latency = new Chart(document.getElementById("latency-chart"), {
     type: "line",
-    data: { labels: [], datasets: [{ label: "Latency", unit: "seconds", data: [], borderColor: palette.latency, backgroundColor: "rgba(47, 211, 107, 0.12)", ...lineStyle, tension: 0.25, spanGaps: false }] },
-    options: chartOptions()
+    data: { labels: [], datasets: [{ label: "Latency", unit: "ms", data: [], borderColor: palette.latency, backgroundColor: "rgba(47, 211, 107, 0.12)", ...lineStyle, tension: 0.25, spanGaps: false }] },
+    options: latencyOptions()
   });
   state.charts.runtime = new Chart(document.getElementById("runtime-chart"), {
     type: "line",
@@ -154,6 +154,15 @@ function chartOptions() {
       y: { beginAtZero: true, ticks: { color: palette.ticks, precision: 0 }, grid: { color: palette.grid } }
     }
   };
+}
+
+function latencyOptions() {
+  const options = chartOptions();
+  options.scales = {
+    x: { ticks: { color: palette.ticks, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { display: false } },
+    y: { beginAtZero: true, title: { display: true, text: "ms", color: palette.ticks }, ticks: { color: palette.ticks }, grid: { color: palette.grid } }
+  };
+  return options;
 }
 
 function runtimeOptions() {
@@ -398,7 +407,7 @@ function renderSeries(series) {
     points.map((point) => point.http_4xx),
     points.map((point) => point.http_5xx)
   ]);
-  updateChart(state.charts.latency, labels, [points.map((point) => point.average_latency_seconds)]);
+  updateChart(state.charts.latency, labels, [points.map((point) => point.average_latency_seconds == null ? null : point.average_latency_seconds * 1000)]);
   updateChart(state.charts.runtime, labels, [
     points.map((point) => point.heap_used_bytes == null ? null : point.heap_used_bytes / 1024 / 1024),
     points.map((point) => point.process_cpu_usage == null ? null : point.process_cpu_usage * 100)
@@ -648,6 +657,7 @@ function formatTick(value) {
 
 function formatValue(value, unit) {
   if (value == null || !Number.isFinite(value)) return "Unknown";
+  if (unit === "ms") return value.toFixed(0) + " ms";
   if (unit === "seconds") return value.toFixed(3) + " s";
   if (unit === "percent") return value.toFixed(1) + "%";
   if (unit === "mb") return value.toFixed(1) + " MB";

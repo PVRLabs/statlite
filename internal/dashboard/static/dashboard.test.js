@@ -181,6 +181,7 @@ test("dashboard displays embedded host fields with application data", () => {
 
 test("formatters reject non-finite inputs and show the current disk observation", () => {
   assert.equal(dashboard.formatValue(Infinity, "percent"), "Unknown");
+  assert.equal(dashboard.formatValue(34, "ms"), "34 ms");
   assert.equal(dashboard.formatBytes(NaN), "Unknown");
   assert.equal(dashboard.formatCurrentResource(null, "Disk"), "No data");
   assert.equal(dashboard.formatCurrentResource({ used_bytes: 30, total_bytes: 60, usage: 0.5 }, "Disk"), "Disk — 30 B / 60 B · 50.0%");
@@ -293,11 +294,12 @@ test("renderSeries applies capability visibility with a minimal DOM stub", () =>
   dashboard.state.charts = chartStubs();
 
   try {
-    dashboard.renderSeries({ points: [{ host_memory_used_bytes: 10, process_cpu_usage: 0.25 }] });
+    dashboard.renderSeries({ points: [{ host_memory_used_bytes: 10, process_cpu_usage: 0.25, average_latency_seconds: 0.034 }] });
     assert.equal(document.getElementById("host-section").hidden, false);
     assert.equal(document.getElementById("host-runtime-chart-card").hidden, false);
     assert.equal(document.getElementById("host-disk-chart-card").hidden, true);
     assert.deepEqual(dashboard.state.charts.runtime.data.datasets[1].data, [25]);
+    assert.deepEqual(dashboard.state.charts.latency.data.datasets[0].data, [34]);
 
     dashboard.renderSeries({ points: [] });
     assert.equal(document.getElementById("host-section").hidden, true);
