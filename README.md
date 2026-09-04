@@ -14,7 +14,7 @@ endpoint](docs/statlite-metrics-v1.md), without requiring Prometheus or Grafana.
 It stores focused health, traffic, latency, CPU, memory, and optional host metrics
 in SQLite.
 
-**Website:** [pvrlabs.xyz/statlite](https://pvrlabs.xyz/statlite)
+**Website:** [pvrlabs.xyz/statlite](https://pvrlabs.xyz/statlite) · [Interactive demo](https://pvrlabs.xyz/statlite/demo.html)
 
 ![StatLite example dashboard](docs/images/dashboard.webp)
 
