@@ -6,6 +6,13 @@ const dashboard = require("./dashboard.js");
 beforeEach(resetDashboardState);
 afterEach(resetDashboardState);
 
+test("targetTypeHelp describes the Spring Actuator integration", () => {
+  assert.equal(
+    dashboard.targetTypeHelp("spring"),
+    "Monitors a Spring Boot application through Actuator health and metrics endpoints."
+  );
+});
+
 test("targetTypeHelp describes the StatLite Metrics application format", () => {
   assert.equal(
     dashboard.targetTypeHelp("statlite-metrics"),
@@ -16,7 +23,26 @@ test("targetTypeHelp describes the StatLite Metrics application format", () => {
 test("targetTypeHelp describes the Quarkus metrics endpoint", () => {
   assert.equal(
     dashboard.targetTypeHelp("quarkus"),
-    "Monitors a Quarkus application through its Prometheus/OpenMetrics endpoint."
+    "Monitors a Quarkus application through its metrics endpoint; SmallRye Health is used when available."
+  );
+});
+
+test("runtimeHelp describes generic application runtime memory", () => {
+  assert.equal(
+    dashboard.runtimeHelp("statlite-metrics"),
+    "Process CPU usage and memory managed by the application runtime, not total process memory."
+  );
+});
+
+test("runtimeHelp identifies JVM heap memory for JVM targets", () => {
+  const suffix = " Runtime memory is current JVM heap usage.";
+  assert.equal(
+    dashboard.runtimeHelp("spring"),
+    "Process CPU usage and memory managed by the application runtime, not total process memory." + suffix
+  );
+  assert.equal(
+    dashboard.runtimeHelp("quarkus"),
+    "Process CPU usage and memory managed by the application runtime, not total process memory." + suffix
   );
 });
 

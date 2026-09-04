@@ -554,7 +554,7 @@ pre {
       <div class="canvas-wrap"><canvas id="latency-chart"></canvas></div>
     </div>
     <div id="process-section" class="chart">
-      <div class="chart-head"><h2 class="label-help">Process runtime <button type="button" class="help" aria-label="Runtime help" aria-expanded="false">i</button><span id="runtime-tooltip" class="tooltip" role="tooltip">Process CPU usage and current managed runtime heap or allocator usage.</span></h2></div>
+      <div class="chart-head"><h2 class="label-help">Process runtime <button type="button" class="help" aria-label="Runtime help" aria-expanded="false">i</button><span id="runtime-tooltip" class="tooltip" role="tooltip">Process CPU usage and memory managed by the application runtime, not total process memory.</span></h2></div>
       <div class="canvas-wrap"><canvas id="runtime-chart"></canvas></div>
     </div>
     </div>
@@ -564,11 +564,11 @@ pre {
     <h2 id="host-heading">Host resources</h2>
     <div class="chart-grid">
       <div id="host-runtime-chart-card" class="chart">
-        <div class="chart-head"><h2 class="label-help">Host runtime <button type="button" class="help" aria-label="Host runtime help" aria-expanded="false">i</button><span class="tooltip" role="tooltip">Current and total host RAM, with CPU usage across the capacity visible to StatLite.</span></h2></div>
+        <div class="chart-head"><h2 class="label-help">Host runtime <button type="button" class="help" aria-label="Host runtime help" aria-expanded="false">i</button><span class="tooltip" role="tooltip">Host memory and CPU reported by the target. In containers, values may describe the container-visible environment rather than the physical host.</span></h2></div>
         <div class="canvas-wrap"><canvas id="host-runtime-chart"></canvas></div>
       </div>
       <div id="host-disk-chart-card" class="chart">
-        <div class="chart-head"><h2>Disk</h2><div id="host-disk-note" class="note"></div></div>
+        <div class="chart-head"><h2 class="label-help">Disk <button type="button" class="help" aria-label="Disk help" aria-expanded="false">i</button><span class="tooltip" role="tooltip">Usage and capacity for one relevant filesystem reported by the target.</span></h2><div id="host-disk-note" class="note"></div></div>
         <div class="canvas-wrap"><canvas id="host-disk-chart"></canvas></div>
       </div>
     </div>

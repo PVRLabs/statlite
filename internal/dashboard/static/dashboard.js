@@ -603,9 +603,9 @@ function statusLabel(value) {
 function targetTypeHelp(value) {
   switch (String(value || "").toLowerCase()) {
   case "spring":
-    return "Monitors a Spring Boot application through its Actuator endpoint.";
+    return "Monitors a Spring Boot application through Actuator health and metrics endpoints.";
   case "quarkus":
-    return "Monitors a Quarkus application through its Prometheus/OpenMetrics endpoint.";
+    return "Monitors a Quarkus application through its metrics endpoint; SmallRye Health is used when available.";
   case "statlite-metrics":
     return "Monitors an app that exposes metrics in StatLite’s standard format.";
   default:
@@ -614,9 +614,10 @@ function targetTypeHelp(value) {
 }
 
 function runtimeHelp(value) {
-  const help = "Process CPU usage and current managed runtime heap or allocator usage.";
-  if (String(value || "").toLowerCase() === "spring") {
-    return help + " For this Spring Boot target, Runtime memory is current JVM heap usage.";
+  const help = "Process CPU usage and memory managed by the application runtime, not total process memory.";
+  const targetType = String(value || "").toLowerCase();
+  if (targetType === "spring" || targetType === "quarkus") {
+    return help + " Runtime memory is current JVM heap usage.";
   }
   return help;
 }
@@ -699,6 +700,6 @@ function initDashboard() {
   refreshWhenVisible();
 }
 
-const dashboardTestHooks = { detectCapabilities, foldRepeatedEvents, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, openEventGroupKeys, refresh, refreshWhenVisible, renderFooterSummary, renderPollStatus, renderRangeSelection, renderSeries, shouldRenderSeries, state, targetTypeHelp, validDiskPoint };
+const dashboardTestHooks = { detectCapabilities, foldRepeatedEvents, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, openEventGroupKeys, refresh, refreshWhenVisible, renderFooterSummary, renderPollStatus, renderRangeSelection, renderSeries, runtimeHelp, shouldRenderSeries, state, targetTypeHelp, validDiskPoint };
 if (typeof module !== "undefined" && module.exports) module.exports = dashboardTestHooks;
 if (typeof document !== "undefined") initDashboard();
