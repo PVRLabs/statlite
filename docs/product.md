@@ -8,6 +8,10 @@ integration. It also supports the fixed
 [`statlite-metrics/v1`](statlite-metrics-v1.md) application profile, and
 StatLite self-monitoring through the canonical `statlite-metrics/v1` profile.
 
+Spring Boot Actuator is the reference integration for StatLite's integration
+semantics and quality bar. Other supported integrations need to provide a
+useful, documented contract; they do not need feature parity with Spring.
+
 It is intended for solo developers and small teams that need practical
 production visibility without operating Prometheus and Grafana. StatLite is a
 focused production-support tool, not a general observability platform.
@@ -52,6 +56,21 @@ architecture or tier. Proposals for new normalized metrics still require
 explicit product and architecture review covering operational value, storage
 and retention cost, dashboard behavior, and long-term compatibility.
 
+New integrations expand source compatibility, not StatLite's normalized metric
+vocabulary. Unknown framework or exporter metrics, arbitrary labels, route
+dimensions, histogram buckets, and similar source-specific data remain
+unsupported unless separately approved.
+
+When prioritizing integrations, application-level HTTP signals have the
+highest value: request volume, HTTP status and error rates (especially 4xx and
+5xx), and latency. Health is also valuable when the target exposes an
+authoritative health contract. Runtime and process metrics such as CPU, memory,
+GC, threads, and goroutines are secondary signals and generally do not justify
+prioritizing an integration by themselves. This is a prioritization guide, not
+a requirement that every target expose every HTTP concept. Deliberate strategic
+or runtime-focused targets can be exceptions when their constrained-environment
+value is clear; the planned Go baseline is one such product decision.
+
 ## Supported integration boundaries
 
 ### Currently supported targets
@@ -85,6 +104,11 @@ certification fixtures, documentation, and user-facing explanation. A valid
 metrics endpoint alone is not a StatLite integration. StatLite must know which
 application concepts the endpoint represents and how they can be normalized
 safely.
+
+Where an ecosystem lacks a stable framework-owned metrics contract, StatLite
+may support one explicitly documented and tested library, configuration, and
+metric setup. Certification applies only to that setup and contract, not to
+arbitrary metrics emitted by the language or framework.
 
 Prometheus/OpenMetrics, Micrometer, and similar metric technologies may be
 shared internally by multiple target adapters. They are implementation

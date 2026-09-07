@@ -1,6 +1,7 @@
 # Supported integrations
 
-StatLite supports a small set of framework-owned application integrations.
+StatLite supports a small set of framework/application integrations, including
+explicitly certified setups where no framework-owned contract exists.
 Prometheus and OpenMetrics are wire formats used by some adapters; StatLite is
 not a generic Prometheus scraper or metrics database.
 
@@ -17,10 +18,15 @@ not a generic Prometheus scraper or metrics database.
 
 Support means that the integration has an owned endpoint and source contract,
 bounded collection behavior, normalization rules, and regression or
-certification evidence. A framework can appear here as “In development” without
-being accepted as a production target yet. Supporting a source format means only
-that the named adapter understands that source's documented contract; it does
-not enable arbitrary metric ingestion.
+certification evidence that can be verified through recognized signals,
+inspection, fixtures, or tests. A framework can appear here as “In development”
+without being accepted as a production target yet. Where an ecosystem has no
+stable framework-owned contract, support may be limited to one explicitly
+documented and tested library/configuration/metric setup. That certification
+covers only the named setup and contract, not arbitrary metrics emitted by the
+language or framework. Supporting a source format means only that the named
+adapter understands that source's documented contract; it does not enable
+arbitrary metric ingestion.
 
 ## Spring Boot
 
