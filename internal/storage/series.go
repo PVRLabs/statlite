@@ -65,15 +65,14 @@ ORDER BY p.started_at ASC, p.id ASC, ms.metric_key ASC
 
 	series := &Series{Start: start.UTC(), End: end.UTC()}
 	var current *pollSamples
-	flush := func() error {
+	flush := func() {
 		if current == nil {
-			return nil
+			return
 		}
 		point, include := buildSeriesPoint(current, previous, start)
 		if include {
 			series.Points = append(series.Points, point)
 		}
-		return nil
 	}
 
 	for rows.Next() {
@@ -89,9 +88,7 @@ ORDER BY p.started_at ASC, p.id ASC, ms.metric_key ASC
 			return nil, fmt.Errorf("parse series sample started_at: %w", err)
 		}
 		if current == nil || current.pollID != pollID {
-			if err := flush(); err != nil {
-				return nil, err
-			}
+			flush()
 			current = &pollSamples{
 				pollID:    pollID,
 				timestamp: startedAt,
@@ -106,9 +103,7 @@ ORDER BY p.started_at ASC, p.id ASC, ms.metric_key ASC
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate series samples: %w", err)
 	}
-	if err := flush(); err != nil {
-		return nil, err
-	}
+	flush()
 	if len(series.Points) > 0 {
 		latest := series.Points[len(series.Points)-1]
 		series.LatestPoint = &latest
@@ -121,10 +116,11 @@ ORDER BY p.started_at ASC, p.id ASC, ms.metric_key ASC
 func (s *Store) previousCounterValues(ctx context.Context, targetName string, start time.Time, keys []string) (map[string]counterValue, error) {
 	previous := make(map[string]counterValue, len(keys))
 	for _, key := range keys {
+		var pollID int64
 		var appRunID sql.NullInt64
 		var value float64
 		err := s.db.QueryRowContext(ctx, `
-SELECT p.app_run_id, ms.value
+SELECT p.id, p.app_run_id, ms.value
 FROM polls p
 JOIN targets t ON t.id = p.target_id
 JOIN metric_samples ms ON ms.poll_id = p.id
@@ -134,14 +130,14 @@ WHERE t.name = ?
   AND ms.metric_kind = ?
 ORDER BY p.started_at DESC, p.id DESC
 LIMIT 1
-`, targetName, formatSortableTime(start), key, collector.MetricKindCounter).Scan(&appRunID, &value)
+`, targetName, formatSortableTime(start), key, collector.MetricKindCounter).Scan(&pollID, &appRunID, &value)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				continue
 			}
 			return nil, fmt.Errorf("query previous series sample %q: %w", key, err)
 		}
-		counter := counterValue{value: value}
+		counter := counterValue{pollID: pollID, value: value}
 		if appRunID.Valid {
 			id := appRunID.Int64
 			counter.appRunID = &id
@@ -183,6 +179,7 @@ type sampleValue struct {
 }
 
 type counterValue struct {
+	pollID   int64
 	appRunID *int64
 	value    float64
 }
@@ -200,7 +197,8 @@ func buildSeriesPoint(poll *pollSamples, previous map[string]counterValue, start
 	point.HTTP404 = counterDelta(poll, previous, "http_404_total")
 	point.HTTP4xx = counterDelta(poll, previous, "http_4xx_total")
 	point.HTTP5xx = counterDelta(poll, previous, "http_5xx_total")
-	if requestDelta != nil && requestTimeDelta != nil && *requestDelta > 0 {
+	if requestDelta != nil && requestTimeDelta != nil && *requestDelta > 0 &&
+		matchingCounterBaseline(previous, "http_requests_total", "http_request_time_total_seconds") {
 		value := *requestTimeDelta / *requestDelta
 		point.AverageLatencySeconds = &value
 	}
@@ -249,6 +247,12 @@ func counterDelta(poll *pollSamples, previous map[string]counterValue, key strin
 	return &delta
 }
 
+func matchingCounterBaseline(previous map[string]counterValue, firstKey, secondKey string) bool {
+	first, firstOK := previous[firstKey]
+	second, secondOK := previous[secondKey]
+	return firstOK && secondOK && first.pollID == second.pollID
+}
+
 func gaugeValue(poll *pollSamples, key string) *float64 {
 	sample, ok := poll.samples[key]
 	if !ok || sample.kind != collector.MetricKindGauge {
@@ -263,7 +267,7 @@ func updatePreviousCounters(poll *pollSamples, previous map[string]counterValue)
 		if sample.kind != collector.MetricKindCounter {
 			continue
 		}
-		previous[key] = counterValue{appRunID: poll.appRunID, value: sample.value}
+		previous[key] = counterValue{pollID: poll.pollID, appRunID: poll.appRunID, value: sample.value}
 	}
 }
 

@@ -38,12 +38,12 @@ func TestQuarkusCollectorUsesOneLogicalScrapeAndPreservesExactEndpoint(t *testin
 	if result.HealthStatus != "UP" || result.DBHealthStatus != "UP" {
 		t.Fatalf("health = %q/%q, want UP/UP", result.HealthStatus, result.DBHealthStatus)
 	}
-	assertQuarkusSamples(t, result.Samples, quarkusNoTrafficSamples(
+	assertQuarkusSamples(t, result.Samples, []MetricSample{
 		MetricSample{Key: "process_cpu_usage", Kind: MetricKindGauge, Value: 0.25, Unit: "ratio"},
-	))
+	})
 }
 
-func TestQuarkusCollectorUsesIdleHTTPZerosForContextPrefixedConventionalPath(t *testing.T) {
+func TestQuarkusCollectorLeavesHTTPUnavailableForRuntimeOnlyConventionalPath(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/service/q/metrics":
@@ -70,9 +70,9 @@ func TestQuarkusCollectorUsesIdleHTTPZerosForContextPrefixedConventionalPath(t *
 	if err != nil {
 		t.Fatalf("Collect() error = %v", err)
 	}
-	assertQuarkusSamples(t, result.Samples, quarkusNoTrafficSamples(
+	assertQuarkusSamples(t, result.Samples, []MetricSample{
 		MetricSample{Key: "process_cpu_usage", Kind: MetricKindGauge, Value: 0.25, Unit: "ratio"},
-	))
+	})
 }
 
 func TestQuarkusCollectorDoesNotUseIdleHTTPZerosForCustomMetricsPath(t *testing.T) {
@@ -141,12 +141,12 @@ disk_total_bytes 54321
 `
 	result := collectQuarkusBody(t, body)
 
-	assertQuarkusSamples(t, result.Samples, quarkusNoTrafficSamples(
+	assertQuarkusSamples(t, result.Samples, []MetricSample{
 		MetricSample{Key: "process_cpu_usage", Kind: MetricKindGauge, Value: 0.25, Unit: "ratio"},
 		MetricSample{Key: "jvm_heap_used_bytes", Kind: MetricKindGauge, Value: 3000, Unit: "bytes"},
 		MetricSample{Key: "process_start_time", Kind: MetricKindGauge, Value: 1770000000.5, Unit: "unix_seconds"},
 		MetricSample{Key: "process_uptime", Kind: MetricKindGauge, Value: 120.25, Unit: "seconds"},
-	))
+	})
 	wantStart := time.Unix(1770000000, 500_000_000).UTC()
 	if result.ProcessStartTime == nil || !result.ProcessStartTime.Equal(wantStart) {
 		t.Fatalf("ProcessStartTime = %v, want %v", result.ProcessStartTime, wantStart)
@@ -169,9 +169,9 @@ jvm_memory_used_bytes{area="heap",id="eden"} 2048
 `
 	result := collectQuarkusBody(t, body)
 
-	assertQuarkusSamples(t, result.Samples, quarkusNoTrafficSamples(
+	assertQuarkusSamples(t, result.Samples, []MetricSample{
 		MetricSample{Key: "jvm_heap_used_bytes", Kind: MetricKindGauge, Value: 2048, Unit: "bytes"},
-	))
+	})
 	if result.ProcessStartTime != nil {
 		t.Fatalf("ProcessStartTime = %v, want nil", result.ProcessStartTime)
 	}
@@ -187,9 +187,9 @@ jvm_memory_used_bytes{area="heap",id="eden"} 2048
 func TestQuarkusCollectorProcessStartMustRoundTripThroughStoredRFC3339(t *testing.T) {
 	result := collectQuarkusBody(t, `process_start_time_seconds 253402300799
 `)
-	assertQuarkusSamples(t, result.Samples, quarkusNoTrafficSamples(
+	assertQuarkusSamples(t, result.Samples, []MetricSample{
 		MetricSample{Key: "process_start_time", Kind: MetricKindGauge, Value: 253402300799, Unit: "unix_seconds"},
-	))
+	})
 	if result.ProcessStartTime == nil || result.ProcessStartTime.Year() != 9999 {
 		t.Fatalf("ProcessStartTime = %v, want storable year-9999 boundary", result.ProcessStartTime)
 	}
@@ -197,9 +197,9 @@ func TestQuarkusCollectorProcessStartMustRoundTripThroughStoredRFC3339(t *testin
 	result = collectQuarkusBody(t, `process_start_time_seconds 253402300800
 jvm_memory_used_bytes{area="heap"} 1024
 `)
-	assertQuarkusSamples(t, result.Samples, quarkusNoTrafficSamples(
+	assertQuarkusSamples(t, result.Samples, []MetricSample{
 		MetricSample{Key: "jvm_heap_used_bytes", Kind: MetricKindGauge, Value: 1024, Unit: "bytes"},
-	))
+	})
 	if result.ProcessStartTime != nil {
 		t.Fatalf("ProcessStartTime = %v, want out-of-range timestamp omitted", result.ProcessStartTime)
 	}
@@ -744,17 +744,6 @@ func collectQuarkusContent(t *testing.T, contentType, body string) *CollectionRe
 		t.Fatalf("Collect() error = %v", err)
 	}
 	return result
-}
-
-func quarkusNoTrafficSamples(runtime ...MetricSample) []MetricSample {
-	samples := []MetricSample{
-		{Key: "http_requests_total", Kind: MetricKindCounter, Value: 0, Unit: "requests"},
-		{Key: "http_404_total", Kind: MetricKindCounter, Value: 0, Unit: "requests"},
-		{Key: "http_4xx_total", Kind: MetricKindCounter, Value: 0, Unit: "requests"},
-		{Key: "http_5xx_total", Kind: MetricKindCounter, Value: 0, Unit: "requests"},
-		{Key: "http_request_time_total_seconds", Kind: MetricKindCounter, Value: 0, Unit: "seconds"},
-	}
-	return append(samples, runtime...)
 }
 
 func assertQuarkusSamples(t *testing.T, got, want []MetricSample) {

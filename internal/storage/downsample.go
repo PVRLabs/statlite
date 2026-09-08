@@ -9,9 +9,10 @@ import "time"
 // (1h/7d/30d) from shifting bucket edges on every refresh. The first partial
 // bucket uses series.Start so its timestamp never precedes the requested range.
 //
-// Counter-like fields are summed; gauges and latency are averaged. Null metrics
-// stay null. Empty buckets are not synthesized. Bucket identities are retained
-// only when every contributing sample has the same value.
+// Counter-like fields are summed; gauges are averaged. Latency is weighted by
+// the matching positive request delta for each point. Null metrics stay null.
+// Empty buckets are not synthesized. Bucket identities are retained only when
+// every contributing sample has the same value.
 //
 // Aggregation runs in a single pass. If no two points share a bucket, the
 // original series is returned unchanged (native resolution). Aggregation
@@ -86,8 +87,9 @@ type bucketAccumulator struct {
 	requestsSum, http404Sum, http4xxSum, http5xxSum float64
 	requestsN, http404N, http4xxN, http5xxN         int
 
-	latencySum, heapSum, cpuSum, hostCPUSum                   float64
-	latencyN, heapN, cpuN, hostCPUN                           int
+	latencyWeightedSum, latencyRequestsSum                    float64
+	heapSum, cpuSum, hostCPUSum                               float64
+	heapN, cpuN, hostCPUN                                     int
 	hostMemoryUsedSum, hostMemoryTotalSum, hostMemoryUsageSum float64
 	hostMemoryUsedN, hostMemoryTotalN, hostMemoryUsageN       int
 	hostDiskUsedSum, hostDiskTotalSum, hostDiskUsageSum       float64
@@ -120,7 +122,7 @@ func (a *bucketAccumulator) add(point SeriesPoint) {
 	addSum(&a.http404Sum, &a.http404N, point.HTTP404)
 	addSum(&a.http4xxSum, &a.http4xxN, point.HTTP4xx)
 	addSum(&a.http5xxSum, &a.http5xxN, point.HTTP5xx)
-	addSum(&a.latencySum, &a.latencyN, point.AverageLatencySeconds)
+	addWeightedLatency(&a.latencyWeightedSum, &a.latencyRequestsSum, point.AverageLatencySeconds, point.Requests)
 	addSum(&a.heapSum, &a.heapN, point.HeapUsedBytes)
 	addSum(&a.cpuSum, &a.cpuN, point.ProcessCPUUsage)
 	addSum(&a.hostCPUSum, &a.hostCPUN, point.HostCPUUsage)
@@ -139,7 +141,7 @@ func (a *bucketAccumulator) point() SeriesPoint {
 		HTTP404:               sumResult(a.http404Sum, a.http404N),
 		HTTP4xx:               sumResult(a.http4xxSum, a.http4xxN),
 		HTTP5xx:               sumResult(a.http5xxSum, a.http5xxN),
-		AverageLatencySeconds: avgResult(a.latencySum, a.latencyN),
+		AverageLatencySeconds: weightedResult(a.latencyWeightedSum, a.latencyRequestsSum),
 		HeapUsedBytes:         avgResult(a.heapSum, a.heapN),
 		ProcessCPUUsage:       avgResult(a.cpuSum, a.cpuN),
 		HostCPUUsage:          avgResult(a.hostCPUSum, a.hostCPUN),
@@ -167,6 +169,14 @@ func addSum(sum *float64, n *int, value *float64) {
 	*n++
 }
 
+func addWeightedLatency(weightedSum, requestSum *float64, latency, requests *float64) {
+	if latency == nil || requests == nil || *requests <= 0 {
+		return
+	}
+	*weightedSum += *latency * *requests
+	*requestSum += *requests
+}
+
 func sumResult(sum float64, n int) *float64 {
 	if n == 0 {
 		return nil
@@ -180,5 +190,13 @@ func avgResult(sum float64, n int) *float64 {
 		return nil
 	}
 	v := sum / float64(n)
+	return &v
+}
+
+func weightedResult(weightedSum, weightSum float64) *float64 {
+	if weightSum <= 0 {
+		return nil
+	}
+	v := weightedSum / weightSum
 	return &v
 }

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -254,6 +255,67 @@ func TestPollNowDetectsQuarkusRestartWithoutNegativeCounterDelta(t *testing.T) {
 			t.Fatalf("requests delta = %v after Quarkus restart, want nonnegative", *point.Requests)
 		}
 	}
+}
+
+func TestPollNowQuarkusHTTPMetricsRegisterDisappearAndRecoverWithoutSyntheticDeltas(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	const processStart = 1770000000
+	bodies := []string{
+		"process_start_time_seconds 1770000000\nprocess_cpu_usage 0.1\n",
+		"process_start_time_seconds 1770000000\nprocess_cpu_usage 0.2\nhttp_server_requests_seconds_count{method=\"GET\",outcome=\"SUCCESS\",status=\"200\"} 5\nhttp_server_requests_seconds_sum{method=\"GET\",outcome=\"SUCCESS\",status=\"200\"} 1\n",
+		"process_start_time_seconds 1770000000\nprocess_cpu_usage 0.3\n",
+		"process_start_time_seconds 1770000000\nprocess_cpu_usage 0.4\nhttp_server_requests_seconds_count{method=\"GET\",outcome=\"SUCCESS\",status=\"200\"} 8\nhttp_server_requests_seconds_sum{method=\"GET\",outcome=\"SUCCESS\",status=\"200\"} 4\n",
+	}
+	var scrape atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		index := int(scrape.Add(1)) - 1
+		_, _ = w.Write([]byte(bodies[index]))
+	}))
+	defer server.Close()
+	client, err := prometheus.NewClient(time.Second, prometheus.DefaultLimits, nil)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	mon := newTestMonitor(t, store, collector.NewQuarkusCollector("app", server.URL+"/q/metrics", client, nil))
+
+	var snapshots []*storage.Snapshot
+	for range bodies {
+		snapshot, err := mon.PollNow(context.Background())
+		if err != nil {
+			t.Fatalf("PollNow() error = %v", err)
+		}
+		snapshots = append(snapshots, snapshot)
+		if hasEvent(snapshot.Result.Events, EventTypeRestartDetected) {
+			t.Fatalf("events = %#v, did not want restart history for unchanged process start %d", snapshot.Result.Events, processStart)
+		}
+	}
+	for _, index := range []int{0, 2} {
+		if hasMonitorSample(snapshots[index].Result, "http_requests_total") || hasMonitorSample(snapshots[index].Result, "http_request_time_total_seconds") {
+			t.Fatalf("poll %d samples = %#v, want runtime-only metrics without synthetic HTTP counters", index+1, snapshots[index].Result.Samples)
+		}
+		if !hasMonitorSample(snapshots[index].Result, "process_cpu_usage") {
+			t.Fatalf("poll %d samples = %#v, want independently valid runtime metric", index+1, snapshots[index].Result.Samples)
+		}
+	}
+
+	series, err := store.Series(context.Background(), "app", snapshots[0].Result.PollStartedAt.Add(-time.Second), snapshots[3].Result.PollFinishedAt.Add(time.Second))
+	if err != nil {
+		t.Fatalf("Series() error = %v", err)
+	}
+	if len(series.Points) != 4 {
+		t.Fatalf("series points = %d, want 4", len(series.Points))
+	}
+	if series.Points[1].Requests != nil || series.Points[1].AverageLatencySeconds != nil {
+		t.Fatalf("first registration deltas = %v/%v, want nil/nil", series.Points[1].Requests, series.Points[1].AverageLatencySeconds)
+	}
+	if series.Points[2].Requests != nil || series.Points[2].AverageLatencySeconds != nil {
+		t.Fatalf("disappearance deltas = %v/%v, want nil/nil", series.Points[2].Requests, series.Points[2].AverageLatencySeconds)
+	}
+	assertMonitorFloatPointer(t, "recovery requests", series.Points[3].Requests, 3)
+	assertMonitorFloatPointer(t, "recovery latency", series.Points[3].AverageLatencySeconds, 1)
 }
 
 func TestPollNowDetectsRestartAfterMonitorRecreation(t *testing.T) {
@@ -851,6 +913,15 @@ func uptimeResult(at time.Time, uptime float64) *collector.CollectionResult {
 func hasEvent(events []collector.CollectorEvent, eventType string) bool {
 	for _, event := range events {
 		if event.Type == eventType {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMonitorSample(result collector.CollectionResult, key string) bool {
+	for _, sample := range result.Samples {
+		if sample.Key == key {
 			return true
 		}
 	}

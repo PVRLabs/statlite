@@ -7,14 +7,12 @@ import (
 	"fmt"
 	"hash/fnv"
 	"math/bits"
-	"net/url"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/pvrlabs/statlite/internal/config"
 	"github.com/pvrlabs/statlite/internal/prometheus"
 )
 
@@ -50,7 +48,6 @@ type quarkusEvaluation struct {
 	samples          []MetricSample
 	events           []CollectorEvent
 	processStartTime *time.Time
-	noHTTPTraffic    bool
 }
 
 // quarkusHTTPValues retains fixed-size StatLite aggregates plus a bounded set
@@ -136,12 +133,6 @@ func (c *QuarkusCollector) Collect(ctx context.Context) (*CollectionResult, erro
 		}
 	} else {
 		result.Samples = evaluation.samples
-		if evaluation.noHTTPTraffic {
-			// Quarkus registers HTTP server metric series lazily. A successful
-			// poll before the first application request represents zero traffic,
-			// while inspection must continue to report only observed families.
-			result.Samples = prependQuarkusNoTrafficSamples(result.Samples)
-		}
 		result.Events = append(result.Events, evaluation.events...)
 		result.ProcessStartTime = evaluation.processStartTime
 	}
@@ -267,28 +258,7 @@ func (c *QuarkusCollector) evaluate(ctx context.Context) (*quarkusEvaluation, er
 		samples:          normalized.Samples,
 		events:           normalized.Events,
 		processStartTime: normalized.ProcessStartTime,
-		noHTTPTraffic:    isQuarkusHTTPMetricsEndpoint(c.endpoint) && !httpValues.sawCount && !httpValues.sawDuration && !httpValues.incompleteCountLabel && !httpValues.incompleteSumLabel,
 	}, nil
-}
-
-func isQuarkusHTTPMetricsEndpoint(raw string) bool {
-	parsed, err := url.Parse(raw)
-	if err != nil {
-		return false
-	}
-	return config.IsConventionalQuarkusMetricsPath(parsed.Path)
-}
-
-func prependQuarkusNoTrafficSamples(samples []MetricSample) []MetricSample {
-	result := make([]MetricSample, 0, len(samples)+5)
-	result = append(result,
-		MetricSample{Key: "http_requests_total", Kind: MetricKindCounter, Value: 0, Unit: "requests"},
-		MetricSample{Key: "http_404_total", Kind: MetricKindCounter, Value: 0, Unit: "requests"},
-		MetricSample{Key: "http_4xx_total", Kind: MetricKindCounter, Value: 0, Unit: "requests"},
-		MetricSample{Key: "http_5xx_total", Kind: MetricKindCounter, Value: 0, Unit: "requests"},
-		MetricSample{Key: "http_request_time_total_seconds", Kind: MetricKindCounter, Value: 0, Unit: "seconds"},
-	)
-	return append(result, samples...)
 }
 
 func (v quarkusRuntimeValues) compatible() bool {

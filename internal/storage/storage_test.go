@@ -428,6 +428,191 @@ func TestSeriesUsesLatestPreRangeSampleForEachCounter(t *testing.T) {
 	assertFloatPointer(t, "AverageLatencySeconds", point.AverageLatencySeconds, 0.2)
 }
 
+func TestSeriesRequiresMatchingLatencyBaselinePoll(t *testing.T) {
+	tests := []struct {
+		name        string
+		middle      map[string]float64
+		mismatch    map[string]float64
+		recovery    map[string]float64
+		wantRequest float64
+	}{
+		{
+			name: "missing duration",
+			middle: map[string]float64{
+				"http_requests_total": 110,
+			},
+			mismatch: map[string]float64{
+				"http_requests_total":             120,
+				"http_request_time_total_seconds": 24,
+			},
+			wantRequest: 10,
+		},
+		{
+			name: "missing count",
+			middle: map[string]float64{
+				"http_request_time_total_seconds": 22,
+			},
+			mismatch: map[string]float64{
+				"http_requests_total":             120,
+				"http_request_time_total_seconds": 24,
+			},
+			wantRequest: 20,
+		},
+		{
+			name: "independent count reset",
+			middle: map[string]float64{
+				"http_requests_total": 5,
+			},
+			mismatch: map[string]float64{
+				"http_requests_total":             15,
+				"http_request_time_total_seconds": 24,
+			},
+			recovery: map[string]float64{
+				"http_requests_total":             25,
+				"http_request_time_total_seconds": 26,
+			},
+			wantRequest: 10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := openTestStore(t)
+			defer store.Close()
+
+			ctx := context.Background()
+			base := time.Date(2026, 7, 7, 10, 0, 0, 0, time.UTC)
+			appRunID, err := store.EnsureAppRun(ctx, "app", &base, base)
+			if err != nil {
+				t.Fatalf("EnsureAppRun() error = %v", err)
+			}
+			saveSeriesPoll(t, store, appRunID, base, map[string]float64{
+				"http_requests_total":             100,
+				"http_request_time_total_seconds": 20,
+			})
+			saveSeriesPoll(t, store, appRunID, base.Add(time.Minute), tt.middle)
+			saveSeriesPoll(t, store, appRunID, base.Add(2*time.Minute), tt.mismatch)
+			recovery := tt.recovery
+			if recovery == nil {
+				recovery = map[string]float64{
+					"http_requests_total":             130,
+					"http_request_time_total_seconds": 26,
+				}
+			}
+			saveSeriesPoll(t, store, appRunID, base.Add(3*time.Minute), recovery)
+
+			series, err := store.Series(ctx, "app", base, base.Add(3*time.Minute))
+			if err != nil {
+				t.Fatalf("Series() error = %v", err)
+			}
+			if len(series.Points) != 4 {
+				t.Fatalf("series points len = %d, want 4", len(series.Points))
+			}
+			if tt.name == "independent count reset" {
+				if series.Points[1].Requests != nil {
+					t.Fatalf("reset Requests = %v, want nil", *series.Points[1].Requests)
+				}
+				if series.Points[1].AverageLatencySeconds != nil {
+					t.Fatalf("reset AverageLatencySeconds = %v, want nil", *series.Points[1].AverageLatencySeconds)
+				}
+			}
+			mismatch := series.Points[2]
+			assertFloatPointer(t, "mismatched Requests", mismatch.Requests, tt.wantRequest)
+			if mismatch.AverageLatencySeconds != nil {
+				t.Fatalf("mismatched AverageLatencySeconds = %v, want nil", *mismatch.AverageLatencySeconds)
+			}
+			assertFloatPointer(t, "recovered Requests", series.Points[3].Requests, 10)
+			assertFloatPointer(t, "recovered AverageLatencySeconds", series.Points[3].AverageLatencySeconds, 0.2)
+		})
+	}
+}
+
+func TestSeriesRequiresMatchingPreRangeLatencyBaselinePoll(t *testing.T) {
+	tests := []struct {
+		name        string
+		preRange    map[string]float64
+		first       map[string]float64
+		recovery    map[string]float64
+		wantRequest float64
+	}{
+		{
+			name:     "missing duration",
+			preRange: map[string]float64{"http_requests_total": 110},
+			first: map[string]float64{
+				"http_requests_total":             120,
+				"http_request_time_total_seconds": 24,
+			},
+			wantRequest: 10,
+		},
+		{
+			name:     "missing count",
+			preRange: map[string]float64{"http_request_time_total_seconds": 22},
+			first: map[string]float64{
+				"http_requests_total":             120,
+				"http_request_time_total_seconds": 24,
+			},
+			wantRequest: 20,
+		},
+		{
+			name: "independent count reset",
+			preRange: map[string]float64{
+				"http_requests_total": 5,
+			},
+			first: map[string]float64{
+				"http_requests_total":             15,
+				"http_request_time_total_seconds": 24,
+			},
+			recovery: map[string]float64{
+				"http_requests_total":             25,
+				"http_request_time_total_seconds": 26,
+			},
+			wantRequest: 10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := openTestStore(t)
+			defer store.Close()
+
+			ctx := context.Background()
+			base := time.Date(2026, 7, 7, 10, 0, 0, 0, time.UTC)
+			appRunID, err := store.EnsureAppRun(ctx, "app", &base, base)
+			if err != nil {
+				t.Fatalf("EnsureAppRun() error = %v", err)
+			}
+			saveSeriesPoll(t, store, appRunID, base, map[string]float64{
+				"http_requests_total":             100,
+				"http_request_time_total_seconds": 20,
+			})
+			saveSeriesPoll(t, store, appRunID, base.Add(time.Minute), tt.preRange)
+			saveSeriesPoll(t, store, appRunID, base.Add(2*time.Minute), tt.first)
+			recovery := tt.recovery
+			if recovery == nil {
+				recovery = map[string]float64{
+					"http_requests_total":             130,
+					"http_request_time_total_seconds": 26,
+				}
+			}
+			saveSeriesPoll(t, store, appRunID, base.Add(3*time.Minute), recovery)
+
+			series, err := store.Series(ctx, "app", base.Add(2*time.Minute), base.Add(3*time.Minute))
+			if err != nil {
+				t.Fatalf("Series() error = %v", err)
+			}
+			if len(series.Points) != 2 {
+				t.Fatalf("series points len = %d, want 2", len(series.Points))
+			}
+			assertFloatPointer(t, "first Requests", series.Points[0].Requests, tt.wantRequest)
+			if series.Points[0].AverageLatencySeconds != nil {
+				t.Fatalf("first AverageLatencySeconds = %v, want nil", *series.Points[0].AverageLatencySeconds)
+			}
+			assertFloatPointer(t, "recovered Requests", series.Points[1].Requests, 10)
+			assertFloatPointer(t, "recovered AverageLatencySeconds", series.Points[1].AverageLatencySeconds, 0.2)
+		})
+	}
+}
+
 func TestSeriesResolvesRuntimeMemoryPerPoll(t *testing.T) {
 	store := openTestStore(t)
 	defer store.Close()

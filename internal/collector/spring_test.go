@@ -285,6 +285,46 @@ func TestSpringActuatorCollectorKeepsSamplesOnPartialMetricFailures(t *testing.T
 	}
 }
 
+func TestSpringActuatorCollectorReportsInvalidStatusAlongsideIncompleteAggregate(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/actuator/health":
+			writeActuatorJSON(t, w, map[string]string{"status": "UP"})
+		case r.URL.Path == "/actuator/metrics/http.server.requests" && r.URL.Query().Get("tag") == "":
+			writeActuatorJSON(t, w, metricBody("http.server.requests", "seconds", map[string]float64{
+				"COUNT":      10,
+				"TOTAL_TIME": 2,
+			}, map[string][]string{"status": {"500", "501"}}))
+		case r.URL.Query().Get("tag") == "status:500":
+			http.Error(w, "backend timeout", http.StatusGatewayTimeout)
+		case r.URL.Query().Get("tag") == "status:501":
+			writeActuatorJSON(t, w, metricBody("http.server.requests", "seconds", map[string]float64{"COUNT": -1}, nil))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client, err := NewActuatorClient(server.URL+"/actuator", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewActuatorClient() error = %v", err)
+	}
+	result, err := NewSpringActuatorCollector("app", client, false).Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+
+	if hasSample(result, "http_5xx_total") {
+		t.Fatalf("incomplete invalid aggregate was retained: %#v", result.Samples)
+	}
+	if countEvents(result, EventSeverityWarning, "metric_fetch_failed") == 0 {
+		t.Fatalf("events = %#v, want fetch warning", result.Events)
+	}
+	if countEvents(result, EventSeverityWarning, "metric_invalid") == 0 {
+		t.Fatalf("events = %#v, want invalid-source warning", result.Events)
+	}
+}
+
 func TestSpringActuatorCollectorReturnsPollErrorWhenHealthFails(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)

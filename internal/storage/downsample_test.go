@@ -18,7 +18,7 @@ func TestAggregateSeriesLeavesSparseSeriesUnchanged(t *testing.T) {
 		Start: start,
 		End:   end,
 		Points: []SeriesPoint{
-			{PollID: 1, Timestamp: start, Requests: f64(1)},
+			{PollID: 1, Timestamp: start, Requests: f64(0), AverageLatencySeconds: f64(0.7)},
 			{PollID: 2, Timestamp: start.Add(5 * time.Minute), Requests: f64(2)},
 			{PollID: 3, Timestamp: start.Add(10 * time.Minute), Requests: f64(3)},
 		},
@@ -31,6 +31,7 @@ func TestAggregateSeriesLeavesSparseSeriesUnchanged(t *testing.T) {
 	if len(out.Points) != 3 {
 		t.Fatalf("points = %d, want 3", len(out.Points))
 	}
+	assertFloatPtr(t, "native average_latency_seconds", out.Points[0].AverageLatencySeconds, 0.7)
 }
 
 func TestAggregateSeriesAggregatesSharedBuckets(t *testing.T) {
@@ -95,7 +96,7 @@ func TestAggregateSeriesAggregatesSharedBuckets(t *testing.T) {
 	assertFloatPtr(t, "http_404", first.HTTP404, 8)
 	assertFloatPtr(t, "http_4xx", first.HTTP4xx, 10)
 	assertFloatPtr(t, "http_5xx", first.HTTP5xx, 12)
-	assertFloatPtr(t, "average_latency_seconds", first.AverageLatencySeconds, 0.20)
+	assertFloatPtr(t, "average_latency_seconds", first.AverageLatencySeconds, (0.10+5*0.30)/6)
 	assertFloatPtr(t, "heap_used_bytes", first.HeapUsedBytes, 200)
 	assertFloatPtr(t, "process_cpu_usage", first.ProcessCPUUsage, 0.30)
 	if first.PollID != 0 || first.AppRunID != nil {
@@ -125,7 +126,8 @@ func TestAggregateSeriesNullsDoNotBecomeZeros(t *testing.T) {
 		End:   end,
 		Points: []SeriesPoint{
 			{PollID: 1, Timestamp: start, Requests: f64(1), HeapUsedBytes: nil, ProcessCPUUsage: nil},
-			{PollID: 2, Timestamp: start.Add(30 * time.Second), Requests: nil, HeapUsedBytes: f64(100), HTTP404: nil},
+			{PollID: 2, Timestamp: start.Add(20 * time.Second), Requests: nil, AverageLatencySeconds: f64(9), HeapUsedBytes: f64(100), HTTP404: nil},
+			{PollID: 3, Timestamp: start.Add(40 * time.Second), Requests: f64(0), AverageLatencySeconds: f64(8)},
 		},
 	}
 
@@ -151,6 +153,40 @@ func TestAggregateSeriesNullsDoNotBecomeZeros(t *testing.T) {
 	if p.ProcessCPUUsage != nil {
 		t.Fatalf("process_cpu_usage = %v, want nil", *p.ProcessCPUUsage)
 	}
+}
+
+func TestAggregateSeriesWeightsLatencyByRequests(t *testing.T) {
+	start := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	series := &Series{
+		Start: start,
+		End:   start.Add(time.Minute),
+		Points: []SeriesPoint{
+			{PollID: 1, Timestamp: start, Requests: f64(1), AverageLatencySeconds: f64(1)},
+			{PollID: 2, Timestamp: start.Add(30 * time.Second), Requests: f64(99), AverageLatencySeconds: f64(0.1)},
+		},
+	}
+
+	point := AggregateSeries(series, time.Minute).Points[0]
+	assertFloatPtr(t, "requests", point.Requests, 100)
+	assertFloatPtr(t, "average_latency_seconds", point.AverageLatencySeconds, 0.109)
+}
+
+func TestAggregateSeriesExcludesInvalidLatencyContributors(t *testing.T) {
+	start := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	series := &Series{
+		Start: start,
+		End:   start.Add(time.Minute),
+		Points: []SeriesPoint{
+			{PollID: 1, Timestamp: start, Requests: nil, AverageLatencySeconds: f64(9)},
+			{PollID: 2, Timestamp: start.Add(10 * time.Second), Requests: f64(0), AverageLatencySeconds: f64(8)},
+			{PollID: 3, Timestamp: start.Add(20 * time.Second), Requests: f64(10), AverageLatencySeconds: nil},
+			{PollID: 4, Timestamp: start.Add(30 * time.Second), Requests: f64(2), AverageLatencySeconds: f64(0.25)},
+		},
+	}
+
+	point := AggregateSeries(series, time.Minute).Points[0]
+	assertFloatPtr(t, "requests", point.Requests, 12)
+	assertFloatPtr(t, "average_latency_seconds", point.AverageLatencySeconds, 0.25)
 }
 
 func TestAggregateSeriesCoversFullTimeline(t *testing.T) {
@@ -236,14 +272,16 @@ func TestAggregateSeriesFirstPartialBucketStartsAtRangeStart(t *testing.T) {
 func TestAggregateSeriesAggregatesRestartAwareDeltas(t *testing.T) {
 	start := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(time.Minute)
+	firstRunID := int64(10)
+	secondRunID := int64(11)
 	series := &Series{
 		Start: start,
 		End:   end,
 		Points: []SeriesPoint{
-			{PollID: 1, Timestamp: start, Requests: f64(10)},
-			{PollID: 2, Timestamp: start.Add(10 * time.Second), Requests: nil},
-			{PollID: 3, Timestamp: start.Add(20 * time.Second), Requests: f64(4)},
-			{PollID: 4, Timestamp: start.Add(30 * time.Second), Requests: f64(6)},
+			{PollID: 1, Timestamp: start, AppRunID: &firstRunID, Requests: f64(10), AverageLatencySeconds: f64(0.1)},
+			{PollID: 2, Timestamp: start.Add(10 * time.Second), AppRunID: &secondRunID, Requests: nil},
+			{PollID: 3, Timestamp: start.Add(20 * time.Second), AppRunID: &secondRunID, Requests: f64(4), AverageLatencySeconds: f64(0.5)},
+			{PollID: 4, Timestamp: start.Add(30 * time.Second), AppRunID: &secondRunID, Requests: f64(6), AverageLatencySeconds: f64(0.25)},
 		},
 	}
 
@@ -252,6 +290,7 @@ func TestAggregateSeriesAggregatesRestartAwareDeltas(t *testing.T) {
 		t.Fatalf("points = %d, want 1", len(out.Points))
 	}
 	assertFloatPtr(t, "requests", out.Points[0].Requests, 20)
+	assertFloatPtr(t, "average_latency_seconds", out.Points[0].AverageLatencySeconds, 0.225)
 }
 
 func TestAggregateSeriesEmptyOrZeroDuration(t *testing.T) {

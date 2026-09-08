@@ -286,18 +286,20 @@ func (c *SpringActuatorCollector) collectHTTP(ctx context.Context, session *spri
 func (c *SpringActuatorCollector) collectHTTPStatusTotal(ctx context.Context, session *springPollSession, result *CollectionResult, key string, statuses []string) {
 	var total float64
 	var sawStatus bool
-	var invalidSource, overflow bool
+	var incomplete, invalidSource, overflow bool
 
 	for _, status := range statuses {
 		metric, err := session.FetchMetric(ctx, "http.server.requests", []string{"status:" + status})
 		if err != nil {
 			message := fmt.Sprintf("http.server.requests status %s: %v", status, err)
 			session.addMetricFetchFailure(result, key, err, message)
+			incomplete = true
 			continue
 		}
 		value, ok := metricMeasurement(metric, "COUNT")
 		if !ok {
 			result.addEvent(EventSeverityWarning, "metric_measurement_missing", key, fmt.Sprintf("http.server.requests status %s missing COUNT measurement", status))
+			incomplete = true
 			continue
 		}
 		if !finiteNonnegative(value) {
@@ -319,6 +321,9 @@ func (c *SpringActuatorCollector) collectHTTPStatusTotal(ctx context.Context, se
 	}
 	if overflow {
 		result.addEvent(EventSeverityWarning, "metric_aggregate_invalid", key, fmt.Sprintf("omitted %s because finite source values overflowed the normalized aggregate", key))
+		return
+	}
+	if incomplete {
 		return
 	}
 	if sawStatus {
