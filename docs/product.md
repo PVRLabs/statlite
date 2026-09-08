@@ -156,6 +156,27 @@ application and database health unless their supported contract provides an
 explicit authoritative signal. Successful collection is reporting
 availability, not permission to synthesize health.
 
+### Dashboard status language
+
+The dashboard's **App health** card answers the practical question "is my app
+up?" using a compact operational vocabulary. In the StatLite UI, `UP` is the
+positive app status: it means either that the application reported positive
+health or that StatLite is successfully receiving metrics when no explicit
+health signal is available. The card's hint identifies which signal produced
+the status.
+
+| Current state | App health display |
+| --- | --- |
+| Successful collection with explicit positive health | `UP` |
+| Successful collection without explicit health | `UP` |
+| Successful collection with explicit negative health | `Unhealthy` with the source status |
+| Current collection failure | `DOWN` |
+| No completed poll | `Not reporting` |
+
+These are presentation labels only. Health fields remain optional and preserve
+only explicit source values; reporting, unavailable, and not-yet-reporting
+remain the underlying collection concepts.
+
 ## Deployment topology
 
 For a collocated deployment, configure application targets (`spring`, `quarkus`,
@@ -201,7 +222,12 @@ rest of the system operates on normalized concepts such as:
 Application health, database health, poll status, and reporting availability
 remain distinct. Health fields preserve optional source values, poll status
 records whether collection succeeded, and the dashboard derives reporting
-availability from the latest poll and monitor state.
+availability from the latest poll and monitor state. For quick scanning, the
+dashboard presents successful reporting as `UP` when explicit application
+health is absent and presents a current collection failure as `DOWN`. Its hint
+identifies the signal source. These labels do not synthesize application health:
+the underlying collection states remain reporting, unavailable, or not yet
+reporting.
 
 Source-specific metric names should not leak into storage or primary dashboard
 paths. For example, Actuator and StatLite Metrics fields are mapped to shared

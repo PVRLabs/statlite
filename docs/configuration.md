@@ -217,8 +217,10 @@ with Java 21 LTS, `quarkus-micrometer-registry-prometheus`, and the optional
 
 Health collection is best-effort and independent from metrics collection. If
 the derived `/q/health` endpoint is absent, aggregate framework health is
-unavailable. A successful metrics scrape is shown as `Reporting`, which means
-StatLite is receiving data and is not an application-health assertion.
+unavailable. A successful metrics scrape is shown as `UP` on the dashboard,
+with its hint explaining that the label is based on collection rather than an
+explicit application-health assertion. Internally this remains reporting
+availability; StatLite does not synthesize or store application health `UP`.
 Database health remains unavailable without a datasource check. The absent
 capability is quiet and does not produce a recurring warning. A known or
 explicitly configured endpoint that returns an invalid or failed response may
@@ -240,8 +242,11 @@ Basic Auth configuration applies to both metrics and health requests.
 
 If the derived `/q/health` endpoint returns `404`, StatLite treats SmallRye
 Health as absent, keeps the metrics poll quiet, and leaves application health
-unavailable. A successful metrics scrape is still shown as `Reporting`. That
-absence is cached for the collector session. Health discovery resumes when
+unavailable. A successful metrics scrape is still shown as `UP`, with the
+dashboard hint identifying successful metrics collection as the source. A
+current collection failure is shown as `DOWN`; the underlying collection
+states remain reporting and unavailable. That absence is cached for the
+collector session. Health discovery resumes when
 the observed process-start identity changes, when that identity is available,
 or when the collector is recreated.
 

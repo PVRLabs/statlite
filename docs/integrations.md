@@ -51,8 +51,12 @@ conventional Quarkus metrics path ending in `/q/metrics`, StatLite derives the
 sibling `/q/health` endpoint where practical, requests it separately when
 available, and normalizes the overall and datasource statuses. A missing health
 capability is quiet: aggregate framework health is unavailable, while a
-successful metrics scrape is presented as `Reporting`. Reporting means
-StatLite is receiving data, not that the application reported health `UP`.
+successful metrics scrape is presented as `UP` on the dashboard. Its hint
+explains that `UP` is derived from successful metrics collection rather than
+explicit application health. A current collection failure is presented as
+`DOWN`. These are presentation labels only: reporting and unavailable remain
+the underlying collection concepts, and StatLite does not synthesize stored
+health values.
 Database health remains unavailable unless a datasource check is published.
 The absent capability is cached until the observed process-start identity
 changes when available, or the collector is recreated. A known health failure

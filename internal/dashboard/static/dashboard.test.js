@@ -243,17 +243,38 @@ test("renderPollStatus shows the latest poll state and a failed-poll summary", (
   }
 });
 
+test("renderError replaces stale App health explanation and accessibility metadata", () => {
+  const originalDocument = global.document;
+  const document = dashboardDocument();
+  global.document = document;
+
+  try {
+    dashboard.renderApplicationHealth(dashboard.targetPresentation(targetSummary("UP", "ok")));
+    dashboard.renderError(new Error("summary unavailable"));
+
+    const health = document.getElementById("health");
+    const tooltip = document.getElementById("application-health-tooltip");
+    assert.equal(health.textContent, "API error");
+    assert.equal(health.title, "App health unavailable because the dashboard API request failed.");
+    assert.equal(health.attributes["aria-label"], health.title);
+    assert.equal(tooltip.textContent, health.title);
+    assert.doesNotMatch(tooltip.textContent, /positive health/);
+  } finally {
+    global.document = originalDocument;
+  }
+});
+
 test("targetPresentation separates authoritative health from reporting", () => {
   const cases = [
     {
       name: "explicit UP",
       target: targetSummary("UP", "ok"),
-      want: { label: "Healthy", tone: "ok", reportingState: "Reporting", reporting: true, selectorSuffix: "🟢 Healthy" }
+      want: { label: "UP", tone: "ok", reportingState: "Reporting", reporting: true, selectorSuffix: "🟢 UP" }
     },
     {
       name: "explicit OK",
       target: targetSummary("OK", "ok"),
-      want: { label: "OK", tone: "ok", reportingState: "Reporting", reporting: true, selectorSuffix: "🟢 OK" }
+      want: { label: "UP", tone: "ok", reportingState: "Reporting", reporting: true, selectorSuffix: "🟢 UP" }
     },
     {
       name: "explicit DOWN",
@@ -263,7 +284,12 @@ test("targetPresentation separates authoritative health from reporting", () => {
     {
       name: "explicit ERROR during failed collection",
       target: targetSummary("ERROR", "error"),
-      want: { label: "Unhealthy", tone: "bad", reportingState: "Unavailable", reporting: false, selectorSuffix: "🔴 Unhealthy (ERROR)" }
+      want: { label: "DOWN", tone: "bad", reportingState: "Unavailable", reporting: false, selectorSuffix: "🔴 DOWN" }
+    },
+    {
+      name: "failed collection overrides previously reported UP",
+      target: targetSummary("UP", "error"),
+      want: { label: "DOWN", tone: "bad", reportingState: "Unavailable", reporting: false, selectorSuffix: "🔴 DOWN" }
     },
     {
       name: "explicit OUT_OF_SERVICE",
@@ -278,17 +304,17 @@ test("targetPresentation separates authoritative health from reporting", () => {
     {
       name: "metrics-only success",
       target: targetSummary("", "ok"),
-      want: { label: "Reporting", tone: "ok", reportingState: "Reporting", reporting: true, selectorSuffix: "🟢 Reporting" }
+      want: { label: "UP", tone: "ok", reportingState: "Reporting", reporting: true, selectorSuffix: "🟢 UP" }
     },
     {
       name: "metrics-only failure",
       target: targetSummary("", "error"),
-      want: { label: "Unavailable", tone: "bad", reportingState: "Unavailable", reporting: false, selectorSuffix: "🔴 Unavailable" }
+      want: { label: "DOWN", tone: "bad", reportingState: "Unavailable", reporting: false, selectorSuffix: "🔴 DOWN" }
     },
     {
       name: "monitor failure overrides stale successful latest state",
       target: targetSummary("", "ok", 1),
-      want: { label: "Unavailable", tone: "bad", reportingState: "Unavailable", reporting: false, selectorSuffix: "🔴 Unavailable" }
+      want: { label: "DOWN", tone: "bad", reportingState: "Unavailable", reporting: false, selectorSuffix: "🔴 DOWN" }
     },
     {
       name: "before first poll",
@@ -318,7 +344,7 @@ test("targetPresentation separates authoritative health from reporting", () => {
 
 test("targetPresentation trims health and normalizes health and poll status case", () => {
   const healthy = dashboard.targetPresentation(targetSummary("  up  ", " OK "));
-  assert.equal(healthy.label, "Healthy");
+  assert.equal(healthy.label, "UP");
   assert.equal(healthy.reporting, true);
   assert.equal(healthy.rawHealth, "up");
 
@@ -327,28 +353,37 @@ test("targetPresentation trims health and normalizes health and poll status case
   assert.match(unhealthy.accessibleLabel, /out_of_service/);
 
   const whitespaceOnly = dashboard.targetPresentation(targetSummary("  ", "ok"));
-  assert.equal(whitespaceOnly.label, "Reporting");
+  assert.equal(whitespaceOnly.label, "UP");
   assert.equal(whitespaceOnly.authoritativeHealth, false);
 });
 
-test("application health card explains derived reporting and retains raw unhealthy health", () => {
+test("application health card keeps one value line and explains details in its help tooltip", () => {
   const originalDocument = global.document;
   const document = dashboardDocument();
   global.document = document;
 
   try {
     dashboard.renderApplicationHealth(dashboard.targetPresentation(targetSummary("", "ok")));
-    assert.match(document.getElementById("health").innerHTML, />Reporting</);
-    assert.match(document.getElementById("health-note").textContent, /No authoritative application health signal/);
+    assert.match(document.getElementById("health").innerHTML, />UP</);
+    assert.equal(document.getElementById("application-health-tooltip").textContent, "No explicit application health signal is available. UP is based on successful metrics collection.");
+
+    dashboard.renderApplicationHealth(dashboard.targetPresentation(targetSummary("OK", "ok")));
+    assert.match(document.getElementById("health").innerHTML, />UP</);
+    assert.equal(document.getElementById("application-health-tooltip").textContent, "UP means the application reported positive health. Collection status: Reporting.");
+    assert.doesNotMatch(document.getElementById("health").attributes["aria-label"], /OK/);
 
     dashboard.renderApplicationHealth(dashboard.targetPresentation(targetSummary("DOWN", "ok")));
     assert.match(document.getElementById("health").innerHTML, />Unhealthy</);
-    assert.equal(document.getElementById("health-note").textContent, "Application reported DOWN.");
+    assert.equal(document.getElementById("application-health-tooltip").textContent, "Application reported DOWN, shown as Unhealthy. Collection status: Reporting.");
     assert.match(document.getElementById("health").attributes["aria-label"], /Unhealthy \(DOWN\).*Reporting/);
 
     dashboard.renderApplicationHealth(dashboard.targetPresentation(targetSummary("DEGRADED", "ok")));
     assert.match(document.getElementById("health").innerHTML, />DEGRADED</);
-    assert.equal(document.getElementById("health-note").textContent, "");
+    assert.equal(document.getElementById("application-health-tooltip").textContent, "Application reported DEGRADED. Collection status: Reporting.");
+
+    dashboard.renderApplicationHealth(dashboard.targetPresentation(targetSummary("UP", "error")));
+    assert.match(document.getElementById("health").innerHTML, />DOWN</);
+    assert.equal(document.getElementById("application-health-tooltip").textContent, "StatLite cannot currently collect from the application. Last reported application health: UP.");
   } finally {
     global.document = originalDocument;
   }
@@ -406,8 +441,8 @@ test("target selector distinguishes reporting, unavailable, and unhealthy target
   try {
     dashboard.renderTargetContext(targets, { name: "unhealthy" });
     assert.deepEqual(document.getElementById("target-select").children.map((option) => option.textContent), [
-      "metrics  🟢 Reporting",
-      "offline  🔴 Unavailable",
+      "metrics  🟢 UP",
+      "offline  🔴 DOWN",
       "unhealthy  🔴 Unhealthy (DOWN)",
       "new  ⚪ Not reporting"
     ]);

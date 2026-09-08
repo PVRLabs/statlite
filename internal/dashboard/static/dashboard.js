@@ -327,15 +327,17 @@ function targetPresentation(target) {
       ? "Unavailable"
       : "Not reporting";
 
-  let label = reportingState;
+  let label = reportingState === "Reporting" ? "UP" : reportingState === "Unavailable" ? "DOWN" : reportingState;
   let tone = reportingState === "Reporting" ? "ok" : reportingState === "Unavailable" ? "bad" : "warn";
   let healthDetail = "";
-  if (normalizedHealth === "UP") {
-    label = "Healthy";
+  if (currentFailure) {
+    label = "DOWN";
+    tone = "bad";
+  } else if (normalizedHealth === "UP") {
+    label = "UP";
     tone = "ok";
-    healthDetail = rawHealth;
   } else if (normalizedHealth === "OK") {
-    label = rawHealth;
+    label = "UP";
     tone = "ok";
   } else if (["DOWN", "ERROR", "OUT_OF_SERVICE"].includes(normalizedHealth)) {
     label = "Unhealthy";
@@ -346,14 +348,18 @@ function targetPresentation(target) {
     tone = "warn";
   }
 
-  const healthDescription = rawHealth
-    ? "Application health: " + label + (healthDetail ? " (" + healthDetail + ")" : "")
-    : "Authoritative application health unavailable; target is " + reportingState.toLowerCase();
+  const healthDescription = currentFailure
+    ? "Application availability: DOWN because collection is failing" + (rawHealth ? "; last reported application health: " + rawHealth : "")
+    : rawHealth
+      ? "Application health: " + label + (healthDetail ? " (" + healthDetail + ")" : "")
+      : reportingState === "Reporting"
+        ? "Authoritative application health unavailable; target is reporting and shown as UP"
+        : "Authoritative application health unavailable; target is " + reportingState.toLowerCase();
   return {
     label,
     tone,
     accessibleLabel: healthDescription + "; reporting status: " + reportingState,
-    selectorSuffix: presentationSymbol(tone) + " " + label + (healthDetail && label !== "Healthy" ? " (" + healthDetail + ")" : ""),
+    selectorSuffix: presentationSymbol(tone) + " " + label + (healthDetail && label === "Unhealthy" ? " (" + healthDetail + ")" : ""),
     reportingState,
     reporting: reportingState === "Reporting",
     authoritativeHealth: rawHealth !== "",
@@ -373,13 +379,21 @@ function renderApplicationHealth(presentation) {
   health.title = presentation.accessibleLabel;
   health.setAttribute("aria-label", presentation.accessibleLabel);
 
-  const note = document.getElementById("health-note");
-  if (!presentation.authoritativeHealth) {
-    note.textContent = "No authoritative application health signal is available.";
-  } else if (presentation.rawHealth.toUpperCase() !== presentation.label.toUpperCase()) {
-    note.textContent = "Application reported " + presentation.rawHealth + ".";
+  const tooltip = document.getElementById("application-health-tooltip");
+  if (presentation.reportingState === "Unavailable") {
+    tooltip.textContent = "StatLite cannot currently collect from the application." +
+      (presentation.authoritativeHealth ? " Last reported application health: " + presentation.rawHealth + "." : "");
+  } else if (!presentation.authoritativeHealth) {
+    tooltip.textContent = presentation.reporting
+      ? "No explicit application health signal is available. UP is based on successful metrics collection."
+      : "No explicit application health signal is available. StatLite has not completed a poll.";
+  } else if (presentation.rawHealth.toUpperCase() !== presentation.label.toUpperCase() && presentation.rawHealth.toUpperCase() !== "OK") {
+    tooltip.textContent = "Application reported " + presentation.rawHealth + ", shown as " + presentation.label +
+      ". Collection status: " + presentation.reportingState + ".";
   } else {
-    note.textContent = "";
+    const reportedHealth = presentation.rawHealth.toUpperCase() === "OK" ? "UP" : presentation.rawHealth;
+    tooltip.textContent = (reportedHealth === "UP" ? "UP means the application reported positive health" : "Application reported " + reportedHealth) +
+      ". Collection status: " + presentation.reportingState + ".";
   }
 }
 
@@ -643,7 +657,12 @@ function createEventRow(event, elementName = "div") {
 }
 
 function renderError(error) {
-  setText("health", "API error");
+  const health = document.getElementById("health");
+  const explanation = "App health unavailable because the dashboard API request failed.";
+  health.textContent = "API error";
+  health.title = explanation;
+  health.setAttribute("aria-label", explanation);
+  document.getElementById("application-health-tooltip").textContent = explanation;
   document.getElementById("latest-json").textContent = String(error);
 }
 
@@ -763,6 +782,6 @@ function initDashboard() {
   refreshWhenVisible();
 }
 
-const dashboardTestHooks = { detectCapabilities, foldRepeatedEvents, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, openEventGroupKeys, refresh, refreshWhenVisible, renderApplicationHealth, renderDatabaseHealth, renderFooterSummary, renderPollStatus, renderRangeSelection, renderSeries, renderTargetContext, runtimeHelp, shouldRenderSeries, state, targetPresentation, targetTypeHelp, validDiskPoint };
+const dashboardTestHooks = { detectCapabilities, foldRepeatedEvents, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, openEventGroupKeys, refresh, refreshWhenVisible, renderApplicationHealth, renderDatabaseHealth, renderError, renderFooterSummary, renderPollStatus, renderRangeSelection, renderSeries, renderTargetContext, runtimeHelp, shouldRenderSeries, state, targetPresentation, targetTypeHelp, validDiskPoint };
 if (typeof module !== "undefined" && module.exports) module.exports = dashboardTestHooks;
 if (typeof document !== "undefined") initDashboard();
