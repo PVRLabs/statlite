@@ -193,15 +193,59 @@ func (c *SpringActuatorCollector) Collect(ctx context.Context) (*CollectionResul
 	session := newSpringPollSession(c.client)
 	health, err := session.FetchHealth(ctx)
 	if err != nil {
-		result.addEvent(EventSeverityError, "health_fetch_failed", "", err.Error())
-		return result, fmt.Errorf("fetching health: %w", err)
+		result.addEvent(EventSeverityWarning, "health_fetch_failed", "", err.Error())
+	} else {
+		result.HealthStatus = health.Status
+		result.DBHealthStatus = health.DBStatus()
 	}
-	result.HealthStatus = health.Status
-	result.DBHealthStatus = health.DBStatus()
 
 	c.collectMetrics(ctx, session, result)
+	validateSpringSamples(result)
+	if len(result.Samples) == 0 {
+		err := errors.New("spring metrics collection produced no usable samples")
+		result.addEvent(EventSeverityError, "metrics_unavailable", "", err.Error())
+		return result, err
+	}
 
 	return result, nil
+}
+
+func validateSpringSamples(result *CollectionResult) {
+	valid := result.Samples[:0]
+	for _, sample := range result.Samples {
+		if springSampleValid(sample) {
+			valid = append(valid, sample)
+			continue
+		}
+		result.addEvent(EventSeverityWarning, "metric_invalid", sample.Key, fmt.Sprintf("omitted %s because value %v is outside its valid range", sample.Key, sample.Value))
+	}
+	result.Samples = valid
+	if result.ProcessStartTime != nil {
+		hasProcessStart := false
+		for _, sample := range valid {
+			if sample.Key == "process_start_time" {
+				hasProcessStart = true
+				break
+			}
+		}
+		if !hasProcessStart {
+			result.ProcessStartTime = nil
+		}
+	}
+}
+
+func springSampleValid(sample MetricSample) bool {
+	if sample.Kind == MetricKindCounter {
+		return finiteNonnegative(sample.Value)
+	}
+	switch sample.Key {
+	case "process_cpu_usage", "host_cpu_usage":
+		return finiteInRange(sample.Value, 0, 1)
+	case "process_start_time":
+		return finiteNonnegative(sample.Value) && sample.Value > 0 && rfc3339RoundTripsUnixSeconds(sample.Value)
+	default:
+		return finiteNonnegative(sample.Value)
+	}
 }
 
 func (c *SpringActuatorCollector) collectActuatorMetrics(ctx context.Context, session *springPollSession, result *CollectionResult) {

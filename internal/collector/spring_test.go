@@ -106,6 +106,8 @@ func TestSpringActuatorCollectorRejectsInvalidHostMetrics(t *testing.T) {
 			writeActuatorJSON(t, w, map[string]string{"status": "UP"})
 		case "/actuator/metrics/system.cpu.usage":
 			writeActuatorJSON(t, w, metricBody("system.cpu.usage", nil, map[string]float64{"VALUE": 1.2}, nil))
+		case "/actuator/metrics/process.cpu.usage":
+			writeActuatorJSON(t, w, metricBody("process.cpu.usage", nil, map[string]float64{"VALUE": 0.2}, nil))
 		case "/actuator/metrics/disk.free":
 			writeActuatorJSON(t, w, metricBody("disk.free", "bytes", map[string]float64{"VALUE": 1200}, nil))
 		case "/actuator/metrics/disk.total":
@@ -152,8 +154,8 @@ func TestSpringActuatorCollectorReportsMissingOptionalMetricsAsWarnings(t *testi
 	collector := NewSpringActuatorCollector("app", client, false)
 
 	result, err := collector.Collect(context.Background())
-	if err != nil {
-		t.Fatalf("Collect() error = %v", err)
+	if err == nil {
+		t.Fatal("Collect() error = nil, want no-usable-metrics error")
 	}
 	if result.HealthStatus != "UP" {
 		t.Fatalf("HealthStatus = %q, want UP", result.HealthStatus)
@@ -163,6 +165,9 @@ func TestSpringActuatorCollectorReportsMissingOptionalMetricsAsWarnings(t *testi
 	}
 	if countEvents(result, EventSeverityWarning, "metric_fetch_failed") != 4 {
 		t.Fatalf("warnings = %#v, want four application metric fetch warnings and no disabled host metric requests", result.Events)
+	}
+	if countEvents(result, EventSeverityError, "metrics_unavailable") != 1 {
+		t.Fatalf("events = %#v, want one metrics_unavailable error", result.Events)
 	}
 }
 
@@ -186,8 +191,8 @@ func TestSpringActuatorCollectorHandlesSparseMetricResponses(t *testing.T) {
 	collector := NewSpringActuatorCollector("app", client, false)
 
 	result, err := collector.Collect(context.Background())
-	if err != nil {
-		t.Fatalf("Collect() error = %v", err)
+	if err == nil {
+		t.Fatal("Collect() error = nil, want no-usable-metrics error")
 	}
 	if result.HealthStatus != "UP" {
 		t.Fatalf("HealthStatus = %q, want UP", result.HealthStatus)
@@ -326,7 +331,9 @@ func TestSpringActuatorCollectorReportsInvalidStatusAlongsideIncompleteAggregate
 }
 
 func TestSpringActuatorCollectorReturnsPollErrorWhenHealthFails(t *testing.T) {
+	var requests int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 	}))
 	defer server.Close()
@@ -341,20 +348,118 @@ func TestSpringActuatorCollectorReturnsPollErrorWhenHealthFails(t *testing.T) {
 	if err == nil {
 		t.Fatal("Collect() error = nil, want error")
 	}
-	if countEvents(result, EventSeverityError, "health_fetch_failed") != 1 {
-		t.Fatalf("events = %#v, want one health_fetch_failed error", result.Events)
+	if result.HealthStatus != "" || len(result.Samples) != 0 {
+		t.Fatalf("result = %#v, want no authoritative health or samples", result)
+	}
+	if countEvents(result, EventSeverityWarning, "health_fetch_failed") != 1 {
+		t.Fatalf("events = %#v, want one health_fetch_failed warning", result.Events)
+	}
+	if countEvents(result, EventSeverityError, "metrics_unavailable") != 1 {
+		t.Fatalf("events = %#v, want one metrics_unavailable error", result.Events)
+	}
+	if requests != 5 {
+		t.Fatalf("requests = %d, want health plus four metric requests", requests)
+	}
+}
+
+func TestSpringActuatorCollectorRetainsMetricsWhenHealthFails(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/actuator/health":
+			http.Error(w, "not exposed", http.StatusNotFound)
+		case "/actuator/metrics/process.cpu.usage":
+			writeActuatorJSON(t, w, metricBody("process.cpu.usage", nil, map[string]float64{"VALUE": 0.25}, nil))
+		default:
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client, err := NewActuatorClient(server.URL+"/actuator", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewActuatorClient() error = %v", err)
+	}
+	result, err := NewSpringActuatorCollector("app", client, false).Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() error = %v, want valid metrics to keep the poll successful", err)
+	}
+	if result.HealthStatus != "" || result.DBHealthStatus != "" {
+		t.Fatalf("health statuses = %q/%q, want empty after failed health fetch", result.HealthStatus, result.DBHealthStatus)
+	}
+	assertSample(t, result, "process_cpu_usage", MetricKindGauge, 0.25, "ratio")
+	if countEvents(result, EventSeverityWarning, "health_fetch_failed") != 1 {
+		t.Fatalf("events = %#v, want one health_fetch_failed warning", result.Events)
+	}
+	if countEvents(result, EventSeverityError, "metrics_unavailable") != 0 {
+		t.Fatalf("events = %#v, want no collection error", result.Events)
+	}
+}
+
+func TestSpringActuatorCollectorRejectsInvalidGaugesAsUsableMetrics(t *testing.T) {
+	tests := []struct {
+		name      string
+		path      string
+		metric    string
+		statistic string
+		value     float64
+		key       string
+	}{
+		{name: "negative heap", path: "/actuator/metrics/jvm.memory.used", metric: "jvm.memory.used", statistic: "VALUE", value: -1, key: "jvm_heap_used_bytes"},
+		{name: "negative process CPU", path: "/actuator/metrics/process.cpu.usage", metric: "process.cpu.usage", statistic: "VALUE", value: -0.1, key: "process_cpu_usage"},
+		{name: "out of range process CPU", path: "/actuator/metrics/process.cpu.usage", metric: "process.cpu.usage", statistic: "VALUE", value: 1.1, key: "process_cpu_usage"},
+		{name: "zero process start", path: "/actuator/metrics/process.start.time", metric: "process.start.time", statistic: "VALUE", value: 0, key: "process_start_time"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/actuator/health":
+					http.Error(w, "not exposed", http.StatusNotFound)
+				case tt.path:
+					writeActuatorJSON(t, w, metricBody(tt.metric, nil, map[string]float64{tt.statistic: tt.value}, nil))
+				default:
+					http.Error(w, "not found", http.StatusNotFound)
+				}
+			}))
+			defer server.Close()
+
+			client, err := NewActuatorClient(server.URL+"/actuator", time.Second, nil)
+			if err != nil {
+				t.Fatalf("NewActuatorClient() error = %v", err)
+			}
+			result, err := NewSpringActuatorCollector("app", client, false).Collect(context.Background())
+			if err == nil {
+				t.Fatal("Collect() error = nil, want invalid-only metrics to fail")
+			}
+			if len(result.Samples) != 0 {
+				t.Fatalf("Samples = %#v, want invalid gauge omitted", result.Samples)
+			}
+			if result.ProcessStartTime != nil {
+				t.Fatalf("ProcessStartTime = %v, want invalid start time cleared", result.ProcessStartTime)
+			}
+			if !hasCollectorEvent(result, "metric_invalid", tt.key) {
+				t.Fatalf("events = %#v, want metric_invalid for %s", result.Events, tt.key)
+			}
+			if countEvents(result, EventSeverityWarning, "health_fetch_failed") != 1 || countEvents(result, EventSeverityError, "metrics_unavailable") != 1 {
+				t.Fatalf("events = %#v, want health warning and collection error", result.Events)
+			}
+		})
 	}
 }
 
 func TestSpringActuatorCollectorRecordsUnhealthyHealthFromNon2xxResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/actuator/health" {
+		switch r.URL.Path {
+		case "/actuator/health":
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
 			json.NewEncoder(w).Encode(map[string]string{"status": "DOWN"})
-			return
+		case "/actuator/metrics/process.cpu.usage":
+			writeActuatorJSON(t, w, metricBody("process.cpu.usage", nil, map[string]float64{"VALUE": 0.4}, nil))
+		default:
+			http.Error(w, "not found", http.StatusNotFound)
 		}
-		http.Error(w, "not found", http.StatusNotFound)
 	}))
 	defer server.Close()
 
@@ -370,8 +475,34 @@ func TestSpringActuatorCollectorRecordsUnhealthyHealthFromNon2xxResponse(t *test
 	if result.HealthStatus != "DOWN" {
 		t.Fatalf("HealthStatus = %q, want DOWN", result.HealthStatus)
 	}
-	if countEvents(result, EventSeverityError, "health_fetch_failed") != 0 {
+	if countEvents(result, EventSeverityWarning, "health_fetch_failed") != 0 {
 		t.Fatalf("events = %#v, want no health fetch failure", result.Events)
+	}
+}
+
+func TestSpringActuatorCollectorRetainsHealthWhenMetricsAreUnavailable(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/actuator/health" {
+			writeActuatorJSON(t, w, map[string]string{"status": "UP"})
+			return
+		}
+		http.Error(w, "not found", http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client, err := NewActuatorClient(server.URL+"/actuator", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewActuatorClient() error = %v", err)
+	}
+	result, err := NewSpringActuatorCollector("app", client, false).Collect(context.Background())
+	if err == nil {
+		t.Fatal("Collect() error = nil, want no-usable-metrics error")
+	}
+	if result.HealthStatus != "UP" {
+		t.Fatalf("HealthStatus = %q, want authoritative UP retained", result.HealthStatus)
+	}
+	if countEvents(result, EventSeverityError, "metrics_unavailable") != 1 {
+		t.Fatalf("events = %#v, want one metrics_unavailable error", result.Events)
 	}
 }
 

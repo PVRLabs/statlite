@@ -49,6 +49,33 @@ func TestSpringAutoSelectsPrometheusOnceAndNormalizes(t *testing.T) {
 	}
 }
 
+func TestSpringPrometheusRetainsMetricsWhenHealthFails(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/actuator/health":
+			http.Error(w, "not exposed", http.StatusNotFound)
+		case "/actuator/prometheus":
+			w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+			fmt.Fprint(w, "process_start_time_seconds 1700000000\nprocess_cpu_usage 0.3\n")
+		default:
+			http.Error(w, "unexpected actuator fallback", http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	result, err := newConfiguredSpringTestCollector(t, server.URL+"/actuator", SpringMetricsSourcePrometheus).Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() error = %v, want usable Prometheus metrics to keep the poll successful", err)
+	}
+	if result.HealthStatus != "" || result.DBHealthStatus != "" {
+		t.Fatalf("health statuses = %q/%q, want unavailable health", result.HealthStatus, result.DBHealthStatus)
+	}
+	assertSample(t, result, "process_cpu_usage", MetricKindGauge, 0.3, "ratio")
+	if countEvents(result, EventSeverityWarning, "health_fetch_failed") != 1 {
+		t.Fatalf("events = %#v, want one health_fetch_failed warning", result.Events)
+	}
+}
+
 func TestSpringActuatorAndPrometheusNormalizeHTTPCountersEquivalently(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -223,14 +250,15 @@ func TestSpringAutoFallsBackOnlyOnDefinitiveResults(t *testing.T) {
 		body, contentType string
 		wantPrometheus    int
 		wantActuator      int
+		wantError         bool
 	}{
 		{name: "absent", prometheusStatus: http.StatusNotFound, body: "missing", wantPrometheus: 1, wantActuator: 1},
 		{name: "valid incompatible", prometheusStatus: http.StatusOK, body: "unrelated_metric 1\n", contentType: "text/plain; version=0.0.4", wantPrometheus: 1, wantActuator: 1},
 		{name: "process start only is incompatible", prometheusStatus: http.StatusOK, body: "process_start_time_seconds 1\n", contentType: "text/plain; version=0.0.4", wantPrometheus: 1, wantActuator: 1},
 		{name: "invalid counter is incompatible", prometheusStatus: http.StatusOK, body: "process_start_time_seconds 1\nhttp_server_requests_seconds_count{status=\"200\"} -5\n", contentType: "text/plain; version=0.0.4", wantPrometheus: 1, wantActuator: 1},
-		{name: "malformed remains unresolved", prometheusStatus: http.StatusOK, body: "bad", contentType: "text/plain; version=0.0.4", wantPrometheus: 2},
-		{name: "auth remains unresolved", prometheusStatus: http.StatusUnauthorized, body: "denied", wantPrometheus: 2},
-		{name: "transient remains unresolved", prometheusStatus: http.StatusServiceUnavailable, body: "later", wantPrometheus: 2},
+		{name: "malformed remains unresolved", prometheusStatus: http.StatusOK, body: "bad", contentType: "text/plain; version=0.0.4", wantPrometheus: 2, wantError: true},
+		{name: "auth remains unresolved", prometheusStatus: http.StatusUnauthorized, body: "denied", wantPrometheus: 2, wantError: true},
+		{name: "transient remains unresolved", prometheusStatus: http.StatusServiceUnavailable, body: "later", wantPrometheus: 2, wantError: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -260,8 +288,8 @@ func TestSpringAutoFallsBackOnlyOnDefinitiveResults(t *testing.T) {
 			c := newConfiguredSpringTestCollector(t, server.URL+"/actuator", SpringMetricsSourceAuto)
 			for i := 0; i < 2; i++ {
 				result, err := c.Collect(context.Background())
-				if err != nil {
-					t.Fatal(err)
+				if (err != nil) != tt.wantError {
+					t.Fatalf("Collect() error = %v, wantError=%v", err, tt.wantError)
 				}
 				if tt.wantActuator == 0 && len(result.Events) == 0 {
 					t.Fatal("unresolved source missing warning")
@@ -303,10 +331,10 @@ func TestSpringCommittedPrometheusFailureDoesNotSwitch(t *testing.T) {
 		t.Fatal(err)
 	}
 	result, err := c.Collect(context.Background())
-	if err != nil {
-		t.Fatalf("metrics failure should be partial: %v", err)
+	if err == nil {
+		t.Fatal("metrics failure returned nil error")
 	}
-	if result.HealthStatus != "UP" || len(result.Events) == 0 {
+	if result.HealthStatus != "UP" || len(result.Samples) != 0 || countEvents(result, EventSeverityError, "metrics_unavailable") != 1 {
 		t.Fatalf("partial result = %#v", result)
 	}
 	if actuator != 0 {
@@ -368,8 +396,8 @@ func TestSpringExplicitPrometheusReportsIncompatibleScrapeWithoutFallback(t *tes
 	defer server.Close()
 
 	result, err := newConfiguredSpringTestCollector(t, server.URL+"/actuator", SpringMetricsSourcePrometheus).Collect(context.Background())
-	if err != nil {
-		t.Fatalf("Collect() error = %v", err)
+	if err == nil {
+		t.Fatal("Collect() error = nil, want incompatible no-sample scrape to fail")
 	}
 	if result.HealthStatus != "UP" || len(result.Samples) != 0 {
 		t.Fatalf("partial result = %#v", result)

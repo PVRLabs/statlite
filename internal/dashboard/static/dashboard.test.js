@@ -243,21 +243,196 @@ test("renderPollStatus shows the latest poll state and a failed-poll summary", (
   }
 });
 
-test("footer summary reuses target health data without fetching", () => {
+test("targetPresentation separates authoritative health from reporting", () => {
+  const cases = [
+    {
+      name: "explicit UP",
+      target: targetSummary("UP", "ok"),
+      want: { label: "Healthy", tone: "ok", reportingState: "Reporting", reporting: true, selectorSuffix: "🟢 Healthy" }
+    },
+    {
+      name: "explicit OK",
+      target: targetSummary("OK", "ok"),
+      want: { label: "OK", tone: "ok", reportingState: "Reporting", reporting: true, selectorSuffix: "🟢 OK" }
+    },
+    {
+      name: "explicit DOWN",
+      target: targetSummary("DOWN", "ok"),
+      want: { label: "Unhealthy", tone: "bad", reportingState: "Reporting", reporting: true, selectorSuffix: "🔴 Unhealthy (DOWN)" }
+    },
+    {
+      name: "explicit ERROR during failed collection",
+      target: targetSummary("ERROR", "error"),
+      want: { label: "Unhealthy", tone: "bad", reportingState: "Unavailable", reporting: false, selectorSuffix: "🔴 Unhealthy (ERROR)" }
+    },
+    {
+      name: "explicit OUT_OF_SERVICE",
+      target: targetSummary("OUT_OF_SERVICE", "ok"),
+      want: { label: "Unhealthy", tone: "bad", reportingState: "Reporting", reporting: true, selectorSuffix: "🔴 Unhealthy (OUT_OF_SERVICE)" }
+    },
+    {
+      name: "unusual authoritative value",
+      target: targetSummary("DEGRADED", "ok"),
+      want: { label: "DEGRADED", tone: "warn", reportingState: "Reporting", reporting: true, selectorSuffix: "⚪ DEGRADED" }
+    },
+    {
+      name: "metrics-only success",
+      target: targetSummary("", "ok"),
+      want: { label: "Reporting", tone: "ok", reportingState: "Reporting", reporting: true, selectorSuffix: "🟢 Reporting" }
+    },
+    {
+      name: "metrics-only failure",
+      target: targetSummary("", "error"),
+      want: { label: "Unavailable", tone: "bad", reportingState: "Unavailable", reporting: false, selectorSuffix: "🔴 Unavailable" }
+    },
+    {
+      name: "monitor failure overrides stale successful latest state",
+      target: targetSummary("", "ok", 1),
+      want: { label: "Unavailable", tone: "bad", reportingState: "Unavailable", reporting: false, selectorSuffix: "🔴 Unavailable" }
+    },
+    {
+      name: "before first poll",
+      target: {},
+      want: { label: "Not reporting", tone: "warn", reportingState: "Not reporting", reporting: false, selectorSuffix: "⚪ Not reporting" }
+    }
+  ];
+
+  cases.forEach(({ name, target, want }) => {
+    const originalHealth = target.latest && target.latest.result.health_status;
+    const got = dashboard.targetPresentation(target);
+    assert.deepEqual(
+      {
+        label: got.label,
+        tone: got.tone,
+        reportingState: got.reportingState,
+        reporting: got.reporting,
+        selectorSuffix: got.selectorSuffix
+      },
+      want,
+      name
+    );
+    assert.match(got.accessibleLabel, new RegExp(got.reportingState, "i"), name);
+    if (target.latest) assert.equal(target.latest.result.health_status, originalHealth, name);
+  });
+});
+
+test("targetPresentation trims health and normalizes health and poll status case", () => {
+  const healthy = dashboard.targetPresentation(targetSummary("  up  ", " OK "));
+  assert.equal(healthy.label, "Healthy");
+  assert.equal(healthy.reporting, true);
+  assert.equal(healthy.rawHealth, "up");
+
+  const unhealthy = dashboard.targetPresentation(targetSummary(" out_of_service ", "Ok"));
+  assert.equal(unhealthy.label, "Unhealthy");
+  assert.match(unhealthy.accessibleLabel, /out_of_service/);
+
+  const whitespaceOnly = dashboard.targetPresentation(targetSummary("  ", "ok"));
+  assert.equal(whitespaceOnly.label, "Reporting");
+  assert.equal(whitespaceOnly.authoritativeHealth, false);
+});
+
+test("application health card explains derived reporting and retains raw unhealthy health", () => {
+  const originalDocument = global.document;
+  const document = dashboardDocument();
+  global.document = document;
+
+  try {
+    dashboard.renderApplicationHealth(dashboard.targetPresentation(targetSummary("", "ok")));
+    assert.match(document.getElementById("health").innerHTML, />Reporting</);
+    assert.match(document.getElementById("health-note").textContent, /No authoritative application health signal/);
+
+    dashboard.renderApplicationHealth(dashboard.targetPresentation(targetSummary("DOWN", "ok")));
+    assert.match(document.getElementById("health").innerHTML, />Unhealthy</);
+    assert.equal(document.getElementById("health-note").textContent, "Application reported DOWN.");
+    assert.match(document.getElementById("health").attributes["aria-label"], /Unhealthy \(DOWN\).*Reporting/);
+
+    dashboard.renderApplicationHealth(dashboard.targetPresentation(targetSummary("DEGRADED", "ok")));
+    assert.match(document.getElementById("health").innerHTML, />DEGRADED</);
+    assert.equal(document.getElementById("health-note").textContent, "");
+  } finally {
+    global.document = originalDocument;
+  }
+});
+
+test("database health remains raw and reports absence as unavailable", () => {
+  const originalDocument = global.document;
+  const document = dashboardDocument();
+  global.document = document;
+
+  try {
+    dashboard.renderDatabaseHealth("OUT_OF_SERVICE");
+    assert.match(document.getElementById("db-health").innerHTML, /bad.*OUT_OF_SERVICE/);
+    assert.match(document.getElementById("db-health").attributes["aria-label"], /reported by the target: OUT_OF_SERVICE/);
+
+    dashboard.renderDatabaseHealth("");
+    assert.match(document.getElementById("db-health").innerHTML, />Unavailable</);
+    assert.match(document.getElementById("db-health").attributes["aria-label"], /Authoritative database health unavailable/);
+  } finally {
+    global.document = originalDocument;
+  }
+});
+
+test("target context uses the shared presentation for one selected target", () => {
+  const originalDocument = global.document;
+  const document = dashboardDocument();
+  global.document = document;
+  const targets = [{
+    metadata: { name: "api", endpoint: "http://api", type: "quarkus" },
+    ...targetSummary("", "ok")
+  }];
+
+  try {
+    dashboard.renderTargetContext(targets, targets[0].metadata);
+    assert.equal(document.getElementById("target-name").textContent, "api");
+    assert.match(document.getElementById("target-status").className, /ok/);
+    assert.match(document.getElementById("target-status").attributes["aria-label"], /target is reporting/i);
+    assert.equal(document.getElementById("target-select").classList.toggles.hidden, true);
+  } finally {
+    global.document = originalDocument;
+  }
+});
+
+test("target selector distinguishes reporting, unavailable, and unhealthy targets", () => {
+  const originalDocument = global.document;
+  const document = dashboardDocument();
+  global.document = document;
+  const targets = [
+    { metadata: { name: "metrics" }, ...targetSummary("", "ok") },
+    { metadata: { name: "offline" }, ...targetSummary("", "error") },
+    { metadata: { name: "unhealthy" }, ...targetSummary("DOWN", "ok") },
+    { metadata: { name: "new" } }
+  ];
+
+  try {
+    dashboard.renderTargetContext(targets, { name: "unhealthy" });
+    assert.deepEqual(document.getElementById("target-select").children.map((option) => option.textContent), [
+      "metrics  🟢 Reporting",
+      "offline  🔴 Unavailable",
+      "unhealthy  🔴 Unhealthy (DOWN)",
+      "new  ⚪ Not reporting"
+    ]);
+    assert.match(document.getElementById("target-status").attributes["aria-label"], /Unhealthy \(DOWN\).*Reporting/);
+  } finally {
+    global.document = originalDocument;
+  }
+});
+
+test("footer summary counts reporting independently from application health", () => {
   const originalDocument = global.document;
   const document = dashboardDocument();
   global.document = document;
 
   try {
     dashboard.renderFooterSummary([
-      { latest: { result: { health_status: "UP" } } },
-      { latest: { result: { health_status: "OK" } } },
-      { latest: { result: { health_status: "DOWN" } } },
+      targetSummary("UP", "ok"),
+      targetSummary("DOWN", "ok"),
+      targetSummary("DEGRADED", "ok"),
+      targetSummary("", "error"),
       {}
     ], new Date("2026-09-02T12:34:56"));
 
-    assert.equal(document.getElementById("footer-targets").textContent, "4");
-    assert.equal(document.getElementById("footer-up").textContent, "2");
+    assert.equal(document.getElementById("footer-targets").textContent, "5");
+    assert.equal(document.getElementById("footer-reporting").textContent, "3");
     assert.match(document.getElementById("footer-refresh").textContent, /12:34:56/);
   } finally {
     global.document = originalDocument;
@@ -392,12 +567,34 @@ function rangeButton(range) {
 
 function dashboardDocument() {
   const elements = new Map();
+  const element = () => ({
+    attributes: {},
+    children: [],
+    hidden: false,
+    textContent: "",
+    innerHTML: "",
+    className: "",
+    title: "",
+    classList: {
+      toggles: {},
+      toggle(name, active) { this.toggles[name] = active; }
+    },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    appendChild(child) { this.children.push(child); }
+  });
   return {
     getElementById(id) {
-      if (!elements.has(id)) elements.set(id, { hidden: false, textContent: "", innerHTML: "", className: "", title: "", classList: { toggle() {} }, setAttribute() {} });
+      if (!elements.has(id)) elements.set(id, element());
       return elements.get(id);
     },
-    createElement() { return { children: [], appendChild() {}, classList: { toggle() {} }, setAttribute() {} }; }
+    createElement: element
+  };
+}
+
+function targetSummary(healthStatus, pollStatus, consecutiveFailures = 0) {
+  return {
+    latest: { status: pollStatus, result: { health_status: healthStatus } },
+    status: { consecutive_poll_failures: consecutiveFailures }
   };
 }
 

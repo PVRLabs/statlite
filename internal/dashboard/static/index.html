@@ -327,6 +327,12 @@ main {
 .pill.ok { background: rgba(47, 211, 107, 0.12); color: var(--pvr-green); border-color: rgba(47, 211, 107, 0.24); }
 .pill.warn { background: rgba(245, 158, 11, 0.12); color: var(--amber); border-color: rgba(245, 158, 11, 0.24); }
 .pill.bad { background: rgba(239, 68, 68, 0.12); color: var(--red); border-color: rgba(239, 68, 68, 0.24); }
+.metric-note {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
 .chart-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -516,7 +522,7 @@ pre {
   <section class="target-context" aria-label="Target">
     <span class="label">Target:</span>
     <span class="target-picker">
-      <span id="target-status" class="target-status warn" aria-label="Target health unavailable" title="Target health unavailable">●</span>
+      <span id="target-status" class="target-status warn" aria-label="Target status unavailable" title="Target status unavailable">●</span>
       <span id="target-name" class="target-name">...</span>
       <select id="target-select" class="target-select hidden" aria-label="Target"></select>
     </span>
@@ -529,8 +535,8 @@ pre {
   </section>
 
   <section class="status-grid" aria-label="Current status">
-    <div class="metric"><div class="label">Health</div><div id="health" class="value"><span class="pill">...</span></div></div>
-    <div class="metric"><div class="label label-help">DB <button type="button" class="help" aria-label="DB health help" aria-expanded="false">i</button><span class="tooltip" role="tooltip">Health reported by the target for its database dependency.</span></div><div id="db-health" class="value"><span class="pill">...</span></div></div>
+    <div class="metric"><div class="label label-help">Application health <button type="button" class="help" aria-label="Application health help" aria-expanded="false">i</button><span class="tooltip" role="tooltip">Application-reported health when available. Reporting means StatLite is receiving metrics, not that the application reported itself healthy.</span></div><div id="health" class="value"><span class="pill">...</span></div><div id="health-note" class="metric-note"></div></div>
+    <div class="metric"><div class="label label-help">DB health <button type="button" class="help" aria-label="DB health help" aria-expanded="false">i</button><span class="tooltip" role="tooltip">Health explicitly reported by the target for its database dependency. Unavailable means no authoritative database health signal was provided.</span></div><div id="db-health" class="value"><span class="pill">...</span></div></div>
     <div class="metric"><div class="label">Started</div><div id="process-start" class="value small">...</div></div>
     <div class="metric"><div class="label label-help">Restart <button type="button" class="help" aria-label="Restart detection help" aria-expanded="false">i</button><span class="tooltip" role="tooltip">Detected from process start time or counter resets; detection can lag by one poll.</span></div><div id="restart-detected" class="value small">...</div></div>
     <div class="metric"><div class="label">Last poll success</div><div id="last-success" class="value small">...</div></div>
@@ -589,7 +595,7 @@ pre {
   <div class="footer-summary" aria-label="Dashboard summary">
     <span>Targets: <span id="footer-targets">...</span></span>
     <span class="footer-separator" aria-hidden="true">|</span>
-    <span>UP: <span id="footer-up">...</span></span>
+    <span title="Targets whose latest metrics collection succeeded; not an application-health assertion">Reporting: <span id="footer-reporting">...</span></span>
     <span class="footer-separator" aria-hidden="true">|</span>
     <span>Last refresh: <span id="footer-refresh">...</span></span>
   </div>

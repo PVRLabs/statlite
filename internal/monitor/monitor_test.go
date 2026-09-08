@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -51,6 +52,151 @@ func TestPollNowTracksFailureStatusAndStoresFailedPoll(t *testing.T) {
 	}
 	if status.LastFailedPollAt == nil {
 		t.Fatal("LastFailedPollAt = nil, want timestamp")
+	}
+}
+
+func TestSpringHealthWarningWithCountersAdvancesSuccessfulBaseline(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	requestCount := 10
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/actuator/health":
+			http.Error(w, "not exposed", http.StatusNotFound)
+		case "/actuator/metrics/http.server.requests":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"name":"http.server.requests","measurements":[{"statistic":"COUNT","value":%d},{"statistic":"TOTAL_TIME","value":%d}]}`, requestCount, requestCount/5)))
+		default:
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client, err := collector.NewActuatorClient(server.URL+"/actuator", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewActuatorClient() error = %v", err)
+	}
+	mon := newTestMonitor(t, store, collector.NewSpringActuatorCollector("app", client, false))
+	first, err := mon.PollNow(context.Background())
+	if err != nil {
+		t.Fatalf("first PollNow() error = %v", err)
+	}
+	requestCount = 15
+	second, err := mon.PollNow(context.Background())
+	if err != nil {
+		t.Fatalf("second PollNow() error = %v", err)
+	}
+	if first.Status != "ok" || second.Status != "ok" {
+		t.Fatalf("poll statuses = %q/%q, want ok/ok", first.Status, second.Status)
+	}
+	if first.Result.HealthStatus != "" || !hasEvent(first.Result.Events, "health_fetch_failed") {
+		t.Fatalf("first result = %#v, want unavailable health and visible warning", first.Result)
+	}
+	status := mon.Status()
+	if status.LastSuccessfulStoredPollID != second.PollID || status.ConsecutivePollFailures != 0 {
+		t.Fatalf("Status() = %#v, want second poll as current successful baseline", status)
+	}
+
+	series, err := store.Series(context.Background(), "app", first.Result.PollStartedAt.Add(-time.Second), second.Result.PollFinishedAt.Add(time.Second))
+	if err != nil {
+		t.Fatalf("Series() error = %v", err)
+	}
+	if len(series.Points) != 2 || series.Points[0].Requests != nil {
+		t.Fatalf("series = %#v, want first counter baseline and second delta", series.Points)
+	}
+	assertMonitorFloatPointer(t, "second request delta", series.Points[1].Requests, 5)
+
+	events, err := store.Events(context.Background(), "app", first.Result.PollStartedAt.Add(-time.Second), second.Result.PollFinishedAt.Add(time.Second), 0)
+	if err != nil {
+		t.Fatalf("Events() error = %v", err)
+	}
+	var healthWarnings int
+	for _, event := range events {
+		if event.Type == "health_fetch_failed" && event.Severity == string(collector.EventSeverityWarning) {
+			healthWarnings++
+		}
+	}
+	if healthWarnings != 2 {
+		t.Fatalf("health warning count = %d, want 2; events=%#v", healthWarnings, events)
+	}
+}
+
+func TestSpringSharedAuthenticationFailureDoesNotAdvanceSuccessfulHistory(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	unauthorized := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if unauthorized {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		switch r.URL.Path {
+		case "/actuator/health":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"UP"}`))
+		case "/actuator/metrics/process.cpu.usage":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"name":"process.cpu.usage","measurements":[{"statistic":"VALUE","value":0.2}]}`))
+		default:
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client, err := collector.NewActuatorClient(server.URL+"/actuator", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewActuatorClient() error = %v", err)
+	}
+	mon := newTestMonitor(t, store, collector.NewSpringActuatorCollector("app", client, false))
+	first, err := mon.PollNow(context.Background())
+	if err != nil {
+		t.Fatalf("first PollNow() error = %v", err)
+	}
+	unauthorized = true
+	failed, err := mon.PollNow(context.Background())
+	if err == nil {
+		t.Fatal("second PollNow() error = nil, want shared authentication failure")
+	}
+	if failed.Status != "error" || failed.Result.HealthStatus != "" || len(failed.Result.Samples) != 0 {
+		t.Fatalf("failed snapshot = %#v, want failed poll without health or samples", failed)
+	}
+	status := mon.Status()
+	if status.ConsecutivePollFailures != 1 || status.LastSuccessfulStoredPollID != first.PollID {
+		t.Fatalf("Status() = %#v, want failure with first poll retained as successful history", status)
+	}
+}
+
+func TestSpringHealthWithoutMetricsIsStoredAsFailedObservation(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/actuator/health" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"UP"}`))
+			return
+		}
+		http.Error(w, "not found", http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client, err := collector.NewActuatorClient(server.URL+"/actuator", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewActuatorClient() error = %v", err)
+	}
+	mon := newTestMonitor(t, store, collector.NewSpringActuatorCollector("app", client, false))
+	failed, err := mon.PollNow(context.Background())
+	if err == nil {
+		t.Fatal("PollNow() error = nil, want no-usable-metrics failure")
+	}
+	if failed.Status != "error" || failed.Result.HealthStatus != "UP" {
+		t.Fatalf("snapshot = %#v, want failed poll retaining authoritative UP", failed)
+	}
+	status := mon.Status()
+	if status.ConsecutivePollFailures != 1 || status.LastSuccessfulPollAt != nil || status.LastSuccessfulStoredPollID != 0 {
+		t.Fatalf("Status() = %#v, want no successful history", status)
 	}
 }
 
