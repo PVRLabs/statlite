@@ -1142,7 +1142,7 @@ func TestSummaryReturnsAllTargetsAndSelectedTarget(t *testing.T) {
 			TargetName:     "alpha",
 			PollStartedAt:  start,
 			PollFinishedAt: start.Add(time.Second),
-			HealthStatus:   "UP",
+			Samples:        []collector.MetricSample{{Key: "process_cpu_usage", Kind: collector.MetricKindGauge, Value: 0.1}},
 		},
 	}}})
 	beta := newServerTestMonitor(t, "beta", store, &sequenceCollector{results: []collectResult{{
@@ -1151,16 +1151,34 @@ func TestSummaryReturnsAllTargetsAndSelectedTarget(t *testing.T) {
 			PollStartedAt:  start,
 			PollFinishedAt: start.Add(time.Second),
 			HealthStatus:   "DOWN",
+			Samples:        []collector.MetricSample{{Key: "process_cpu_usage", Kind: collector.MetricKindGauge, Value: 0.2}},
+		},
+	}}})
+	gamma := newServerTestMonitor(t, "gamma", store, &sequenceCollector{results: []collectResult{{
+		result: &collector.CollectionResult{
+			TargetName:     "gamma",
+			PollStartedAt:  start,
+			PollFinishedAt: start.Add(time.Second),
 			Events:         []collector.CollectorEvent{{Severity: collector.EventSeverityError, Type: "collector_failed", Message: "boom"}},
 		},
 		err: fmt.Errorf("boom"),
 	}}})
-	manager := newServerTestManager(t, alpha, beta)
+	manager, err := monitor.NewManager([]monitor.ManagedTarget{
+		{Metadata: monitor.TargetMetadata{Name: "alpha", Type: "spring"}, Monitor: alpha},
+		{Metadata: monitor.TargetMetadata{Name: "beta", Type: "spring"}, Monitor: beta},
+		{Metadata: monitor.TargetMetadata{Name: "gamma", Type: "quarkus"}, Monitor: gamma},
+	})
+	if err != nil {
+		t.Fatalf("monitor.NewManager() error = %v", err)
+	}
 	if _, err := manager.PollNow(t.Context(), "alpha"); err != nil {
 		t.Fatalf("PollNow(alpha) error = %v", err)
 	}
-	if _, err := manager.PollNow(t.Context(), "beta"); err == nil {
-		t.Fatal("PollNow(beta) error = nil, want error")
+	if _, err := manager.PollNow(t.Context(), "beta"); err != nil {
+		t.Fatalf("PollNow(beta) error = %v", err)
+	}
+	if _, err := manager.PollNow(t.Context(), "gamma"); err == nil {
+		t.Fatal("PollNow(gamma) error = nil, want error")
 	}
 
 	statlite := NewWithManager("127.0.0.1:0", manager)
@@ -1179,11 +1197,43 @@ func TestSummaryReturnsAllTargetsAndSelectedTarget(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
 		t.Fatalf("decode summary: %v", err)
 	}
-	if len(summary.Targets) != 2 {
-		t.Fatalf("summary targets = %d, want 2", len(summary.Targets))
+	if len(summary.Targets) != 3 {
+		t.Fatalf("summary targets = %d, want 3", len(summary.Targets))
 	}
-	if summary.Targets[0].Metadata.Name != "alpha" || summary.Targets[1].Metadata.Name != "beta" {
-		t.Fatalf("summary target order = %#v, want alpha,beta", summary.Targets)
+	if summary.Targets[0].Metadata.Name != "alpha" || summary.Targets[1].Metadata.Name != "beta" || summary.Targets[2].Metadata.Name != "gamma" {
+		t.Fatalf("summary target order = %#v, want alpha,beta,gamma", summary.Targets)
+	}
+	if summary.Targets[0].Latest.Status != "ok" || summary.Targets[0].Latest.Result.HealthStatus != "" || summary.Targets[0].Status.ConsecutivePollFailures != 0 {
+		t.Fatalf("alpha summary = %#v, want successful poll with nullable health", summary.Targets[0])
+	}
+	if summary.Targets[1].Latest.Status != "ok" || summary.Targets[1].Latest.Result.HealthStatus != "DOWN" || summary.Targets[1].Status.ConsecutivePollFailures != 0 {
+		t.Fatalf("beta summary = %#v, want authoritative unhealthy health with successful poll", summary.Targets[1])
+	}
+	if summary.Targets[2].Latest.Status != "error" || summary.Targets[2].Latest.Result.HealthStatus != "" || summary.Targets[2].Status.ConsecutivePollFailures != 1 || summary.Targets[2].Status.LastPollErrorSummary != "boom" {
+		t.Fatalf("gamma summary = %#v, want failed poll with nullable health and monitor failure state", summary.Targets[2])
+	}
+	encoded, err := json.Marshal(summary)
+	if err != nil {
+		t.Fatalf("marshal decoded summary: %v", err)
+	}
+	var raw struct {
+		Targets []struct {
+			Latest struct {
+				Result map[string]interface{} `json:"result"`
+			} `json:"latest"`
+		} `json:"targets"`
+	}
+	if err := json.Unmarshal(encoded, &raw); err != nil {
+		t.Fatalf("decode raw summary shape: %v", err)
+	}
+	if _, ok := raw.Targets[0].Latest.Result["health_status"]; ok {
+		t.Fatal("alpha health_status is present, want omitted nullable health")
+	}
+	if got := raw.Targets[1].Latest.Result["health_status"]; got != "DOWN" {
+		t.Fatalf("beta raw health_status = %#v, want DOWN", got)
+	}
+	if _, ok := raw.Targets[2].Latest.Result["health_status"]; ok {
+		t.Fatal("gamma health_status is present, want omitted nullable health")
 	}
 	if summary.SelectedTarget.Name != "alpha" {
 		t.Fatalf("selected target = %q, want alpha", summary.SelectedTarget.Name)
@@ -1204,8 +1254,8 @@ func TestSummaryReturnsAllTargetsAndSelectedTarget(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
 		t.Fatalf("decode default summary: %v", err)
 	}
-	if summary.SelectedTarget.Name != "beta" {
-		t.Fatalf("default selected target = %q, want beta with poll failure", summary.SelectedTarget.Name)
+	if summary.SelectedTarget.Name != "gamma" {
+		t.Fatalf("default selected target = %q, want gamma with poll failure", summary.SelectedTarget.Name)
 	}
 }
 

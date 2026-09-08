@@ -141,14 +141,20 @@ for that poll while retaining independently valid metrics.
 
 A real health response is authoritative for application or dependency health.
 StatLite must not infer database or dependency health from generic process or
-metrics reachability. A successful metrics scrape can establish collection
-reachability or liveness, but is not equivalent to framework aggregate health
-unless that behavior is explicitly defined for the target. Spring Boot
+metrics reachability. A successful metrics scrape establishes that the target
+is reporting to StatLite, but is not equivalent to framework aggregate health.
+Spring Boot
 Actuator health is normally an established part of the `spring` integration;
 SmallRye Health for Quarkus and health endpoints for future Go or other
-framework targets remain optional capabilities. The current Spring collector
-retains its established health-fetch behavior; making Spring health optional
-for collection is a separate implementation change.
+framework targets remain optional capabilities. If Spring health retrieval
+fails, StatLite retains independently usable metrics, leaves health
+unavailable, and records a focused warning. A poll without any usable metric
+sample remains a collection failure even when health responded.
+
+Future Caddy, Go, Gin, Node, Python, and other certified integrations must omit
+application and database health unless their supported contract provides an
+explicit authoritative signal. Successful collection is reporting
+availability, not permission to synthesize health.
 
 ## Deployment topology
 
@@ -191,6 +197,11 @@ rest of the system operates on normalized concepts such as:
 * CPU usage;
 * poll status; and
 * collector warnings and errors.
+
+Application health, database health, poll status, and reporting availability
+remain distinct. Health fields preserve optional source values, poll status
+records whether collection succeeded, and the dashboard derives reporting
+availability from the latest poll and monitor state.
 
 Source-specific metric names should not leak into storage or primary dashboard
 paths. For example, Actuator and StatLite Metrics fields are mapped to shared

@@ -33,7 +33,11 @@ arbitrary metric ingestion.
 Configure Spring applications with `type: spring` or omit `type` for the
 default. The `url` is the Actuator management base URL. Spring can use its
 Actuator source, its Micrometer Prometheus source, or the configured automatic
-source selection described in [configuration](configuration.md).
+source selection described in [configuration](configuration.md). Health is an
+independent authoritative Actuator signal. If its retrieval fails, StatLite
+leaves health unavailable, retains independently usable metrics, and records a
+focused warning. A poll still requires at least one usable metric sample to
+count as reporting.
 
 ## Quarkus
 
@@ -46,12 +50,13 @@ successful scrape. SmallRye Health is an optional Quarkus capability. For a
 conventional Quarkus metrics path ending in `/q/metrics`, StatLite derives the
 sibling `/q/health` endpoint where practical, requests it separately when
 available, and normalizes the overall and datasource statuses. A missing health
-capability is quiet: aggregate framework health is unavailable, while
-successful metrics reachability reports overall `UP`. Database health remains
-unavailable unless a datasource check is published. The absent capability is
-cached until the observed process-start identity changes when available, or the
-collector is recreated. A known health failure can record a focused warning
-without discarding valid metrics. For a customized
+capability is quiet: aggregate framework health is unavailable, while a
+successful metrics scrape is presented as `Reporting`. Reporting means
+StatLite is receiving data, not that the application reported health `UP`.
+Database health remains unavailable unless a datasource check is published.
+The absent capability is cached until the observed process-start identity
+changes when available, or the collector is recreated. A known health failure
+can record a focused warning without discarding valid metrics. For a customized
 layout, set `health_url` as an optional override; a custom metrics path without
 that override remains a supported metrics-only target.
 
@@ -75,3 +80,7 @@ StatLite does not currently provide a generic Prometheus target, arbitrary
 metric storage, Prometheus querying, remote write, or a Prometheus-compatible
 time-series database. Supported integrations expose only the normalized
 concepts that StatLite can use for its dashboard, health, and diagnostics.
+
+Future Caddy, Go, Gin, Node, Python, and other framework adapters must omit
+health when their certified integration contract has no explicit authoritative
+health signal. Metrics collection alone establishes reporting availability.

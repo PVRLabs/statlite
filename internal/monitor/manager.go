@@ -160,7 +160,7 @@ func snapshotUnhealthy(snapshot *storage.Snapshot) bool {
 
 func statusUnhealthy(status string) bool {
 	switch strings.ToUpper(strings.TrimSpace(status)) {
-	case "DOWN", "ERROR":
+	case "DOWN", "ERROR", "OUT_OF_SERVICE":
 		return true
 	default:
 		return false

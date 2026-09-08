@@ -15,8 +15,10 @@ Go binary monitors Spring Boot applications through Actuator JSON or Micrometer
 Prometheus metrics, Quarkus applications through Micrometer metrics, and other
 applications that expose [a small, fixed JSON metrics
 endpoint](docs/statlite-metrics-v1.md), without requiring Prometheus or Grafana.
-It stores focused health, traffic, latency, CPU, memory, and optional host metrics
-in SQLite.
+It stores focused traffic, latency, CPU, memory, optional authoritative health,
+and optional host metrics in SQLite. When a target has no health signal, the
+dashboard reports whether StatLite is successfully receiving its metrics
+without treating reachability as application health.
 
 🌐 [Website](https://pvrlabs.xyz/statlite) · 👀 [Interactive demo](https://pvrlabs.xyz/statlite/demo.html)
 
@@ -118,9 +120,11 @@ configuration. See [`examples/`](examples/) for complete configurations.
 
 ## Supported metric sources
 
-- **Spring Boot:** Collects health through Actuator and automatically selects a
-  compatible Micrometer Prometheus endpoint or Actuator JSON for request, JVM,
-  process, and optional host metrics.
+- **Spring Boot:** Collects authoritative health when Actuator health is
+  available and automatically selects a compatible Micrometer Prometheus
+  endpoint or Actuator JSON for request, JVM, process, and optional host
+  metrics. Independently usable metrics remain reportable if health retrieval
+  fails.
 - **Quarkus Micrometer:** Collects bounded request, latency, CPU, heap, process,
   and restart concepts from an exact Prometheus/OpenMetrics endpoint. SmallRye
   Health is an optional capability when the application publishes it.

@@ -140,6 +140,66 @@ func TestSaveCollectionResultAndLatestSnapshot(t *testing.T) {
 	}
 }
 
+func TestHealthStatusRoundTripsIndependentlyFromPollStatus(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	tests := []struct {
+		name       string
+		health     string
+		dbHealth   string
+		pollStatus string
+	}{
+		{name: "up-error", health: "UP", pollStatus: "error"},
+		{name: "down-ok", health: "DOWN", pollStatus: "ok"},
+		{name: "error-ok", health: "ERROR", pollStatus: "ok"},
+		{name: "out-of-service-ok", health: "OUT_OF_SERVICE", pollStatus: "ok"},
+		{name: "unusual-error", health: "DEGRADED", dbHealth: "MAINTENANCE", pollStatus: "error"},
+		{name: "null-ok", pollStatus: "ok"},
+		{name: "null-error", pollStatus: "error"},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			at := time.Date(2026, 9, 8, 12, i, 0, 0, time.UTC)
+			result := &collector.CollectionResult{
+				TargetName:     tt.name,
+				PollStartedAt:  at,
+				PollFinishedAt: at.Add(time.Second),
+				HealthStatus:   tt.health,
+				DBHealthStatus: tt.dbHealth,
+			}
+			if tt.pollStatus == "error" {
+				result.Events = []collector.CollectorEvent{{
+					Severity: collector.EventSeverityError,
+					Type:     "collector_failed",
+					Message:  "test failure",
+				}}
+			}
+
+			pollID, err := store.SaveCollectionResult(context.Background(), result)
+			if err != nil {
+				t.Fatalf("SaveCollectionResult() error = %v", err)
+			}
+			snapshot, err := store.LatestSnapshot(context.Background(), tt.name)
+			if err != nil {
+				t.Fatalf("LatestSnapshot() error = %v", err)
+			}
+			if snapshot.Status != tt.pollStatus || snapshot.Result.HealthStatus != tt.health || snapshot.Result.DBHealthStatus != tt.dbHealth {
+				t.Fatalf("snapshot status/health/db health = %q/%q/%q, want %q/%q/%q", snapshot.Status, snapshot.Result.HealthStatus, snapshot.Result.DBHealthStatus, tt.pollStatus, tt.health, tt.dbHealth)
+			}
+
+			var health, dbHealth sql.NullString
+			if err := store.db.QueryRow(`SELECT health_status, db_health_status FROM polls WHERE id = ?`, pollID).Scan(&health, &dbHealth); err != nil {
+				t.Fatalf("query stored health: %v", err)
+			}
+			if health.Valid != (tt.health != "") || dbHealth.Valid != (tt.dbHealth != "") {
+				t.Fatalf("stored health validity = %v/%v, want %v/%v", health.Valid, dbHealth.Valid, tt.health != "", tt.dbHealth != "")
+			}
+		})
+	}
+}
+
 func TestEnsureAppRunPreservesLegacyProcessStartTimeIdentity(t *testing.T) {
 	store := openTestStore(t)
 	defer store.Close()

@@ -55,6 +55,12 @@ every individual metric are optional. `status` is application-defined; v1 does
 not impose a status enum. `started_at` uses RFC 3339 and is recommended because
 it improves restart detection.
 
+The required `status` field is an explicit producer-defined health contract
+for this profile. It does not imply that every StatLite integration must expose
+health. Framework adapters without an authoritative health signal omit health;
+successful metrics collection is presented separately as reporting
+availability.
+
 ## Python and FastAPI
 
 Request metrics must be measured inside the application, where requests and

@@ -147,6 +147,43 @@ func TestManagerResolveTargetPrefersRequestedThenProblemsThenFirst(t *testing.T)
 	}
 }
 
+func TestManagerSummariesAndResolutionKeepHealthSeparateFromReporting(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	start := time.Date(2026, 9, 8, 10, 0, 0, 0, time.UTC)
+	reportingResult := namedSuccessfulResult("reporting", start, 1, 0.1)
+	reportingResult.HealthStatus = ""
+	unhealthyResult := namedSuccessfulResult("unhealthy", start, 1, 0.1)
+	unhealthyResult.HealthStatus = "OUT_OF_SERVICE"
+	reporting := newNamedTestMonitor(t, "reporting", store, &sequenceCollector{results: []collectResult{{result: reportingResult}}})
+	unhealthy := newNamedTestMonitor(t, "unhealthy", store, &sequenceCollector{results: []collectResult{{result: unhealthyResult}}})
+	manager, err := NewManager([]ManagedTarget{
+		{Metadata: TargetMetadata{Name: "reporting"}, Monitor: reporting},
+		{Metadata: TargetMetadata{Name: "unhealthy"}, Monitor: unhealthy},
+	})
+	if err != nil {
+		t.Fatalf("NewManager() error = %v", err)
+	}
+	if _, err := manager.PollNow(context.Background(), "reporting"); err != nil {
+		t.Fatalf("PollNow(reporting) error = %v", err)
+	}
+	if _, err := manager.PollNow(context.Background(), "unhealthy"); err != nil {
+		t.Fatalf("PollNow(unhealthy) error = %v", err)
+	}
+
+	summaries := manager.Summaries()
+	if summaries[0].Latest.Status != "ok" || summaries[0].Latest.Result.HealthStatus != "" || summaries[0].Status.ConsecutivePollFailures != 0 {
+		t.Fatalf("reporting summary = %#v, want successful poll without health", summaries[0])
+	}
+	if summaries[1].Latest.Status != "ok" || summaries[1].Latest.Result.HealthStatus != "OUT_OF_SERVICE" || summaries[1].Status.ConsecutivePollFailures != 0 {
+		t.Fatalf("unhealthy summary = %#v, want successful poll with authoritative health", summaries[1])
+	}
+	if got := manager.ResolveTarget("").Metadata.Name; got != "unhealthy" {
+		t.Fatalf("ResolveTarget(empty) = %q, want explicitly unhealthy target", got)
+	}
+}
+
 func newTestManager(t *testing.T, alpha, beta *Monitor) *Manager {
 	t.Helper()
 	manager, err := NewManager([]ManagedTarget{
