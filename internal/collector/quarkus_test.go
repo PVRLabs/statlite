@@ -534,8 +534,8 @@ func TestQuarkusCollectorSupportsMetricsWithoutHealthCapability(t *testing.T) {
 	assertQuarkusSamples(t, result.Samples, []MetricSample{
 		{Key: "process_cpu_usage", Kind: MetricKindGauge, Value: 0.25, Unit: "ratio"},
 	})
-	if len(result.Events) != 0 || result.HealthStatus != "UP" {
-		t.Fatalf("result = %#v, want metrics-only reachable UP", result)
+	if len(result.Events) != 0 || result.HealthStatus != "" || result.DBHealthStatus != "" {
+		t.Fatalf("result = %#v, want metrics-only collection without synthesized health", result)
 	}
 }
 
@@ -560,8 +560,8 @@ func TestQuarkusCollectorTreatsMissingDerivedHealthAsReachable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Collect() error = %v", err)
 	}
-	if result.HealthStatus != "UP" || result.DBHealthStatus != "" || len(result.Events) != 0 {
-		t.Fatalf("result = %#v, want quiet reachable UP without database status", result)
+	if result.HealthStatus != "" || result.DBHealthStatus != "" || len(result.Events) != 0 {
+		t.Fatalf("result = %#v, want quiet optional absence without synthesized health", result)
 	}
 }
 
@@ -593,8 +593,8 @@ func TestQuarkusCollectorCachesMissingDerivedHealthUntilRestart(t *testing.T) {
 	c := NewQuarkusCollector("orders", server.URL+"/q/metrics", client, healthClient)
 	for i := 0; i < 2; i++ {
 		result, err := c.Collect(context.Background())
-		if err != nil || result.HealthStatus != "UP" || len(result.Events) != 0 {
-			t.Fatalf("Collect() #%d = (%#v, %v), want quiet UP", i+1, result, err)
+		if err != nil || result.HealthStatus != "" || result.DBHealthStatus != "" || len(result.Events) != 0 {
+			t.Fatalf("Collect() #%d = (%#v, %v), want quiet cached absence without synthesized health", i+1, result, err)
 		}
 	}
 	if healthRequests != 1 {
@@ -602,8 +602,8 @@ func TestQuarkusCollectorCachesMissingDerivedHealthUntilRestart(t *testing.T) {
 	}
 	processStart = "process_start_time_seconds 2000\n"
 	result, err := c.Collect(context.Background())
-	if err != nil || result.HealthStatus != "UP" {
-		t.Fatalf("Collect() after restart = (%#v, %v), want reprobed UP fallback", result, err)
+	if err != nil || result.HealthStatus != "" || result.DBHealthStatus != "" {
+		t.Fatalf("Collect() after restart = (%#v, %v), want reprobed absence without synthesized health", result, err)
 	}
 	if healthRequests != 2 {
 		t.Fatalf("health requests after restart = %d, want 2", healthRequests)

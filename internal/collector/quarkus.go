@@ -144,9 +144,6 @@ func (c *QuarkusCollector) Collect(ctx context.Context) (*CollectionResult, erro
 				if c.healthClient.notFoundOptional && errors.Is(err, ErrQuarkusHealthNotFound) && c.health404IsOptional() {
 					if metricsErr == nil {
 						c.markHealthAbsent(result.ProcessStartTime)
-						// A successful conventional metrics scrape proves basic
-						// application reachability when SmallRye Health is absent.
-						result.HealthStatus = "UP"
 					}
 				} else {
 					result.addEvent(EventSeverityWarning, "health_fetch_failed", "", err.Error())
@@ -156,14 +153,7 @@ func (c *QuarkusCollector) Collect(ctx context.Context) (*CollectionResult, erro
 				result.DBHealthStatus = health.DBStatus()
 				c.markHealthAvailable(result.ProcessStartTime)
 			}
-		} else if metricsErr == nil {
-			// A cached absent derived endpoint still has a reachable application.
-			result.HealthStatus = "UP"
 		}
-	} else if metricsErr == nil {
-		// Custom metrics-only targets have no authoritative health capability,
-		// but a successful metrics scrape proves basic application reachability.
-		result.HealthStatus = "UP"
 	}
 	return result, metricsErr
 }
