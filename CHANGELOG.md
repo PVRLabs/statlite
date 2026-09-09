@@ -3,7 +3,7 @@
 This file summarizes the main user-facing changes in each StatLite release.
 Detailed release notes are generated on GitHub from the commit history.
 
-## v0.4.1 (unreleased)
+## v0.4.1 — 2026-09-09
 
 - Added a TierHive deployment recipe with bootstrap, service lifecycle, and
   StatLite self-monitoring support.
