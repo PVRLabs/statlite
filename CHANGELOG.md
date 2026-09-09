@@ -3,6 +3,16 @@
 This file summarizes the main user-facing changes in each StatLite release.
 Detailed release notes are generated on GitHub from the commit history.
 
+## v0.4.1 (unreleased)
+
+- Added a TierHive deployment recipe with bootstrap, service lifecycle, and
+  StatLite self-monitoring support.
+- Corrected health-versus-reporting semantics, counter recovery, poll-identity
+  delta handling, and request-weighted latency aggregation across collectors,
+  storage, and the dashboard.
+- Clarified dashboard integration guidance, SQLite path resolution, latency
+  units, product documentation, and release-facing README links.
+
 ## v0.4.0 — 2026-09-03
 
 - Added Quarkus monitoring through a bounded Micrometer
