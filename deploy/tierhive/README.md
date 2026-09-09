@@ -45,8 +45,10 @@ The fresh-install inputs are:
 | `spring_auth_password` | No | Basic Auth password |
 | `statlite_version` | No | Latest release, resolved once to a concrete `vX.Y.Z` |
 
-The username and password must be supplied together. The generated target is
-exactly one Spring target with `metrics_source: "auto"` and a `30s` polling
+The username and password must be supplied together. The generated targets
+contain one user-configured Spring target with `metrics_source: "auto"` and a
+fixed local `statlite-self` target at
+`http://127.0.0.1:9090/statlite/metrics`. Both use the standard `30s` polling
 interval. Retention and timeout are omitted so StatLite applies its normal
 defaults. See the [configuration reference](../../docs/configuration.md) for
 the complete target schema.
@@ -155,8 +157,9 @@ StatLite VPS to connect.
 
 ## Adding targets
 
-The recipe generates one Spring target. To add another target later, edit the
-normal YAML configuration and add another entry under `targets:`. For example:
+The recipe generates one Spring target and the fixed local `statlite-self`
+target. To add another target later, edit the normal YAML configuration and
+add another entry under `targets:`. For example:
 
 ```yaml
 targets:
@@ -168,6 +171,9 @@ targets:
     type: "spring"
     url: "http://10.0.0.3:8080/actuator"
     metrics_source: "auto"
+  - name: "statlite-self"
+    type: "statlite-metrics"
+    url: "http://127.0.0.1:9090/statlite/metrics"
 ```
 
 Use the ordinary StatLite `targets:` schema, including the documented `url`

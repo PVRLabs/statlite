@@ -223,6 +223,11 @@ write_config() {
 				'      username: ${STATLITE_ACTUATOR_USERNAME}' \
 				'      password: ${STATLITE_ACTUATOR_PASSWORD}'
 		fi
+		printf '%s\n' \
+			'' \
+			'  - name: "statlite-self"' \
+			'    type: "statlite-metrics"' \
+			'    url: "http://127.0.0.1:9090/statlite/metrics"'
 	) >"$temporary_file"
 	set_file_owner root:statlite "$temporary_file"
 	chmod 0640 "$temporary_file"
