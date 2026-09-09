@@ -7,6 +7,7 @@ CONFIG_FILE=/etc/statlite/statlite.yaml
 ENV_FILE=/etc/conf.d/statlite
 DATA_DIR=/var/lib/statlite
 LOG_DIR=/var/log/statlite
+INIT_FILE=/etc/init.d/statlite
 
 fail() {
 	printf 'StatLite TierHive recipe: %s\n' "$*" >&2
@@ -110,6 +111,9 @@ ensure_runtime_prerequisites() {
 	if ! command -v curl >/dev/null 2>&1 || [ ! -r /etc/ssl/certs/ca-certificates.crt ]; then
 		apk add --no-cache ca-certificates curl
 	fi
+	if ! command -v rc-service >/dev/null 2>&1 || ! command -v rc-update >/dev/null 2>&1; then
+		apk add --no-cache openrc
+	fi
 	need curl
 	need tar
 	need mktemp
@@ -118,6 +122,9 @@ ensure_runtime_prerequisites() {
 	need sed
 	need grep
 	need sha256sum
+	need install
+	need rc-service
+	need rc-update
 }
 
 validate_platform() {
@@ -285,18 +292,114 @@ preserve_or_create_config() {
 	fi
 }
 
+write_openrc_service() {
+	temporary_file=$(mktemp "${INIT_FILE}.tmp.XXXXXX")
+	cat >"$temporary_file" <<'EOF'
+#!/sbin/openrc-run
+
+name="StatLite monitoring service"
+command="/usr/local/bin/statlite"
+command_args="--config /etc/statlite/statlite.yaml"
+command_user="statlite:statlite"
+directory="/var/lib/statlite"
+command_background="yes"
+pidfile="/run/${RC_SVCNAME}.pid"
+output_log="/var/log/statlite/statlite.log"
+error_log="/var/log/statlite/statlite.err"
+retry="SIGTERM/20/SIGKILL/5"
+required_files="/usr/local/bin/statlite /etc/statlite/statlite.yaml"
+required_dirs="/var/lib/statlite /var/log/statlite"
+
+depend() {
+	need net
+}
+
+start_pre() {
+	checkpath --directory --owner statlite:statlite --mode 0750 /var/lib/statlite
+	checkpath --directory --owner statlite:statlite --mode 0750 /var/log/statlite
+	if [ -f /etc/conf.d/statlite ]; then
+		. /etc/conf.d/statlite
+	fi
+}
+EOF
+	set_file_owner root:root "$temporary_file"
+	chmod 0755 "$temporary_file"
+	mv "$temporary_file" "$INIT_FILE"
+}
+
+config_uses_generated_listener() {
+	grep -Fqx '  listen: "127.0.0.1:9090"' "$CONFIG_FILE"
+}
+
+report_service_failure() {
+	reason=$1
+	printf 'StatLite service failure: %s\n' "$reason" >&2
+	rc-service statlite status >&2 || true
+	printf 'Inspect service logs at %s/statlite.log and %s/statlite.err.\n' "$LOG_DIR" "$LOG_DIR" >&2
+	fail "$reason"
+}
+
+enable_and_restart_service() {
+	rc-update add statlite default
+	if rc-service statlite status >/dev/null 2>&1; then
+		service_action=restart
+	else
+		service_action=start
+	fi
+	if ! rc-service statlite "$service_action"; then
+		report_service_failure "could not $service_action the OpenRC service"
+	fi
+}
+
+verify_health() {
+	attempt=1
+	max_attempts=15
+	while [ "$attempt" -le "$max_attempts" ]; do
+		if curl -fsS --max-time 2 -o /dev/null http://127.0.0.1:9090/healthz 2>/dev/null; then
+			printf '%s\n' 'StatLite health check passed: http://127.0.0.1:9090/healthz'
+			return
+		fi
+		if [ "$attempt" -lt "$max_attempts" ]; then
+			sleep 1
+		fi
+		attempt=$((attempt + 1))
+	done
+
+	printf '%s\n' 'StatLite did not become healthy at http://127.0.0.1:9090/healthz.' >&2
+	report_service_failure "local health verification failed"
+}
+
+verify_health_when_safe() {
+	if [ "$1" = fresh ] || config_uses_generated_listener; then
+		verify_health
+	else
+		sleep 1
+		if ! rc-service statlite status >/dev/null 2>&1; then
+			report_service_failure "service exited after startup with the preserved custom listener"
+		fi
+		printf '%s\n' 'Preserved configuration uses a different listener; automatic health verification was skipped.'
+		printf '%s\n' 'After confirming its address, run: curl -fsS http://HOST:PORT/healthz'
+	fi
+}
+
 main() {
 	validate_platform
 	need grep
 	if [ ! -e "$CONFIG_FILE" ]; then
+		config_state=fresh
 		validate_initial_config_inputs
+	else
+		config_state=preserved
 	fi
 	ensure_runtime_prerequisites
 	selected_version=$(resolve_version "${statlite_version:-}")
 	install_release "$selected_version"
 	ensure_account_and_directories
 	preserve_or_create_config
-	printf 'Installed StatLite %s and prepared its TierHive configuration.\n' "$selected_version"
+	write_openrc_service
+	enable_and_restart_service
+	verify_health_when_safe "$config_state"
+	printf 'Installed StatLite %s and started its TierHive service.\n' "$selected_version"
 }
 
 if [ "${STATLITE_TIERHIVE_TESTING:-0}" != 1 ]; then
