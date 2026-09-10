@@ -164,6 +164,7 @@ func TestRootServesDashboardPage(t *testing.T) {
 	}
 	content := string(body)
 	for _, want := range []string{
+		`<link rel="icon" type="image/png" href="/static/statlite-icon.png">`,
 		`<script src="` + dashboard.ChartJSPath + `"></script>`,
 		`url("` + dashboard.OrbitronFontPath + `")`,
 		"/static/statlite-icon.png",
