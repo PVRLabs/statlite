@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,3 +35,42 @@ jobs:
 
       - name: Run Go tests
         run: go test ./...
+
+      - name: Run Go static analysis
+        run: go vet ./...
+
+      - name: Check Go formatting
+        run: test -z "$(gofmt -l .)"
+
+  spring-actuator-smoke:
+    name: Spring Actuator smoke test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build StatLite
+        run: go build -trimpath -o "$RUNNER_TEMP/statlite" ./cmd/statlite
+
+      - name: Test and package Spring demo
+        working-directory: examples/spring-actuator-demo
+        run: mvn --batch-mode --no-transfer-progress package
+
+      - name: Run Spring Actuator smoke test
+        env:
+          STATLITE_BIN: ${{ runner.temp }}/statlite
+        run: ./scripts/smoke-spring-actuator.sh

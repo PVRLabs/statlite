@@ -18,3 +18,4 @@ AGENTS.local.md
 .badger-context
 .idea/
 .agent-logs/
+examples/python-fastapi-demo/__pycache__/
