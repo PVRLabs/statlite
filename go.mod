@@ -1,6 +1,6 @@
 module github.com/pvrlabs/statlite
 
-go 1.26.4
+go 1.27.1
 
 require (
 	github.com/ebitengine/purego v0.10.2
