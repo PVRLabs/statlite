@@ -6,6 +6,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/PVRLabs/statlite?style=flat)](https://github.com/PVRLabs/statlite/stargazers)
 [![GitHub release](https://img.shields.io/github/v/release/PVRLabs/statlite)](https://github.com/PVRLabs/statlite/releases)
 [![Go powered](https://img.shields.io/github/go-mod/go-version/PVRLabs/statlite?label=Go%20powered&logo=go&logoColor=white)](go.mod)
+[![Frameworks: Spring Boot · Quarkus](https://img.shields.io/badge/Frameworks-Spring%20Boot%20%C2%B7%20Quarkus-6db33f)](docs/integrations.md)
 [![CI](https://github.com/PVRLabs/statlite/actions/workflows/test.yml/badge.svg)](https://github.com/PVRLabs/statlite/actions/workflows/test.yml)
 [![License](https://img.shields.io/github/license/PVRLabs/statlite)](LICENSE)
 
