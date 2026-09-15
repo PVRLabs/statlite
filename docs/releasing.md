@@ -1,330 +1,265 @@
 # Releasing StatLite
 
-This document describes the public OSS release process for StatLite.
+StatLite releases use a semi-automated maintainer workflow. The GitHub Actions
+release workflow creates the tag, builds and verifies the release archives,
+publishes the GitHub Release, and publishes multi-platform GHCR images. The
+Homebrew tap update remains a separate manual dispatch after those checks pass.
 
-Release tags use exact versions, such as `vX.Y.Z`. The `main` branch keeps a
-development version, such as `vX.Y.Z-dev`, so source builds are clearly
-distinguishable from published release binaries.
+The maintainer flow is:
+
+`prepare release commit → push and verify CI → dispatch StatLite release → verify GitHub/GHCR → bump main to next -dev → dispatch Homebrew updater → install checks → announcement`
 
 ## What Gets Released
 
-The release workflow builds archives for:
+For release `vX.Y.Z`, the release workflow produces archives for Linux and macOS
+on amd64 and arm64, plus SHA-256 checksum files. It publishes GHCR images tagged
+`X.Y.Z` and `latest` from the same multi-platform build. The image embeds the
+release version, which is returned by `statlite --version`.
 
-- macOS `amd64`
-- macOS `arm64`
-- Linux `amd64`
-- Linux `arm64`
+The workflow is started manually from `main` with an explicit `vX.Y.Z` input.
+It checks that the dispatch is from `main`, the version format is valid, the
+checked-in StatLite version matches, and the changelog contains the release. It
+creates the tag at the dispatched commit. It does not update the Homebrew tap.
 
-Each artifact is a `.tar.gz` containing the `statlite` binary, standalone
-third-party dashboard license notices, and a matching `.sha256` file. The
-dashboard assets are embedded in the binary; container images do not include
-separate license files. Windows artifacts are not part of the initial release.
-
-Archive names use this pattern:
-
-```text
-statlite_X.Y.Z_darwin_amd64.tar.gz
-statlite_X.Y.Z_darwin_arm64.tar.gz
-statlite_X.Y.Z_linux_amd64.tar.gz
-statlite_X.Y.Z_linux_arm64.tar.gz
-```
-
-The version component omits the leading `v` from the Git tag.
-
-## Versioning
-
-`internal/version.Version` is the default version for source builds. Release
-builds override it from the Git tag with:
-
-```bash
--ldflags="-s -w -X github.com/pvrlabs/statlite/internal/version.Version=${RELEASE_VERSION}"
-```
-
-That means a source build from `main` reports the checked-in `-dev` version,
-while release archives report the exact tag:
-
-```bash
-statlite --version
-```
-
-`GET /healthz` exposes the same version string and SQLite readiness. It is not
-a dashboard metrics endpoint.
-
-## Release Journal
-
-Keep a local process journal at `release/release-vX.Y.Z-journal.md` for each
-release. The `release/` directory is ignored because the journal is an
-operator's working record, not a release artifact. Start the journal before
-the pre-release checks and record the commands, results, blockers, publication
-verification, and post-release documentation work there.
+The manual `:dev` image workflow remains separate. See [Docker development
+images](docker.md) for its process.
 
 ## Before Releasing
 
-1. Choose the release version:
+Prepare a release commit on `main`:
+
+1. Set `RELEASE_VERSION` below to the intended version, including the `v`
+   prefix, for example `v0.4.2`.
+2. Update the changelog with a heading for that exact version.
+3. Update `internal/version/version.go` to that exact version, including the
+   `v` prefix.
+4. Review the changes and run the relevant Go and web checks, then build StatLite
+   locally.
+5. Commit the release preparation changes.
 
 ```bash
-RELEASE_VERSION=vX.Y.Z
+export RELEASE_VERSION=v0.4.2
 ```
 
-2. Update `CHANGELOG.md` with the main user-facing changes for the release.
-3. Confirm `internal/version/version.go` on `main` contains a `-dev` version.
-4. Run the Go and dashboard JavaScript test suites:
+## 1. Push the Release Commit and Verify CI
+
+Push the release commit to `main` and confirm the `test.yml` workflow succeeds
+for that commit before publishing.
 
 ```bash
-go test ./...
-node --test internal/dashboard/static/dashboard.test.js
+git push origin main
+gh run list --repo PVRLabs/statlite --workflow test.yml --branch main --limit 5
 ```
 
-5. Build a local release-style binary and confirm the version override:
+Find the successful `test.yml` run for the pushed commit in the list, then set
+its ID and watch it finish:
 
 ```bash
-go build -trimpath -ldflags="-s -w -X github.com/pvrlabs/statlite/internal/version.Version=${RELEASE_VERSION}" -o statlite ./cmd/statlite
-./statlite --version
+export CI_RUN_ID=123456789
+gh run watch "$CI_RUN_ID" --repo PVRLabs/statlite --exit-status
 ```
 
-6. Review `.github/workflows/release.yml` if archive names, platforms, or the
-   binary path changed.
+Dispatch the release from `main` only after CI for the pushed release commit
+has passed.
 
-## Operator Authentication
+## 2. Dispatch the StatLite Release
 
-Run these commands as the release operator before pushing the tag or publishing
-the container. Do not put tokens in commands, shell history, repository files,
-or chat messages.
-
-Authenticate GitHub CLI and configure Git to use it for the HTTPS remote:
+Authenticate with GitHub CLI, then start `release.yml` with the explicit
+version. This creates the tag at the dispatched commit and publishes the
+GitHub Release and GHCR images.
 
 ```bash
-gh auth login --hostname github.com --git-protocol https --web
 gh auth status
-ORIGIN_URL="$(git remote get-url origin)"
-case "${ORIGIN_URL}" in
-  https://*) gh auth setup-git ;;
-  *) echo "origin is not HTTPS; skip gh auth setup-git" ;;
-esac
+gh run list --repo PVRLabs/statlite --workflow release.yml --limit 5
+gh workflow run release.yml --repo PVRLabs/statlite --ref main \
+  -f version="$RELEASE_VERSION"
+gh run list --repo PVRLabs/statlite --workflow release.yml --limit 5
 ```
 
-Authenticate Docker to GHCR separately. The GitHub CLI login does not provide
-Docker registry credentials. Use a GitHub classic personal access token with
-`read:packages` and `write:packages`. Enter it through a hidden prompt:
+Identify the new dispatch run, set its ID, and watch it finish:
+
+```bash
+export RELEASE_RUN_ID=123456789
+gh run watch "$RELEASE_RUN_ID" --repo PVRLabs/statlite --exit-status
+gh run view "$RELEASE_RUN_ID" --repo PVRLabs/statlite
+```
+
+The run should be a `workflow_dispatch` from `main` with the requested version.
+The workflow validates the release invariants, creates the tag, reuses the
+existing archive build and release-note generation, checks the expected release
+assets and checksums, publishes the two GHCR tags for `linux/amd64` and
+`linux/arm64`, and checks the image manifest and `--version` output.
+
+## 3. Verify GitHub and GHCR
+
+Check the GitHub Release assets and inspect both image tags. The first public
+pull can take a short time to work after the image is pushed.
+
+```bash
+gh release view "$RELEASE_VERSION" --repo PVRLabs/statlite
+docker buildx imagetools inspect "ghcr.io/pvrlabs/statlite:${RELEASE_VERSION#v}"
+docker buildx imagetools inspect ghcr.io/pvrlabs/statlite:latest
+docker pull "ghcr.io/pvrlabs/statlite:${RELEASE_VERSION#v}"
+docker run --rm "ghcr.io/pvrlabs/statlite:${RELEASE_VERSION#v}" --version
+```
+
+Start the published image and verify that the server becomes ready and serves
+its self-metrics endpoint and dashboard:
+
+```bash
+set -euo pipefail
+image="ghcr.io/pvrlabs/statlite:${RELEASE_VERSION#v}"
+container_id="$(docker run -d -p 127.0.0.1:19090:9090 "$image")"
+trap 'docker rm -f "$container_id" >/dev/null 2>&1 || true' EXIT
+
+for attempt in $(seq 1 30); do
+  if curl -fsS http://127.0.0.1:19090/healthz >/dev/null; then
+    break
+  fi
+  sleep 1
+done
+
+curl -fsS http://127.0.0.1:19090/healthz \
+  | grep -F "\"version\":\"$RELEASE_VERSION\"" >/dev/null
+curl -fsS http://127.0.0.1:19090/statlite/metrics \
+  | grep -F '"schema":"statlite-metrics/v1"' >/dev/null
+curl -fsS http://127.0.0.1:19090/ \
+  | grep -F '<title>StatLite</title>' >/dev/null
+docker rm -f "$container_id" >/dev/null
+trap - EXIT
+```
+
+Confirm the release has all expected platform archives and checksum files, the
+GHCR manifests include amd64 and arm64, and the container reports the intended
+release version. The smoke check also confirms the image starts with the
+release version, responds through `/healthz` and `/statlite/metrics`, and serves
+the dashboard page. It uses the local Docker credentials; an anonymous pull
+check is optional when GHCR package visibility needs separate verification.
+
+## 4. Bump `main` to the Next Development Version
+
+After the release and GHCR checks pass, update the checked-in StatLite version
+on `main` to the next `-dev` version, for example `v0.4.3-dev`, then commit and
+push the change. Verify its `test.yml` run succeeds.
+
+## 5. Dispatch the Homebrew Updater
+
+After the StatLite and GHCR release succeeds and `main` has its next development
+version, manually dispatch the canonical
+[`update-formula.yml`](https://github.com/PVRLabs/homebrew-tap/actions/workflows/update-formula.yml)
+workflow in `PVRLabs/homebrew-tap`. Select the `statlite` formula and enter the
+release version, including the `v` prefix, for example `v0.4.2`. From the tap
+repository, dispatch and monitor it with:
+
+```bash
+gh workflow run update-formula.yml --repo PVRLabs/homebrew-tap --ref main \
+  -f formula=statlite -f version="$RELEASE_VERSION"
+gh run list --repo PVRLabs/homebrew-tap --workflow update-formula.yml --limit 5
+```
+
+Identify the new run, then confirm it succeeded and inspect the resulting
+formula change on the tap's `main` branch:
+
+```bash
+export TAP_RUN_ID=123456789
+gh run watch "$TAP_RUN_ID" --repo PVRLabs/homebrew-tap --exit-status
+gh run view "$TAP_RUN_ID" --repo PVRLabs/homebrew-tap
+```
+
+The tap updater stays an independent manual operation. StatLite does not trigger
+the tap workflow automatically.
+
+## 6. Install Checks and Announcement
+
+Install or upgrade StatLite with Homebrew, verify the installed version, and
+run the formula checks:
+
+```bash
+brew update
+brew audit --formula pvrlabs/tap/statlite
+if brew list --formula statlite >/dev/null 2>&1; then
+  brew upgrade pvrlabs/tap/statlite
+else
+  brew install pvrlabs/tap/statlite
+fi
+brew test pvrlabs/tap/statlite
+statlite --version
+```
+
+Confirm the output is `statlite $RELEASE_VERSION`. Once the GitHub Release,
+GHCR images, and tap formula are verified, announce the release.
+
+## Recovery
+
+Publication can leave durable results before a later step fails: the tag can
+exist before the archive build finishes, the GitHub Release can exist before
+GHCR publication succeeds, and `latest` may have been updated before container
+verification fails.
+
+For an ordinary transient failure, inspect the failed Actions run and its tag.
+If the workflow-created lightweight tag still points to the release commit,
+rerun that workflow run with **Re-run all jobs**. The release workflow accepts
+that matching tag and can replace the release assets while publication is
+retried.
+
+If the tag is annotated or points to a different commit, stop and inspect it
+manually before taking further release action. Do not try to repair or delete
+release state as part of the routine retry path.
+
+## Manual Fallback
+
+Use this only when the release workflow cannot be used. If a tag or partial
+release already exists, inspect that state first. Set `RELEASE_VERSION` and
+confirm the current `main` commit has the matching checked-in version and
+changelog entry. If the release tag does not exist, create it at that prepared
+commit:
+
+```bash
+export RELEASE_VERSION=v0.4.2
+export PLAIN_VERSION="${RELEASE_VERSION#v}"
+export RELEASE_SHA="$(git rev-parse HEAD)"
+git tag "$RELEASE_VERSION" "$RELEASE_SHA"
+git push origin "refs/tags/$RELEASE_VERSION"
+```
+
+Build the same four archives and portable checksums locally:
+
+```bash
+mkdir -p dist
+for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64; do
+  GOOS="${target%/*}"
+  GOARCH="${target#*/}"
+  out_dir="dist/statlite_${GOOS}_${GOARCH}"
+  archive="statlite_${PLAIN_VERSION}_${GOOS}_${GOARCH}.tar.gz"
+  mkdir -p "$out_dir"
+  CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" go build -trimpath \
+    -ldflags="-s -w -X github.com/pvrlabs/statlite/internal/version.Version=$RELEASE_VERSION" \
+    -o "$out_dir/statlite" ./cmd/statlite
+  cp internal/dashboard/static/vendor/CHARTJS-LICENSE.md "$out_dir/LICENSE-Chart.js.md"
+  cp internal/dashboard/static/fonts/ORBITRON-LICENSE.txt "$out_dir/LICENSE-Orbitron.txt"
+  tar -czf "dist/$archive" -C "$out_dir" statlite LICENSE-Chart.js.md LICENSE-Orbitron.txt
+  (cd dist && shasum -a 256 "$archive" > "$archive.sha256")
+done
+bash scripts/generate-release-notes.sh "$RELEASE_VERSION" > dist/release-notes.md
+gh release create "$RELEASE_VERSION" --repo PVRLabs/statlite \
+  --verify-tag --title "StatLite $RELEASE_VERSION" \
+  --notes-file dist/release-notes.md dist/*.tar.gz dist/*.tar.gz.sha256
+```
+
+For GHCR, authenticate with a token that can publish packages, then publish
+both tags from the same multi-platform build:
 
 ```bash
 read -s GHCR_TOKEN
 printf '\n'
 printf '%s' "$GHCR_TOKEN" | docker login ghcr.io \
-  --username YOUR_GITHUB_USERNAME \
-  --password-stdin
+  --username YOUR_GITHUB_USERNAME --password-stdin
 unset GHCR_TOKEN
+docker buildx build --platform linux/amd64,linux/arm64 \
+  --build-arg VERSION="$RELEASE_VERSION" \
+  --tag "ghcr.io/pvrlabs/statlite:$PLAIN_VERSION" \
+  --tag ghcr.io/pvrlabs/statlite:latest --push .
 ```
 
-If the organization requires SSO, authorize the token for the organization.
-Before the first push, confirm the organization allows public package creation.
-The package itself may not exist until the first authenticated push.
-
-## Release Steps
-
-1. Commit any release-readiness changes.
-2. Create a Git tag that matches the release version:
-
-```bash
-git tag "${RELEASE_VERSION}"
-```
-
-3. Push the tag:
-
-```bash
-git push origin "${RELEASE_VERSION}"
-```
-
-4. Confirm the `release` workflow publishes all four archives and checksums to
-   the GitHub Release. Find the run for this release tag, then monitor that run:
-
-```bash
-RUN_ID="$(gh run list \
-  --workflow release.yml \
-  --limit 20 \
-  --json databaseId,headBranch,event,createdAt \
-  --jq ".[] | select(.headBranch == \"${RELEASE_VERSION}\" and .event == \"push\") | .databaseId" \
-  | head -n 1)"
-test -n "${RUN_ID}" || { echo "release workflow run not found"; exit 1; }
-gh run watch "${RUN_ID}" --exit-status
-gh release view "${RELEASE_VERSION}" --json tagName,name,isDraft,isPrerelease,assets,url
-```
-
-5. Publish the versioned container image and `:latest` using the section below
-   before changing the source version to the next development version.
-6. After the release archives and container images are public, bump
-   `internal/version/version.go` on `main` to the next development version, for
-   example `v0.1.1-dev` after releasing `v0.1.0`.
-7. Commit and push the `-dev` bump.
-8. Update and publish the Homebrew tap as described below, then complete the
-   installer and Homebrew verification for the release.
-
-The workflow is triggered by pushes of `v*` tags.
-
-## Publishing the Container Image
-
-Container publication is currently manual. Publish the versioned image and
-`:latest` from the same multi-platform build.
-
-On macOS, StatLite release work uses [Colima](https://github.com/abiosoft/colima)
-as the Docker runtime. Start it before running the container commands and
-confirm that the active Docker context points to the running Colima daemon:
-
-```bash
-colima start
-docker context show
-docker info
-```
-
-Confirm the active Buildx builder supports both target platforms:
-
-```bash
-docker buildx inspect --bootstrap
-```
-
-Authenticate Docker to `ghcr.io` without storing credentials in the repository
-or shell history. This section must run before the post-release `-dev` bump.
-Check out the release tag, with `RELEASE_VERSION` set as described above:
-
-```bash
-git switch --detach "${RELEASE_VERSION}"
-```
-
-Then run the build from the repository root:
-
-```bash
-docker buildx build \
-  --platform linux/amd64,linux/arm64 \
-  --build-arg VERSION="${RELEASE_VERSION}" \
-  --tag "ghcr.io/pvrlabs/statlite:${RELEASE_VERSION#v}" \
-  --tag ghcr.io/pvrlabs/statlite:latest \
-  --push \
-  .
-```
-
-For example, `RELEASE_VERSION=v0.2.1` publishes these tags:
-
-```text
-ghcr.io/pvrlabs/statlite:0.2.1
-ghcr.io/pvrlabs/statlite:latest
-```
-
-Both images report `statlite v0.2.1`.
-
-After the initial authenticated push creates the package, confirm the GHCR
-package visibility is public before testing anonymous pulls.
-
-Inspect both manifests and confirm they contain `linux/amd64` and
-`linux/arm64`:
-
-```bash
-docker buildx imagetools inspect \
-  "ghcr.io/pvrlabs/statlite:${RELEASE_VERSION#v}"
-docker buildx imagetools inspect ghcr.io/pvrlabs/statlite:latest
-```
-
-Pull the versioned image and verify its version:
-
-```bash
-docker pull "ghcr.io/pvrlabs/statlite:${RELEASE_VERSION#v}"
-docker run --rm "ghcr.io/pvrlabs/statlite:${RELEASE_VERSION#v}" --version
-```
-
-Run the published image and verify `/healthz`, `/statlite/metrics`, the
-dashboard, and the `statlite-self` target. Then confirm the public package can
-be pulled without GHCR credentials:
-
-```bash
-docker run --rm \
-  -p 127.0.0.1:9090:9090 \
-  "ghcr.io/pvrlabs/statlite:${RELEASE_VERSION#v}"
-```
-
-After stopping that container, verify the public `:latest` image:
-
-```bash
-ANON_DOCKER_HOST="$(docker context inspect "$(docker context show)" \
-  --format '{{ (index .Endpoints "docker").Host }}')"
-
-(
-  ANON_DOCKER_CONFIG="$(mktemp -d)"
-  trap 'rm -rf "${ANON_DOCKER_CONFIG}"' EXIT
-  DOCKER_CONFIG="${ANON_DOCKER_CONFIG}" \
-    DOCKER_HOST="${ANON_DOCKER_HOST}" \
-    docker pull ghcr.io/pvrlabs/statlite:latest
-)
-```
-
-Run the anonymously pulled image and repeat the health, metrics, dashboard, and
-self-monitoring checks. The temporary Docker configuration leaves the
-maintainer's normal Docker credentials unchanged and keeps the active Docker
-daemon endpoint for local Unix-socket contexts such as Colima.
-
-After container verification, return to `main` before performing the post-release
-`-dev` version bump:
-
-```bash
-git switch main
-```
-
-## Verification Checklist
-
-- The GitHub Release page exists for the new tag.
-- The release has four `.tar.gz` assets and four `.tar.gz.sha256` assets.
-- The release tag contains `scripts/systemd.sh`, and the tagged raw GitHub URL
-  is accessible.
-- Each archive contains a single `statlite` binary.
-- `statlite --version` reports the release tag.
-- `/healthz` reports the same version and SQLite readiness.
-- Source builds from `main` after the release report the next `-dev` version.
-- `go test ./...` passes.
-- `go build -o statlite ./cmd/statlite` works for source users.
-- README Quick Start still works from a clean clone.
-- The versioned container manifest contains `linux/amd64` and `linux/arm64`.
-- The `:latest` container manifest contains `linux/amd64` and `linux/arm64`.
-- The versioned container reports `statlite ${RELEASE_VERSION}` from `--version`.
-- An anonymous pull of `:latest` succeeds, and the image passes health, metrics,
-  dashboard, and self-monitoring checks.
-
-## Publishing the Homebrew Tap
-
-The Homebrew formula is maintained in the separate `PVRLabs/homebrew-tap`
-repository. Update that repository independently after the GitHub Release assets
-are available.
-
-From the tap checkout, update `Formula/statlite.rb`:
-
-- Set each platform URL to the matching `${RELEASE_VERSION}` GitHub Release
-  archive and update the four `sha256` values from those archives.
-
-Commit and publish the formula, then refresh and validate the tap by name:
-
-```bash
-git diff --check
-git add Formula/statlite.rb
-git commit -m "statlite: update to ${RELEASE_VERSION#v}"
-git push origin main
-brew update
-brew audit --formula pvrlabs/tap/statlite
-brew upgrade pvrlabs/tap/statlite
-brew test pvrlabs/tap/statlite
-statlite --version
-```
-
-Verify installation through the tap and confirm the binary reports the release
-version:
-
-```bash
-brew update
-brew upgrade pvrlabs/tap/statlite
-statlite --version
-```
-
-The output should be `statlite ${RELEASE_VERSION}`.
-
-## Manual Fallback
-
-If the release workflow is unavailable, build the archives locally with the same
-platform matrix, archive names, and `-ldflags` version override used by
-`.github/workflows/release.yml`, then upload the archives and checksum files to
-the GitHub Release manually.
+Then complete the GitHub/GHCR verification above before dispatching the
+Homebrew updater.
