@@ -26,10 +26,11 @@ images](docker.md) for its process.
 
 Before the first release workflow publication, grant the `PVRLabs/statlite`
 repository **Write** access under the GHCR package's **Manage Actions access**
-settings. The workflow's `packages: write` permission does not by itself grant
-an existing package access. If publication fails with `permission_denied:
-write_package`, add that access and rerun all jobs in the same workflow run
-while its lightweight release tag still points to the intended release commit.
+settings; this is normally a one-time setup. The workflow's `packages: write`
+permission does not by itself grant an existing package access. If publication
+fails with `permission_denied: write_package`, add that access and rerun all
+jobs in the same workflow run while its lightweight release tag still points
+to the intended release commit.
 
 ## Before Releasing
 
@@ -149,14 +150,14 @@ After the release and GHCR checks pass, update the checked-in StatLite version
 on `main` to the next `-dev` version, for example `v0.4.3-dev`, then commit and
 push the change. Verify its `test.yml` run succeeds.
 
-## 5. Dispatch the Homebrew Updater
+## 5. Dispatch the Homebrew Updater and Verify Installation
 
 After the StatLite and GHCR release succeeds and `main` has its next development
 version, manually dispatch the canonical
 [`update-formula.yml`](https://github.com/PVRLabs/homebrew-tap/actions/workflows/update-formula.yml)
 workflow in `PVRLabs/homebrew-tap`. Select the `statlite` formula and enter the
-release version, including the `v` prefix, for example `v0.4.2`. From the tap
-repository, dispatch and monitor it with:
+release version, including the `v` prefix, for example `v0.4.2`. From the
+StatLite checkout, dispatch it and identify the new run:
 
 ```bash
 gh workflow run update-formula.yml --repo PVRLabs/homebrew-tap --ref main \
@@ -164,37 +165,23 @@ gh workflow run update-formula.yml --repo PVRLabs/homebrew-tap --ref main \
 gh run list --repo PVRLabs/homebrew-tap --workflow update-formula.yml --limit 5
 ```
 
-Identify the new run, then confirm it succeeded and inspect the resulting
-formula change on the tap's `main` branch:
+Identify the new run, then run the local verification script. It waits for the
+tap updater to finish successfully before touching the local Homebrew install,
+then audits, installs or upgrades, tests the formula, and confirms its version.
 
 ```bash
 export TAP_RUN_ID=123456789
-gh run watch "$TAP_RUN_ID" --repo PVRLabs/homebrew-tap --exit-status
+scripts/verify-homebrew-release.sh "$TAP_RUN_ID" "$RELEASE_VERSION"
 gh run view "$TAP_RUN_ID" --repo PVRLabs/homebrew-tap
 ```
 
 The tap updater stays an independent manual operation. StatLite does not trigger
 the tap workflow automatically.
 
-## 6. Install Checks and Announcement
+## 6. Announcement
 
-Install or upgrade StatLite with Homebrew, verify the installed version, and
-run the formula checks:
-
-```bash
-brew update
-brew audit --formula pvrlabs/tap/statlite
-if brew list --formula statlite >/dev/null 2>&1; then
-  brew upgrade pvrlabs/tap/statlite
-else
-  brew install pvrlabs/tap/statlite
-fi
-brew test pvrlabs/tap/statlite
-statlite --version
-```
-
-Confirm the output is `statlite $RELEASE_VERSION`. Once the GitHub Release,
-GHCR images, and tap formula are verified, announce the release.
+Once the GitHub Release, GHCR images, and tap formula are verified, announce
+the release.
 
 ## Recovery
 

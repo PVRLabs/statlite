@@ -21,6 +21,7 @@ RUN CGO_ENABLED=0 \
       ./cmd/statlite
 
 FROM alpine:3.22.1
+LABEL org.opencontainers.image.source="https://github.com/PVRLabs/statlite"
 
 RUN apk add --no-cache ca-certificates \
     && addgroup -S statlite \
