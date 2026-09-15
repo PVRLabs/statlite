@@ -100,7 +100,15 @@ targets:
 }
 
 func TestLoadRejectsHealthURLForNonQuarkusTarget(t *testing.T) {
-	path := writeConfig(t, `
+	tests := []struct {
+		targetType, url, healthURL string
+	}{
+		{targetType: TargetTypeSpring, url: "http://example.com/actuator", healthURL: "http://example.com/health"},
+		{targetType: TargetTypeStatliteMetrics, url: "http://example.com/statlite/metrics", healthURL: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.targetType, func(t *testing.T) {
+			path := writeConfig(t, `
 server:
   listen: "127.0.0.1:9090"
 storage:
@@ -109,13 +117,15 @@ polling:
   interval: "30s"
 targets:
   - name: app
-    type: spring
-    url: "http://example.com/actuator"
-    health_url: "http://example.com/health"
+    type: "`+tt.targetType+`"
+    url: "`+tt.url+`"
+    health_url: "`+tt.healthURL+`"
 `)
-	_, err := Load(path)
-	if err == nil || !strings.Contains(err.Error(), "health_url is supported only for type quarkus") {
-		t.Fatalf("Load() error = %v, want Quarkus-only health_url error", err)
+			_, err := Load(path)
+			if err == nil || !strings.Contains(err.Error(), "health_url is supported only for type quarkus") {
+				t.Fatalf("Load() error = %v, want Quarkus-only health_url error", err)
+			}
+		})
 	}
 }
 

@@ -179,12 +179,17 @@ func (c *Config) validate() error {
 	if _, err := time.ParseDuration(c.Polling.Timeout); err != nil {
 		return fmt.Errorf("polling.timeout: invalid duration: %w", err)
 	}
+	return c.validateTargets()
+}
+
+func (c *Config) validateTargets() error {
 	if len(c.Targets) == 0 {
 		return fmt.Errorf("at least one target is required")
 	}
 	seenTargetNames := make(map[string]int, len(c.Targets))
-	for i, t := range c.Targets {
-		name := strings.TrimSpace(t.Name)
+	for i := range c.Targets {
+		target := &c.Targets[i]
+		name := strings.TrimSpace(target.Name)
 		if name == "" {
 			return fmt.Errorf("targets[%d].name is required", i)
 		}
@@ -192,84 +197,116 @@ func (c *Config) validate() error {
 			return fmt.Errorf("targets[%d].name %q duplicates targets[%d].name", i, name, previous)
 		}
 		seenTargetNames[name] = i
-		c.Targets[i].Name = name
+		target.Name = name
 
-		targetType := t.Type
+		targetType := target.Type
 		if targetType == "" {
 			targetType = TargetTypeSpring
-			c.Targets[i].Type = targetType
+			target.Type = targetType
 		}
 		switch targetType {
 		case TargetTypeSpring:
-			if t.URL == "" {
-				return fmt.Errorf("targets[%d].url is required for type spring", i)
+			if err := validateSpringTarget(i, target); err != nil {
+				return err
 			}
-			if !t.legacyActuatorUserinfo && urlHasUserinfo(t.URL) {
-				return fmt.Errorf("targets[%d].url must not contain embedded credentials; use the explicit auth configuration instead", i)
+		case TargetTypeQuarkus:
+			if err := validateQuarkusTarget(i, target); err != nil {
+				return err
 			}
-			if t.MetricsSource == "" {
-				c.Targets[i].MetricsSource = SpringMetricsSourceAuto
-			} else if t.MetricsSource != SpringMetricsSourceAuto && t.MetricsSource != SpringMetricsSourcePrometheus && t.MetricsSource != SpringMetricsSourceActuator {
-				return fmt.Errorf("targets[%d].metrics_source: unsupported value %q (supported: auto, prometheus, actuator)", i, t.MetricsSource)
-			}
-			if t.legacyActuatorUserinfo {
-				if t.Auth != nil {
-					return fmt.Errorf("targets[%d].auth cannot be combined with embedded credentials from deprecated actuator_base_url; use either the legacy URL credentials or url with explicit auth configuration", i)
-				}
-				if t.MetricsSource == SpringMetricsSourcePrometheus {
-					return fmt.Errorf("targets[%d].metrics_source: prometheus cannot be used with embedded credentials from deprecated actuator_base_url; use metrics_source: actuator or url with explicit auth configuration", i)
-				}
-				c.Targets[i].MetricsSource = SpringMetricsSourceActuator
-			}
-		case TargetTypeQuarkus, TargetTypeStatliteMetrics:
-			if t.URL == "" {
-				return fmt.Errorf("targets[%d].url is required for type %s", i, targetType)
-			}
-			if targetType == TargetTypeQuarkus {
-				if t.actuatorURLSet {
-					return fmt.Errorf("targets[%d].actuator_base_url is supported only for type spring", i)
-				}
-				if t.metricsSourceSet {
-					return fmt.Errorf("targets[%d].metrics_source is supported only for type spring", i)
-				}
-				if t.collectHostSet {
-					return fmt.Errorf("targets[%d].collect_host_metrics is supported only for type spring", i)
-				}
-				if err := validateQuarkusURL(t.URL); err != nil {
-					return fmt.Errorf("targets[%d].url for type quarkus: %w", i, err)
-				}
-				if t.HealthURL != "" {
-					if err := validateQuarkusURL(t.HealthURL); err != nil {
-						return fmt.Errorf("targets[%d].health_url for type quarkus: %w", i, err)
-					}
-				}
-			}
-			if t.MetricsSource != "" {
-				return fmt.Errorf("targets[%d].metrics_source is supported only for type spring", i)
+		case TargetTypeStatliteMetrics:
+			if err := validateStatliteMetricsTarget(i, target); err != nil {
+				return err
 			}
 		default:
 			return fmt.Errorf("targets[%d].type: unsupported type %q (supported: spring, quarkus, statlite-metrics)", i, targetType)
 		}
-		if t.Auth != nil {
+		if target.Auth != nil {
 			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus {
 				return fmt.Errorf("targets[%d].auth is currently supported only for type spring and quarkus", i)
 			}
-			if t.Auth.Type != "basic" {
-				return fmt.Errorf("targets[%d].auth.type: unsupported type %q (only 'basic' is supported)", i, t.Auth.Type)
+			if target.Auth.Type != "basic" {
+				return fmt.Errorf("targets[%d].auth.type: unsupported type %q (only 'basic' is supported)", i, target.Auth.Type)
 			}
-			if t.Auth.Username == "" {
+			if target.Auth.Username == "" {
 				return fmt.Errorf("targets[%d].auth.username is required when auth is configured", i)
 			}
-			if t.Auth.Password == "" {
+			if target.Auth.Password == "" {
 				return fmt.Errorf("targets[%d].auth.password is required when auth is configured", i)
 			}
 		}
-		if t.CollectHostMetrics && targetType != TargetTypeSpring {
+		if (target.CollectHostMetrics || target.collectHostSet) && targetType != TargetTypeSpring {
 			return fmt.Errorf("targets[%d].collect_host_metrics is supported only for type spring", i)
 		}
-		if t.healthURLSet && targetType != TargetTypeQuarkus {
+		if (target.HealthURL != "" || target.healthURLSet) && targetType != TargetTypeQuarkus {
 			return fmt.Errorf("targets[%d].health_url is supported only for type quarkus", i)
 		}
+	}
+	return nil
+}
+
+func validateSpringTarget(index int, target *TargetConfig) error {
+	if target.URL == "" {
+		return fmt.Errorf("targets[%d].url is required for type spring", index)
+	}
+	if !target.legacyActuatorUserinfo && urlHasUserinfo(target.URL) {
+		return fmt.Errorf("targets[%d].url must not contain embedded credentials; use the explicit auth configuration instead", index)
+	}
+	if target.MetricsSource == "" {
+		target.MetricsSource = SpringMetricsSourceAuto
+	} else if target.MetricsSource != SpringMetricsSourceAuto && target.MetricsSource != SpringMetricsSourcePrometheus && target.MetricsSource != SpringMetricsSourceActuator {
+		return fmt.Errorf("targets[%d].metrics_source: unsupported value %q (supported: auto, prometheus, actuator)", index, target.MetricsSource)
+	}
+	if target.legacyActuatorUserinfo {
+		if target.Auth != nil {
+			return fmt.Errorf("targets[%d].auth cannot be combined with embedded credentials from deprecated actuator_base_url; use either the legacy URL credentials or url with explicit auth configuration", index)
+		}
+		if target.MetricsSource == SpringMetricsSourcePrometheus {
+			return fmt.Errorf("targets[%d].metrics_source: prometheus cannot be used with embedded credentials from deprecated actuator_base_url; use metrics_source: actuator or url with explicit auth configuration", index)
+		}
+		target.MetricsSource = SpringMetricsSourceActuator
+	}
+	return nil
+}
+
+func validateQuarkusTarget(index int, target *TargetConfig) error {
+	if target.URL == "" {
+		return fmt.Errorf("targets[%d].url is required for type quarkus", index)
+	}
+	if target.ActuatorBaseURL != "" || target.actuatorURLSet {
+		return fmt.Errorf("targets[%d].actuator_base_url is supported only for type spring", index)
+	}
+	if target.metricsSourceSet {
+		return fmt.Errorf("targets[%d].metrics_source is supported only for type spring", index)
+	}
+	if target.collectHostSet {
+		return fmt.Errorf("targets[%d].collect_host_metrics is supported only for type spring", index)
+	}
+	if err := validateQuarkusURL(target.URL); err != nil {
+		return fmt.Errorf("targets[%d].url for type quarkus: %w", index, err)
+	}
+	if target.HealthURL != "" {
+		if err := validateQuarkusURL(target.HealthURL); err != nil {
+			return fmt.Errorf("targets[%d].health_url for type quarkus: %w", index, err)
+		}
+	}
+	if target.MetricsSource != "" {
+		return fmt.Errorf("targets[%d].metrics_source is supported only for type spring", index)
+	}
+	return nil
+}
+
+func validateStatliteMetricsTarget(index int, target *TargetConfig) error {
+	if target.URL == "" {
+		return fmt.Errorf("targets[%d].url is required for type %s", index, target.Type)
+	}
+	if target.MetricsSource != "" {
+		return fmt.Errorf("targets[%d].metrics_source is supported only for type spring", index)
+	}
+	if target.ActuatorBaseURL != "" || target.actuatorURLSet {
+		return fmt.Errorf("targets[%d].actuator_base_url is supported only for type spring", index)
+	}
+	if target.metricsSourceSet {
+		return fmt.Errorf("targets[%d].metrics_source is supported only for type spring", index)
 	}
 	return nil
 }

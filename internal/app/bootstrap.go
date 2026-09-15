@@ -43,68 +43,80 @@ func NewMonitorManager(targets []config.TargetConfig, store *storage.Store, time
 func newCollector(target config.TargetConfig, timeout time.Duration) (monitor.Collector, error) {
 	switch target.Type {
 	case "", config.TargetTypeSpring:
-		var auth *collector.BasicAuth
-		if target.Auth != nil {
-			auth = &collector.BasicAuth{
-				Username: target.Auth.Username,
-				Password: target.Auth.Password,
-			}
-		}
-		actuatorClient, err := collector.NewActuatorClient(target.URL, timeout, auth)
-		if err != nil {
-			return nil, fmt.Errorf("actuator client: %w", err)
-		}
-		source := target.MetricsSource
-		if source == "" {
-			source = config.SpringMetricsSourceAuto
-		}
-		if target.UsesLegacyActuatorURLUserinfo() {
-			source = config.SpringMetricsSourceActuator
-		}
-		if source == config.SpringMetricsSourceActuator {
-			return collector.NewSpringCollector(target.Name, actuatorClient, nil, "", collector.SpringMetricsSource(source), target.CollectHostMetrics)
-		}
-		prometheusClient, err := prometheus.NewClient(timeout, prometheus.DefaultLimits, prometheusAuth(auth))
-		if err != nil {
-			return nil, fmt.Errorf("prometheus client: %w", err)
-		}
-		prometheusURL, err := springEndpoint(target.URL, "prometheus")
-		if err != nil {
-			return nil, fmt.Errorf("prometheus endpoint: %w", err)
-		}
-		return collector.NewSpringCollector(target.Name, actuatorClient, prometheusClient, prometheusURL, collector.SpringMetricsSource(source), target.CollectHostMetrics)
+		return newSpringCollector(target, timeout)
 	case config.TargetTypeStatliteMetrics:
-		client, err := collector.NewStatliteMetricsClient(target.URL, timeout)
-		if err != nil {
-			return nil, fmt.Errorf("statlite metrics client: %w", err)
-		}
-		return collector.NewStatliteMetricsCollector(target.Name, client), nil
+		return newStatliteMetricsCollector(target, timeout)
 	case config.TargetTypeQuarkus:
-		client, err := prometheus.NewClient(timeout, prometheus.DefaultLimits, prometheusAuthConfig(target.Auth))
-		if err != nil {
-			return nil, fmt.Errorf("quarkus metrics client: %w", err)
-		}
-		healthURL := target.HealthURL
-		if healthURL == "" {
-			healthURL, err = config.DefaultQuarkusHealthURL(target.URL)
-			if err != nil {
-				return nil, fmt.Errorf("quarkus health URL: %w", err)
-			}
-		}
-		var healthClient *collector.QuarkusHealthClient
-		if healthURL != "" {
-			healthClient, err = collector.NewQuarkusHealthClient(healthURL, timeout, collectorAuthConfig(target.Auth))
-			if err != nil {
-				return nil, fmt.Errorf("quarkus health client: %w", err)
-			}
-			if target.HealthURL == "" {
-				healthClient.TreatNotFoundAsOptional()
-			}
-		}
-		return collector.NewQuarkusCollector(target.Name, target.URL, client, healthClient), nil
+		return newQuarkusCollector(target, timeout)
 	default:
 		return nil, fmt.Errorf("unsupported target type %q", target.Type)
 	}
+}
+
+func newSpringCollector(target config.TargetConfig, timeout time.Duration) (monitor.Collector, error) {
+	var auth *collector.BasicAuth
+	if target.Auth != nil {
+		auth = &collector.BasicAuth{
+			Username: target.Auth.Username,
+			Password: target.Auth.Password,
+		}
+	}
+	actuatorClient, err := collector.NewActuatorClient(target.URL, timeout, auth)
+	if err != nil {
+		return nil, fmt.Errorf("actuator client: %w", err)
+	}
+	source := target.MetricsSource
+	if source == "" {
+		source = config.SpringMetricsSourceAuto
+	}
+	if target.UsesLegacyActuatorURLUserinfo() {
+		source = config.SpringMetricsSourceActuator
+	}
+	if source == config.SpringMetricsSourceActuator {
+		return collector.NewSpringCollector(target.Name, actuatorClient, nil, "", collector.SpringMetricsSource(source), target.CollectHostMetrics)
+	}
+	prometheusClient, err := prometheus.NewClient(timeout, prometheus.DefaultLimits, prometheusAuth(auth))
+	if err != nil {
+		return nil, fmt.Errorf("prometheus client: %w", err)
+	}
+	prometheusURL, err := springEndpoint(target.URL, "prometheus")
+	if err != nil {
+		return nil, fmt.Errorf("prometheus endpoint: %w", err)
+	}
+	return collector.NewSpringCollector(target.Name, actuatorClient, prometheusClient, prometheusURL, collector.SpringMetricsSource(source), target.CollectHostMetrics)
+}
+
+func newStatliteMetricsCollector(target config.TargetConfig, timeout time.Duration) (monitor.Collector, error) {
+	client, err := collector.NewStatliteMetricsClient(target.URL, timeout)
+	if err != nil {
+		return nil, fmt.Errorf("statlite metrics client: %w", err)
+	}
+	return collector.NewStatliteMetricsCollector(target.Name, client), nil
+}
+
+func newQuarkusCollector(target config.TargetConfig, timeout time.Duration) (monitor.Collector, error) {
+	client, err := prometheus.NewClient(timeout, prometheus.DefaultLimits, prometheusAuthConfig(target.Auth))
+	if err != nil {
+		return nil, fmt.Errorf("quarkus metrics client: %w", err)
+	}
+	healthURL := target.HealthURL
+	if healthURL == "" {
+		healthURL, err = config.DefaultQuarkusHealthURL(target.URL)
+		if err != nil {
+			return nil, fmt.Errorf("quarkus health URL: %w", err)
+		}
+	}
+	var healthClient *collector.QuarkusHealthClient
+	if healthURL != "" {
+		healthClient, err = collector.NewQuarkusHealthClient(healthURL, timeout, collectorAuthConfig(target.Auth))
+		if err != nil {
+			return nil, fmt.Errorf("quarkus health client: %w", err)
+		}
+		if target.HealthURL == "" {
+			healthClient.TreatNotFoundAsOptional()
+		}
+	}
+	return collector.NewQuarkusCollector(target.Name, target.URL, client, healthClient), nil
 }
 
 func prometheusAuthConfig(auth *config.AuthConfig) *prometheus.BasicAuth {

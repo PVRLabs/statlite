@@ -85,6 +85,108 @@ targets:
 	}
 }
 
+func TestLoadRejectsMisplacedSpringFieldsForStatliteMetrics(t *testing.T) {
+	tests := []struct {
+		name, fields, want string
+		includeURL         bool
+	}{
+		{
+			name:       "empty deprecated actuator URL",
+			fields:     "\n    actuator_base_url: \"\"",
+			want:       "actuator_base_url is supported only for type spring",
+			includeURL: true,
+		},
+		{
+			name:       "empty metrics source",
+			fields:     "\n    metrics_source: \"\"",
+			want:       "metrics_source is supported only for type spring",
+			includeURL: true,
+		},
+		{
+			name:       "explicit false host metrics",
+			fields:     "\n    collect_host_metrics: false",
+			want:       "collect_host_metrics is supported only for type spring",
+			includeURL: true,
+		},
+		{
+			name:   "required URL error takes precedence",
+			fields: "\n    actuator_base_url: http://example.com/actuator",
+			want:   "url is required for type statlite-metrics",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			urlField := ""
+			if tt.includeURL {
+				urlField = "\n    url: http://example.com/statlite/metrics"
+			}
+			path := writeConfig(t, `
+server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "./statlite.sqlite"
+polling:
+  interval: "30s"
+targets:
+  - name: "metrics"
+    type: "statlite-metrics"`+urlField+tt.fields+`
+`)
+			_, err := Load(path)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("Load() error = %v, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidateRejectsProgrammaticUnsupportedTargetFields(t *testing.T) {
+	tests := []struct {
+		name, targetType, url, want string
+		actuatorBaseURL, healthURL  string
+	}{
+		{
+			name:            "StatLite Metrics actuator URL",
+			targetType:      TargetTypeStatliteMetrics,
+			url:             "http://example.com/statlite/metrics",
+			actuatorBaseURL: "http://example.com/actuator",
+			want:            "actuator_base_url is supported only for type spring",
+		},
+		{
+			name:            "Quarkus actuator URL",
+			targetType:      TargetTypeQuarkus,
+			url:             "http://example.com/q/metrics",
+			actuatorBaseURL: "http://example.com/actuator",
+			want:            "actuator_base_url is supported only for type spring",
+		},
+		{
+			name:       "Spring health URL",
+			targetType: TargetTypeSpring,
+			url:        "http://example.com/actuator",
+			healthURL:  "http://example.com/health",
+			want:       "health_url is supported only for type quarkus",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{
+				Server:  ServerConfig{Listen: "127.0.0.1:9090"},
+				Storage: StorageConfig{SQLitePath: "./statlite.sqlite"},
+				Polling: PollingConfig{Interval: "30s"},
+				Targets: []TargetConfig{{
+					Type:            tt.targetType,
+					Name:            "app",
+					URL:             tt.url,
+					ActuatorBaseURL: tt.actuatorBaseURL,
+					HealthURL:       tt.healthURL,
+				}},
+			}
+			if err := Validate(cfg); err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("Validate() error = %v, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestLoadExpandsEnvironmentVariablesAcrossConfig(t *testing.T) {
 	t.Setenv("STATLITE_LISTEN", "127.0.0.1:9191")
 	t.Setenv("STATLITE_DB_PATH", "./from-env.sqlite")

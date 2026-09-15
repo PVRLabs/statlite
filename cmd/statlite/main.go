@@ -327,25 +327,26 @@ type suggestedConfig struct {
 	Targets []suggestedTarget      `yaml:"targets"`
 }
 
+type inspectionTargetPresentation struct {
+	displayName  string
+	targetType   string
+	errorContext string
+}
+
 func renderInspection(result *inspect.Result) (string, error) {
 	if result == nil {
 		return "", errors.New("inspection returned no result")
 	}
-	configYAML, err := renderSuggestedConfig(result)
+	presentation, err := inspectionPresentation(result.TargetType)
 	if err != nil {
 		return "", err
 	}
-
-	name := "StatLite Metrics v1"
-	if result.TargetType == inspect.TargetSpring {
-		name = "Spring Boot Actuator"
-	} else if result.TargetType == inspect.TargetQuarkus {
-		name = "Quarkus Metrics"
-	} else if result.TargetType != inspect.TargetStatliteMetrics {
-		return "", fmt.Errorf("unsupported inspection target type %q", result.TargetType)
+	configYAML, err := renderSuggestedTargetConfig(presentation.targetType, result.Endpoint, presentation.errorContext)
+	if err != nil {
+		return "", err
 	}
 	var output strings.Builder
-	fmt.Fprintf(&output, "Detected: %s\n\nEndpoint:\n  %s\n", name, result.Endpoint)
+	fmt.Fprintf(&output, "Detected: %s\n\nEndpoint:\n  %s\n", presentation.displayName, result.Endpoint)
 	if result.Status != "" {
 		fmt.Fprintf(&output, "\nCompatibility: %s\n", result.Status)
 	}
@@ -360,16 +361,28 @@ func renderInspection(result *inspect.Result) (string, error) {
 	return output.String(), nil
 }
 
-func renderSuggestedConfig(result *inspect.Result) (string, error) {
-	switch result.TargetType {
+func inspectionPresentation(targetType inspect.TargetType) (inspectionTargetPresentation, error) {
+	switch targetType {
 	case inspect.TargetSpring:
-		return renderSuggestedTargetConfig(config.TargetTypeSpring, result.Endpoint, "spring target")
+		return inspectionTargetPresentation{
+			displayName:  "Spring Boot Actuator",
+			targetType:   config.TargetTypeSpring,
+			errorContext: "spring target",
+		}, nil
 	case inspect.TargetStatliteMetrics:
-		return renderSuggestedTargetConfig(config.TargetTypeStatliteMetrics, result.Endpoint, "statlite-metrics target")
+		return inspectionTargetPresentation{
+			displayName:  "StatLite Metrics v1",
+			targetType:   config.TargetTypeStatliteMetrics,
+			errorContext: "statlite-metrics target",
+		}, nil
 	case inspect.TargetQuarkus:
-		return renderSuggestedTargetConfig(config.TargetTypeQuarkus, result.Endpoint, "quarkus target")
+		return inspectionTargetPresentation{
+			displayName:  "Quarkus Metrics",
+			targetType:   config.TargetTypeQuarkus,
+			errorContext: "quarkus target",
+		}, nil
 	default:
-		return "", fmt.Errorf("unsupported inspection target type %q", result.TargetType)
+		return inspectionTargetPresentation{}, fmt.Errorf("unsupported inspection target type %q", targetType)
 	}
 }
 

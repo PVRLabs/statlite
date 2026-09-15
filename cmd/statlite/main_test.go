@@ -379,6 +379,13 @@ func TestRenderInspectionRejectsInvalidSuggestedConfig(t *testing.T) {
 	}
 }
 
+func TestRenderInspectionRejectsUnsupportedTargetType(t *testing.T) {
+	_, err := renderInspection(&inspect.Result{TargetType: inspect.TargetType("prometheus")})
+	if err == nil || err.Error() != `unsupported inspection target type "prometheus"` {
+		t.Fatalf("renderInspection() error = %v, want unsupported target type error", err)
+	}
+}
+
 func assertSuggestedConfigLoads(t *testing.T, output string, targetType, endpoint string) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "statlite.yaml")
