@@ -3,6 +3,15 @@
 This file summarizes the main user-facing changes in each StatLite release.
 Detailed release notes are generated on GitHub from the commit history.
 
+## v0.4.2 — 2026-09-15
+
+- Added a StatLite favicon to the dashboard and expanded framework compatibility
+  guidance.
+- Corrected request response-status metrics and polished suggested configuration
+  output from `statlite inspect`.
+- Added a Spring Actuator integration smoke test and expanded CLI and server
+  test coverage.
+
 ## v0.4.1 — 2026-09-09
 
 - Added a TierHive deployment recipe with bootstrap, service lifecycle, and
