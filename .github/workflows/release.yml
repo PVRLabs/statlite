@@ -1,16 +1,97 @@
 name: release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact release version (for example, v0.4.2)
+        required: true
+        type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  validate:
+    name: validate release preparation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release inputs and repository state
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          DISPATCH_REF: ${{ github.ref }}
+        run: |
+          set -eu
+
+          if [ "$DISPATCH_REF" != "refs/heads/main" ]; then
+            echo "release must be dispatched from main (got $DISPATCH_REF)" >&2
+            exit 1
+          fi
+
+          if ! printf '%s\n' "$RELEASE_VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "version must match vX.Y.Z: $RELEASE_VERSION" >&2
+            exit 1
+          fi
+
+          source_version="$(sed -n 's/^var Version = "\([^"]*\)"$/\1/p' internal/version/version.go)"
+          if [ "$source_version" != "$RELEASE_VERSION" ]; then
+            echo "internal/version/version.go is $source_version, expected $RELEASE_VERSION" >&2
+            exit 1
+          fi
+
+          if ! awk -v heading="## $RELEASE_VERSION" '$0 == heading || index($0, heading " ") == 1 { found = 1 } END { exit !found }' CHANGELOG.md; then
+            echo "CHANGELOG.md has no heading for $RELEASE_VERSION" >&2
+            exit 1
+          fi
+
+          echo "validated $RELEASE_VERSION at $GITHUB_SHA"
+
+  tag:
+    name: create or verify release tag
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout dispatched commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create or verify release tag
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+
+          tag_ref="refs/tags/${RELEASE_VERSION}"
+          if git show-ref --verify --quiet "$tag_ref"; then
+            tag_object_type="$(git cat-file -t "$tag_ref")"
+            if [ "$tag_object_type" != "commit" ]; then
+              echo "tag $RELEASE_VERSION is not a lightweight tag; inspect the release state manually" >&2
+              exit 1
+            fi
+
+            existing_tag_commit="$(git rev-parse "$tag_ref")"
+            if [ "$existing_tag_commit" != "$GITHUB_SHA" ]; then
+              echo "tag $RELEASE_VERSION already points to $existing_tag_commit, not dispatched commit $GITHUB_SHA; inspect and repair the release state manually" >&2
+              exit 1
+            fi
+            echo "tag $RELEASE_VERSION already points to the dispatched commit; continuing for retry"
+            exit 0
+          fi
+
+          git tag "$RELEASE_VERSION" "$GITHUB_SHA"
+          git push origin "refs/tags/$RELEASE_VERSION"
+
   build:
     name: build ${{ matrix.goos }}-${{ matrix.goarch }}
+    needs: tag
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -25,10 +106,11 @@ jobs:
           - goos: linux
             goarch: arm64
     steps:
-      - name: Checkout
+      - name: Checkout tagged release
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ inputs.version }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -51,7 +133,7 @@ jobs:
           CGO_ENABLED: 0
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ inputs.version }}
         run: |
           set -eu
 
@@ -67,7 +149,7 @@ jobs:
           cp internal/dashboard/static/fonts/ORBITRON-LICENSE.txt "${out_dir}/LICENSE-Orbitron.txt"
 
           tar -czf "dist/${archive_name}" -C "${out_dir}" "${binary_name}" "LICENSE-Chart.js.md" "LICENSE-Orbitron.txt"
-          sha256sum "dist/${archive_name}" > "dist/${archive_name}.sha256"
+          (cd dist && sha256sum "${archive_name}" > "${archive_name}.sha256")
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -85,10 +167,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout
+      - name: Checkout tagged release
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ inputs.version }}
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -96,19 +179,166 @@ jobs:
           path: release-assets
           merge-multiple: true
 
+      - name: Validate release artifacts and checksums
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+
+          plain_version="${RELEASE_VERSION#v}"
+          expected_assets="$(printf '%s\n' \
+            "statlite_${plain_version}_darwin_amd64.tar.gz" \
+            "statlite_${plain_version}_darwin_amd64.tar.gz.sha256" \
+            "statlite_${plain_version}_darwin_arm64.tar.gz" \
+            "statlite_${plain_version}_darwin_arm64.tar.gz.sha256" \
+            "statlite_${plain_version}_linux_amd64.tar.gz" \
+            "statlite_${plain_version}_linux_amd64.tar.gz.sha256" \
+            "statlite_${plain_version}_linux_arm64.tar.gz" \
+            "statlite_${plain_version}_linux_arm64.tar.gz.sha256" | sort)"
+          actual_assets="$(find release-assets -maxdepth 1 -type f -printf '%f\n' | sort)"
+
+          if [ "$actual_assets" != "$expected_assets" ]; then
+            echo "release build produced an unexpected asset set" >&2
+            echo "expected:" >&2
+            printf '%s\n' "$expected_assets" >&2
+            echo "actual:" >&2
+            printf '%s\n' "$actual_assets" >&2
+            exit 1
+          fi
+
+          for archive in release-assets/*.tar.gz; do
+            archive_name="${archive##*/}"
+            checksum_file="${archive}.sha256"
+            read -r checksum checksum_name < "$checksum_file"
+
+            if [ "$checksum_name" != "$archive_name" ]; then
+              echo "$checksum_file names '$checksum_name', expected '$archive_name'" >&2
+              exit 1
+            fi
+            if ! printf '%s\n' "$checksum" | grep -Eq '^[0-9a-fA-F]{64}$'; then
+              echo "$checksum_file does not contain a valid SHA-256" >&2
+              exit 1
+            fi
+            (cd release-assets && sha256sum --check "${archive_name}.sha256")
+          done
+
       - name: Generate release notes
         id: notes
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
         run: |
-          bash scripts/generate-release-notes.sh "${{ github.ref_name }}" > release-notes.md
+          bash scripts/generate-release-notes.sh "$RELEASE_VERSION" > release-notes.md
           echo "notes_file=release-notes.md" >> "$GITHUB_OUTPUT"
 
       - name: Publish release assets
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ inputs.version }}
           body_path: ${{ steps.notes.outputs.notes_file }}
+          overwrite_files: true
+          fail_on_unmatched_files: true
           files: |
             release-assets/*.tar.gz
             release-assets/*.tar.gz.sha256
+
+      - name: Verify published release assets
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+
+          plain_version="${RELEASE_VERSION#v}"
+          expected_assets="$(printf '%s\n' \
+            "statlite_${plain_version}_darwin_amd64.tar.gz" \
+            "statlite_${plain_version}_darwin_amd64.tar.gz.sha256" \
+            "statlite_${plain_version}_darwin_arm64.tar.gz" \
+            "statlite_${plain_version}_darwin_arm64.tar.gz.sha256" \
+            "statlite_${plain_version}_linux_amd64.tar.gz" \
+            "statlite_${plain_version}_linux_amd64.tar.gz.sha256" \
+            "statlite_${plain_version}_linux_arm64.tar.gz" \
+            "statlite_${plain_version}_linux_arm64.tar.gz.sha256" | sort)"
+          actual_assets="$(gh release view "$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | sort)"
+
+          if [ "$actual_assets" != "$expected_assets" ]; then
+            echo "published GitHub Release has an unexpected asset set" >&2
+            echo "expected:" >&2
+            printf '%s\n' "$expected_assets" >&2
+            echo "actual:" >&2
+            printf '%s\n' "$actual_assets" >&2
+            exit 1
+          fi
+
+  container:
+    name: publish and verify GHCR images
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout tagged release
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve image version
+        id: image
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: echo "version=${RELEASE_VERSION#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and publish multi-platform images
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            VERSION=${{ inputs.version }}
+          tags: |
+            ghcr.io/pvrlabs/statlite:${{ steps.image.outputs.version }}
+            ghcr.io/pvrlabs/statlite:latest
+
+      - name: Verify published manifests and image versions
+        env:
+          IMAGE: ghcr.io/pvrlabs/statlite
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_IMAGE_TAG: ${{ steps.image.outputs.version }}
+        run: |
+          set -eu
+
+          expected_platforms="$(printf 'linux/amd64\nlinux/arm64')"
+          expected_version="statlite ${RELEASE_VERSION}"
+
+          for tag in "$RELEASE_IMAGE_TAG" latest; do
+            image="${IMAGE}:${tag}"
+            platforms="$(docker buildx imagetools inspect --raw "$image" \
+              | jq -r '.manifests[]?.platform | select(.os == "linux") | "\(.os)/\(.architecture)"' \
+              | sort -u)"
+
+            if [ "$platforms" != "$expected_platforms" ]; then
+              echo "$image has unexpected platforms:" >&2
+              printf '%s\n' "$platforms" >&2
+              exit 1
+            fi
+
+            actual_version="$(docker run --rm "$image" --version)"
+            if [ "$actual_version" != "$expected_version" ]; then
+              echo "$image reports '$actual_version', expected '$expected_version'" >&2
+              exit 1
+            fi
+          done
