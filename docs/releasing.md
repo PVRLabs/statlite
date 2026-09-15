@@ -24,6 +24,13 @@ creates the tag at the dispatched commit. It does not update the Homebrew tap.
 The manual `:dev` image workflow remains separate. See [Docker development
 images](docker.md) for its process.
 
+Before the first release workflow publication, grant the `PVRLabs/statlite`
+repository **Write** access under the GHCR package's **Manage Actions access**
+settings. The workflow's `packages: write` permission does not by itself grant
+an existing package access. If publication fails with `permission_denied:
+write_package`, add that access and rerun all jobs in the same workflow run
+while its lightweight release tag still points to the intended release commit.
+
 ## Before Releasing
 
 Prepare a release commit on `main`:
