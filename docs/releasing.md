@@ -96,53 +96,30 @@ The run should be a `workflow_dispatch` from `main` with the requested version.
 The workflow validates the release invariants, creates the tag, reuses the
 existing archive build and release-note generation, checks the expected release
 assets and checksums, publishes the two GHCR tags for `linux/amd64` and
-`linux/arm64`, and checks the image manifest and `--version` output.
+`linux/arm64`, checks both image manifests and `--version` output, then pulls
+the versioned image and smoke-tests readiness, self-metrics schema, and the
+dashboard response. The smoke-test container is always removed.
 
-## 3. Verify GitHub and GHCR
+## 3. Verify the GitHub Release
 
-Check the GitHub Release assets and inspect both image tags. The first public
-pull can take a short time to work after the image is pushed.
+Manually confirm the GitHub Release contains the expected archives and
+checksum files. The successful `release.yml` run is authoritative for both
+GHCR manifests, image versions, startup, and endpoint checks, so the normal
+release flow does not require a local Docker or Buildx setup.
 
 ```bash
 gh release view "$RELEASE_VERSION" --repo PVRLabs/statlite
-docker buildx imagetools inspect "ghcr.io/pvrlabs/statlite:${RELEASE_VERSION#v}"
-docker buildx imagetools inspect ghcr.io/pvrlabs/statlite:latest
-docker pull "ghcr.io/pvrlabs/statlite:${RELEASE_VERSION#v}"
-docker run --rm "ghcr.io/pvrlabs/statlite:${RELEASE_VERSION#v}" --version
 ```
 
-Start the published image and verify that the server becomes ready and serves
-its self-metrics endpoint and dashboard:
+For optional GHCR troubleshooting, inspect the published manifests manually:
 
 ```bash
-set -euo pipefail
-image="ghcr.io/pvrlabs/statlite:${RELEASE_VERSION#v}"
-container_id="$(docker run -d -p 127.0.0.1:19090:9090 "$image")"
-trap 'docker rm -f "$container_id" >/dev/null 2>&1 || true' EXIT
-
-for attempt in $(seq 1 30); do
-  if curl -fsS http://127.0.0.1:19090/healthz >/dev/null; then
-    break
-  fi
-  sleep 1
-done
-
-curl -fsS http://127.0.0.1:19090/healthz \
-  | grep -F "\"version\":\"$RELEASE_VERSION\"" >/dev/null
-curl -fsS http://127.0.0.1:19090/statlite/metrics \
-  | grep -F '"schema":"statlite-metrics/v1"' >/dev/null
-curl -fsS http://127.0.0.1:19090/ \
-  | grep -F '<title>StatLite</title>' >/dev/null
-docker rm -f "$container_id" >/dev/null
-trap - EXIT
+docker buildx imagetools inspect "ghcr.io/pvrlabs/statlite:${RELEASE_VERSION#v}"
+docker buildx imagetools inspect ghcr.io/pvrlabs/statlite:latest
 ```
 
-Confirm the release has all expected platform archives and checksum files, the
-GHCR manifests include amd64 and arm64, and the container reports the intended
-release version. The smoke check also confirms the image starts with the
-release version, responds through `/healthz` and `/statlite/metrics`, and serves
-the dashboard page. It uses the local Docker credentials; an anonymous pull
-check is optional when GHCR package visibility needs separate verification.
+An anonymous pull check is also optional when GHCR package visibility needs
+separate verification.
 
 ## 4. Bump `main` to the Next Development Version
 
@@ -255,5 +232,52 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   --tag ghcr.io/pvrlabs/statlite:latest --push .
 ```
 
-Then complete the GitHub/GHCR verification above before dispatching the
-Homebrew updater.
+The manual fallback bypasses the workflow smoke check, so run this lightweight
+runtime verification before dispatching the Homebrew updater:
+
+```bash
+set -euo pipefail
+image="ghcr.io/pvrlabs/statlite:$PLAIN_VERSION"
+container_id=
+cleanup_container() {
+  if [ -n "$container_id" ]; then
+    docker rm -f "$container_id" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup_container EXIT
+
+docker run --pull=always --rm "$image" --version \
+  | grep -F "statlite $RELEASE_VERSION" >/dev/null
+container_id="$(docker run --pull=always -d \
+  -p 127.0.0.1:19090:9090 "$image")"
+
+ready=false
+for attempt in $(seq 1 30); do
+  if curl -fsS http://127.0.0.1:19090/healthz >/dev/null 2>&1; then
+    ready=true
+    break
+  fi
+  sleep 1
+done
+if [ "$ready" != true ]; then
+  echo 'StatLite container did not become ready at /healthz' >&2
+  docker logs "$container_id" >&2 || true
+  exit 1
+fi
+
+curl -fsS http://127.0.0.1:19090/healthz \
+  | grep -F "\"version\":\"$RELEASE_VERSION\"" >/dev/null
+curl -fsS http://127.0.0.1:19090/statlite/metrics \
+  | grep -F '"schema":"statlite-metrics/v1"' >/dev/null
+curl -fsS http://127.0.0.1:19090/ \
+  | grep -F '<title>StatLite</title>' >/dev/null
+```
+
+Before dispatching the Homebrew updater, verify the GitHub Release and both
+published GHCR manifests as required fallback checks:
+
+```bash
+gh release view "$RELEASE_VERSION" --repo PVRLabs/statlite
+docker buildx imagetools inspect "ghcr.io/pvrlabs/statlite:$PLAIN_VERSION"
+docker buildx imagetools inspect ghcr.io/pvrlabs/statlite:latest
+```

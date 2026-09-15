@@ -342,3 +342,78 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Smoke-test published release container
+        env:
+          IMAGE: ghcr.io/pvrlabs/statlite
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_IMAGE_TAG: ${{ steps.image.outputs.version }}
+        run: |
+          set -eu
+
+          image="${IMAGE}:${RELEASE_IMAGE_TAG}"
+          container_id=
+          cleanup_container() {
+            if [ -n "$container_id" ]; then
+              docker rm --force "$container_id" >/dev/null 2>&1 || true
+            fi
+          }
+          fail() {
+            echo "container smoke check failed: $*" >&2
+            exit 1
+          }
+          trap cleanup_container EXIT
+          trap 'exit 129' HUP
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+
+          container_id="$(docker run --pull=always --detach \
+            --publish 127.0.0.1::9090 "$image")" \
+            || fail "could not start $image"
+
+          port_mapping="$(docker port "$container_id" 9090/tcp)" \
+            || fail "could not find the published container port"
+          host_port="${port_mapping##*:}"
+          case "$host_port" in
+            ''|*[!0-9]*) fail "unexpected port mapping '$port_mapping'" ;;
+          esac
+          base_url="http://127.0.0.1:${host_port}"
+
+          attempt=1
+          while ! curl -fsS --connect-timeout 1 --max-time 2 \
+            "$base_url/healthz" >/dev/null 2>&1; do
+            if [ "$attempt" -ge 30 ]; then
+              echo "container did not become ready at $base_url/healthz after 30 attempts" >&2
+              echo "container logs:" >&2
+              docker logs "$container_id" >&2 || true
+              exit 1
+            fi
+            sleep 1
+            attempt=$((attempt + 1))
+          done
+
+          health_response="$(curl -fsS --connect-timeout 1 --max-time 5 \
+            "$base_url/healthz")" \
+            || fail "GET /healthz failed after the container became ready"
+          if ! printf '%s' "$health_response" \
+            | jq -e --arg version "$RELEASE_VERSION" '.version == $version' >/dev/null; then
+            fail "/healthz did not report version $RELEASE_VERSION"
+          fi
+
+          metrics_response="$(curl -fsS --connect-timeout 1 --max-time 5 \
+            "$base_url/statlite/metrics")" \
+            || fail "GET /statlite/metrics failed"
+          if ! printf '%s' "$metrics_response" \
+            | jq -e '.schema == "statlite-metrics/v1"' >/dev/null; then
+            fail "/statlite/metrics did not report schema statlite-metrics/v1"
+          fi
+
+          dashboard="$(curl -fsS --connect-timeout 1 --max-time 5 \
+            "$base_url/")" \
+            || fail "GET / failed"
+          case "$dashboard" in
+            *'<title>StatLite</title>'*) ;;
+            *) fail "dashboard response did not contain the StatLite page title" ;;
+          esac
+
+          echo "container smoke check passed for $image"
