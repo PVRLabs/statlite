@@ -34,14 +34,17 @@ targets:
 				t.Fatalf("write config: %v", err)
 			}
 
-			cmd := exec.Command("go", "run", ".", "--config", configPath)
-			cmd.Dir = "."
+			cmd := exec.Command(os.Args[0], "-test.run=^TestStatliteEntrypointHelper$")
+			cmd.Env = append(os.Environ(),
+				"STATLITE_ENTRYPOINT_HELPER=1",
+				"STATLITE_ENTRYPOINT_CONFIG="+configPath,
+			)
 			output, err := cmd.CombinedOutput()
 			if err == nil {
-				t.Fatalf("go run succeeded for retired type %q; output=%s", retiredType, output)
+				t.Fatalf("statlite succeeded for retired type %q; output=%s", retiredType, output)
 			}
 			if exitErr, ok := err.(*exec.ExitError); !ok || exitErr.ExitCode() == 0 {
-				t.Fatalf("go run error = %v, want clean non-zero exit; output=%s", err, output)
+				t.Fatalf("statlite error = %v, want clean non-zero exit; output=%s", err, output)
 			}
 			message := string(output)
 			for _, want := range []string{
@@ -62,6 +65,14 @@ targets:
 			}
 		})
 	}
+}
+
+func TestStatliteEntrypointHelper(t *testing.T) {
+	if os.Getenv("STATLITE_ENTRYPOINT_HELPER") != "1" {
+		return
+	}
+	os.Args = []string{"statlite", "--config", os.Getenv("STATLITE_ENTRYPOINT_CONFIG")}
+	main()
 }
 
 func TestPrintVersion(t *testing.T) {
