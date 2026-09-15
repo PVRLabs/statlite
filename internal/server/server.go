@@ -222,10 +222,27 @@ func updateAtomicMax(value *atomic.Uint64, candidate uint64) {
 
 type statusRecorder struct {
 	http.ResponseWriter
-	status int
+	status      int
+	wroteHeader bool
 }
 
 func (r *statusRecorder) WriteHeader(status int) {
+	if r.wroteHeader {
+		return
+	}
+	if status >= 100 && status <= 199 && status != http.StatusSwitchingProtocols {
+		r.ResponseWriter.WriteHeader(status)
+		return
+	}
+	r.wroteHeader = true
 	r.status = status
 	r.ResponseWriter.WriteHeader(status)
+}
+
+func (r *statusRecorder) Write(p []byte) (int, error) {
+	if !r.wroteHeader {
+		r.wroteHeader = true
+		r.status = http.StatusOK
+	}
+	return r.ResponseWriter.Write(p)
 }

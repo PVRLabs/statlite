@@ -48,10 +48,6 @@ func runWithInspectors(args []string, stdout, stderr io.Writer, inspectApplicati
 	return runMonitor(args, stdout, stderr)
 }
 
-func runInspect(args []string, stdout, stderr io.Writer, inspectApplication inspectApplicationFunc) int {
-	return runInspectWithTyped(args, stdout, stderr, inspectApplication, inspect.Inspect)
-}
-
 func runInspectWithTyped(args []string, stdout, stderr io.Writer, inspectApplication inspectApplicationFunc, inspectByType inspectApplicationByTypeFunc) int {
 	for _, arg := range args {
 		if arg == "--help" || arg == "-h" {
@@ -367,59 +363,33 @@ func renderInspection(result *inspect.Result) (string, error) {
 func renderSuggestedConfig(result *inspect.Result) (string, error) {
 	switch result.TargetType {
 	case inspect.TargetSpring:
-		cfg := suggestedConfig{
-			Server:  suggestedServerConfig{Listen: "127.0.0.1:9090"},
-			Storage: suggestedStorageConfig{SQLitePath: "./statlite.sqlite"},
-			Polling: suggestedPollingConfig{Interval: "30s"},
-			Targets: []suggestedTarget{{Name: "app", Type: "spring", URL: result.Endpoint}},
-		}
-		validation := config.Config{
-			Server:  config.ServerConfig{Listen: "127.0.0.1:9090"},
-			Storage: config.StorageConfig{SQLitePath: "./statlite.sqlite"},
-			Polling: config.PollingConfig{Interval: "30s"},
-			Targets: []config.TargetConfig{{Name: "app", Type: config.TargetTypeSpring, URL: result.Endpoint}},
-		}
-		if err := config.Validate(&validation); err != nil {
-			return "", fmt.Errorf("spring target: %w", err)
-		}
-		return marshalSuggestedConfig(cfg)
+		return renderSuggestedTargetConfig(config.TargetTypeSpring, result.Endpoint, "spring target")
 	case inspect.TargetStatliteMetrics:
-		cfg := suggestedConfig{
-			Server:  suggestedServerConfig{Listen: "127.0.0.1:9090"},
-			Storage: suggestedStorageConfig{SQLitePath: "./statlite.sqlite"},
-			Polling: suggestedPollingConfig{Interval: "30s"},
-			Targets: []suggestedTarget{{Name: "app", Type: config.TargetTypeStatliteMetrics, URL: result.Endpoint}},
-		}
-		validation := config.Config{
-			Server:  config.ServerConfig{Listen: "127.0.0.1:9090"},
-			Storage: config.StorageConfig{SQLitePath: "./statlite.sqlite"},
-			Polling: config.PollingConfig{Interval: "30s"},
-			Targets: []config.TargetConfig{{Name: "app", Type: config.TargetTypeStatliteMetrics, URL: result.Endpoint}},
-		}
-		if err := config.Validate(&validation); err != nil {
-			return "", fmt.Errorf("statlite-metrics target: %w", err)
-		}
-		return marshalSuggestedConfig(cfg)
+		return renderSuggestedTargetConfig(config.TargetTypeStatliteMetrics, result.Endpoint, "statlite-metrics target")
 	case inspect.TargetQuarkus:
-		cfg := suggestedConfig{
-			Server:  suggestedServerConfig{Listen: "127.0.0.1:9090"},
-			Storage: suggestedStorageConfig{SQLitePath: "./statlite.sqlite"},
-			Polling: suggestedPollingConfig{Interval: "30s"},
-			Targets: []suggestedTarget{{Name: "app", Type: config.TargetTypeQuarkus, URL: result.Endpoint}},
-		}
-		validation := config.Config{
-			Server:  config.ServerConfig{Listen: "127.0.0.1:9090"},
-			Storage: config.StorageConfig{SQLitePath: "./statlite.sqlite"},
-			Polling: config.PollingConfig{Interval: "30s"},
-			Targets: []config.TargetConfig{{Name: "app", Type: config.TargetTypeQuarkus, URL: result.Endpoint}},
-		}
-		if err := config.Validate(&validation); err != nil {
-			return "", fmt.Errorf("quarkus target: %w", err)
-		}
-		return marshalSuggestedConfig(cfg)
+		return renderSuggestedTargetConfig(config.TargetTypeQuarkus, result.Endpoint, "quarkus target")
 	default:
 		return "", fmt.Errorf("unsupported inspection target type %q", result.TargetType)
 	}
+}
+
+func renderSuggestedTargetConfig(targetType, endpoint, errorContext string) (string, error) {
+	cfg := suggestedConfig{
+		Server:  suggestedServerConfig{Listen: "127.0.0.1:9090"},
+		Storage: suggestedStorageConfig{SQLitePath: "./statlite.sqlite"},
+		Polling: suggestedPollingConfig{Interval: "30s"},
+		Targets: []suggestedTarget{{Name: "app", Type: targetType, URL: endpoint}},
+	}
+	validation := config.Config{
+		Server:  config.ServerConfig{Listen: "127.0.0.1:9090"},
+		Storage: config.StorageConfig{SQLitePath: "./statlite.sqlite"},
+		Polling: config.PollingConfig{Interval: "30s"},
+		Targets: []config.TargetConfig{{Name: "app", Type: targetType, URL: endpoint}},
+	}
+	if err := config.Validate(&validation); err != nil {
+		return "", fmt.Errorf("%s: %w", errorContext, err)
+	}
+	return marshalSuggestedConfig(cfg)
 }
 
 func marshalSuggestedConfig(value any) (string, error) {

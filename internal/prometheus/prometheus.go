@@ -461,10 +461,11 @@ func quotedValue(s string) (string, int, error) {
 			continue
 		}
 		if s[i] == '"' {
-			if !utf8.ValidString(value.String()) {
+			result := value.String()
+			if !utf8.ValidString(result) {
 				return "", 0, errors.New("invalid escaped label value")
 			}
-			return value.String(), i + 1, nil
+			return result, i + 1, nil
 		}
 		value.WriteByte(s[i])
 	}

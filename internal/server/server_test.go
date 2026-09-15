@@ -37,6 +37,139 @@ func TestListenBindsConfiguredAddressBeforeServe(t *testing.T) {
 	}
 }
 
+func TestCountRequestsRecordsFirstResponseStatus(t *testing.T) {
+	tests := []struct {
+		name       string
+		write      func(http.ResponseWriter)
+		wantStatus int
+		want404    uint64
+		want4xx    uint64
+		want5xx    uint64
+	}{
+		{
+			name: "first 4xx status wins",
+			write: func(w http.ResponseWriter) {
+				w.WriteHeader(http.StatusNotFound)
+				w.WriteHeader(http.StatusInternalServerError)
+			},
+			wantStatus: http.StatusNotFound,
+			want404:    1,
+			want4xx:    1,
+		},
+		{
+			name: "first 5xx status wins",
+			write: func(w http.ResponseWriter) {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.WriteHeader(http.StatusNotFound)
+			},
+			wantStatus: http.StatusInternalServerError,
+			want5xx:    1,
+		},
+		{
+			name: "body write implicitly sends 200",
+			write: func(w http.ResponseWriter) {
+				_, _ = w.Write([]byte("ok"))
+				w.WriteHeader(http.StatusInternalServerError)
+			},
+			wantStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			statlite := New("", nil)
+			recorder := httptest.NewRecorder()
+			statlite.countRequests(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				tt.write(w)
+			})).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/test", nil))
+			if recorder.Code != tt.wantStatus {
+				t.Fatalf("response status = %d, want %d", recorder.Code, tt.wantStatus)
+			}
+
+			metricsRecorder := httptest.NewRecorder()
+			statlite.handleStatliteMetrics(metricsRecorder, httptest.NewRequest(http.MethodGet, "/statlite/metrics", nil))
+			var response statliteMetricsResponse
+			if err := json.NewDecoder(metricsRecorder.Body).Decode(&response); err != nil {
+				t.Fatalf("decode StatLite metrics: %v", err)
+			}
+			if got := response.Metrics.Responses404Total; got != tt.want404 {
+				t.Errorf("responses_404_total = %d, want %d", got, tt.want404)
+			}
+			if got := response.Metrics.Responses4xxTotal; got != tt.want4xx {
+				t.Errorf("responses_4xx_total = %d, want %d", got, tt.want4xx)
+			}
+			if got := response.Metrics.Responses5xxTotal; got != tt.want5xx {
+				t.Errorf("responses_5xx_total = %d, want %d", got, tt.want5xx)
+			}
+		})
+	}
+}
+
+func TestStatusRecorderWritePreservesContentTypeDetection(t *testing.T) {
+	response := httptest.NewRecorder()
+	recorder := &statusRecorder{ResponseWriter: response, status: http.StatusOK}
+	if _, err := recorder.Write([]byte("plain text response")); err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+	if got, want := response.Header().Get("Content-Type"), "text/plain; charset=utf-8"; got != want {
+		t.Fatalf("Content-Type = %q, want %q", got, want)
+	}
+}
+
+func TestCountRequestsRecordsFinalStatusAfterInformationalResponse(t *testing.T) {
+	statlite := New("", nil)
+	response := &informationalResponseWriter{header: make(http.Header)}
+	statlite.countRequests(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusEarlyHints)
+		w.WriteHeader(http.StatusNotFound)
+	})).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/test", nil))
+
+	if len(response.statuses) != 2 || response.statuses[0] != http.StatusEarlyHints || response.statuses[1] != http.StatusNotFound {
+		t.Fatalf("sent statuses = %v, want [%d %d]", response.statuses, http.StatusEarlyHints, http.StatusNotFound)
+	}
+	if response.finalStatus != http.StatusNotFound {
+		t.Fatalf("final response status = %d, want %d", response.finalStatus, http.StatusNotFound)
+	}
+	if got := statlite.notFoundTotal.Load(); got != 1 {
+		t.Errorf("responses_404_total = %d, want 1", got)
+	}
+	if got := statlite.clientErrors.Load(); got != 1 {
+		t.Errorf("responses_4xx_total = %d, want 1", got)
+	}
+	if got := statlite.serverErrors.Load(); got != 0 {
+		t.Errorf("responses_5xx_total = %d, want 0", got)
+	}
+}
+
+type informationalResponseWriter struct {
+	header      http.Header
+	statuses    []int
+	finalStatus int
+	final       bool
+}
+
+func (w *informationalResponseWriter) Header() http.Header { return w.header }
+
+func (w *informationalResponseWriter) WriteHeader(status int) {
+	if w.final {
+		return
+	}
+	if status >= 100 && status <= 199 && status != http.StatusSwitchingProtocols {
+		w.statuses = append(w.statuses, status)
+		return
+	}
+	w.statuses = append(w.statuses, status)
+	w.final = true
+	w.finalStatus = status
+}
+
+func (w *informationalResponseWriter) Write(body []byte) (int, error) {
+	if !w.final {
+		w.WriteHeader(http.StatusOK)
+	}
+	return len(body), nil
+}
+
 func TestServeUsesPreboundListener(t *testing.T) {
 	statlite := New("127.0.0.1:0", nil)
 	listener, err := statlite.Listen()
