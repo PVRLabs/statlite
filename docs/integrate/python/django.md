@@ -7,7 +7,17 @@ application with one small, dependency-light helper.
 
 Django does not have a first-class StatLite target type. Use this direct v1
 integration when StatLite's fixed traffic, error, average-latency, status,
-restart, and process signals fit the application's operational needs.
+and process CPU signals fit the application's operational needs. This
+dependency-light example is a single-worker integration. A single Django
+worker can be a reasonable choice for a small VPS or an application beginning
+to receive traffic, but common Gunicorn, uWSGI, and other multi-worker
+deployments need application-owned shared aggregation or stable per-worker
+routing.
+
+The helper intentionally does not emit `started_at` or `uptime_seconds`:
+helper initialization time and lifetime are not necessarily process start time
+and process uptime. Add those optional restart-identity signals only when the
+application can provide accurate process-level values.
 
 StatLite cannot determine request counts, HTTP errors, or request latency from
 outside the application. The middleware below measures those values where
