@@ -1,7 +1,7 @@
 # Integrate FastAPI with StatLite Metrics
 
-This guide adds the fixed `statlite-metrics/v1` JSON profile to a FastAPI
-application with one small, dependency-light helper. A
+This guide adds lightweight FastAPI application monitoring using the fixed
+`statlite-metrics/v1` JSON profile and one small, dependency-light helper. A
 [runnable and tested demo](../../../examples/python-fastapi-demo/) accompanies
 the guide.
 

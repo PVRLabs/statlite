@@ -1,7 +1,7 @@
 # Integrate Django with StatLite Metrics
 
-This guide adds the fixed `statlite-metrics/v1` JSON profile to a Django
-application with one small, dependency-light helper.
+This guide adds lightweight Django application monitoring using the fixed
+`statlite-metrics/v1` JSON profile and one small, dependency-light helper.
 
 ## When to use this integration
 

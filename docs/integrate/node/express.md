@@ -1,7 +1,8 @@
 # Integrate Express with StatLite Metrics
 
-This guide adds the fixed `statlite-metrics/v1` JSON profile to an Express
-application with one small, dependency-light helper.
+This guide adds lightweight Node.js/Express application monitoring using the
+fixed `statlite-metrics/v1` JSON profile and one small, dependency-light
+helper.
 
 ## When to use this integration
 

@@ -1,6 +1,9 @@
 # Integrate an application with StatLite
 
 Use this page to choose an application integration and find a copyable guide.
+These guides are for small and self-hosted applications that need traffic,
+errors, latency, application status, and basic process signals without
+operating a Prometheus server and Grafana stack.
 
 ## Choose an integration path
 
