@@ -50,16 +50,23 @@ The minimal valid response is:
 }
 ```
 
-`schema` and a non-empty `status` are required. `started_at`, `metrics`, and
-every individual metric are optional. `status` is application-defined; v1 does
-not impose a status enum. `started_at` uses RFC 3339 and is recommended because
-it improves restart detection.
+`schema` and a non-empty `status` are required. `database_status`, `started_at`,
+`metrics`, and every individual metric are optional. `status` is
+application-defined; v1 does not impose a status enum. `started_at` uses RFC
+3339 and is recommended because it improves restart detection.
 
-The required `status` field is an explicit producer-defined health contract
-for this profile. It does not imply that every StatLite integration must expose
-health. Framework adapters without an authoritative health signal omit health;
-successful metrics collection is presented separately as reporting
-availability.
+The required `status` field is the producer's application-level operational
+assertion for this profile. It is not proof that every dependency is healthy.
+`database_status` should be emitted only from an authoritative, inexpensive or
+cached application signal, never from a database query performed just for the
+metrics request. A producer without such a signal should omit it.
+
+Serving this endpoint successfully establishes reporting availability, not a
+universal application or dependency-health contract. StatLite keeps the
+producer's status values separate from whether endpoint collection succeeded.
+The requirement does not imply that every other StatLite integration must
+expose health; framework adapters without an authoritative health signal omit
+it.
 
 ## Python and FastAPI
 
@@ -68,6 +75,10 @@ responses pass through its middleware. The [FastAPI integration example](../exam
 contains a copyable helper, FastAPI middleware registration, endpoint code, and
 StatLite target configuration. Only `schema` and `status` are required; all
 individual metrics are optional.
+
+For the integration decision path and guides for other frameworks, see
+[Integrate an application with StatLite](integrate/). For the bounded-profile
+rationale, see [Why StatLite Metrics?](why-statlite-metrics.md).
 
 ## Fields
 
