@@ -7,7 +7,10 @@ application with one small, dependency-light helper.
 
 Express does not have a first-class StatLite target type. Use this direct v1
 integration when StatLite's fixed traffic, error, average-latency, status,
-restart, and process signals fit the application's operational needs.
+restart, and process signals fit the application's operational needs. This
+dependency-light example is a single-process integration. Cluster mode and
+process managers need application-owned shared aggregation or stable
+per-worker routing.
 
 StatLite cannot determine request counts, HTTP errors, or request latency from
 outside the application. The middleware below measures those values where
@@ -167,6 +170,8 @@ value. Unsupported host CPU, memory, and disk fields are omitted.
 
 ## Configure StatLite
 
+Save this as `statlite.yaml`:
+
 ```yaml
 targets:
   - name: "node-express-app"
@@ -179,12 +184,17 @@ poll; it does not add the middleware or endpoint to Express.
 
 ## Run and verify the integration
 
-Install Express, start the application, and generate normal, missing, and
-error responses:
+Install Express and start the application:
 
 ```bash
 npm install express@5.1.0
 node app.js
+```
+
+Leave the application running. In another terminal, generate normal, missing,
+and error responses:
+
+```bash
 curl -s http://127.0.0.1:3000/
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/missing
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/failure

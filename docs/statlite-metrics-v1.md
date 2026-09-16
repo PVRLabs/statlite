@@ -71,10 +71,11 @@ it.
 ## Python and FastAPI
 
 Request metrics must be measured inside the application, where requests and
-responses pass through its middleware. The [FastAPI integration example](../examples/python-fastapi-demo/)
-contains a copyable helper, FastAPI middleware registration, endpoint code, and
-StatLite target configuration. Only `schema` and `status` are required; all
-individual metrics are optional.
+responses pass through its middleware. The [FastAPI integration guide](integrate/python/fastapi.md)
+contains a complete copyable helper, middleware registration, endpoint code,
+and StatLite target configuration. Its [runnable demo](../examples/python-fastapi-demo/)
+keeps the implementation and framework-level tests together. Only `schema`
+and `status` are required; all individual metrics are optional.
 
 For the integration decision path and FastAPI, Express, and Django guides, see
 [Integrate an application with StatLite](integrate/). For the bounded-profile
@@ -156,8 +157,9 @@ them when it deliberately exposes the execution environment visible to its
 process; StatLite displays those values with that application target rather
 than creating a separate target.
 
-The FastAPI helper is illustrative; this document remains the canonical
-contract.
+The FastAPI helper is illustrative; this document remains the canonical wire
+contract, while the FastAPI guide is the canonical framework integration
+documentation.
 
 The configured StatLite target name is authoritative. The application should
 not provide `target_name`, polling timestamps, or other StatLite-owned metadata.

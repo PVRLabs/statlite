@@ -197,6 +197,8 @@ are also omitted.
 
 ## Configure StatLite
 
+Save this as `statlite.yaml`:
+
 ```yaml
 targets:
   - name: "python-django-app"
@@ -209,14 +211,19 @@ poll; it does not add the middleware or endpoint to Django.
 
 ## Run and verify the integration
 
-Install the tested Django version, start one development-server process, and
-generate normal, missing, and application-error responses:
+Install the tested Django version and start one development-server process:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install 'Django==5.2.17'
 python manage.py runserver 127.0.0.1:8000
+```
+
+Leave the application running. In another terminal, generate normal, missing,
+and application-error responses:
+
+```bash
 curl -s http://127.0.0.1:8000/
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/missing
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/failure

@@ -7,8 +7,11 @@ Use this page to choose an application integration and find a copyable guide.
 1. Check the [supported integrations](../integrations.md). If StatLite has a
    first-class integration for your framework, use that target type and its
    documented framework contract.
-2. Otherwise, use the direct [`statlite-metrics/v1`](../statlite-metrics-v1.md)
-   integration. Your application exposes `GET /statlite/metrics`, and StatLite
+2. If StatLite does not have a first-class integration, check the framework
+   guides below. Use the direct
+   [`statlite-metrics/v1`](../statlite-metrics-v1.md) integration when the
+   framework's execution model fits the lightweight application-owned
+   endpoint. Your application exposes `GET /statlite/metrics`, and StatLite
    polls that bounded JSON endpoint with `type: statlite-metrics`.
 3. Follow the framework guide below to add the application middleware, helper,
    and endpoint. Generating StatLite YAML does not replace the required
@@ -25,7 +28,7 @@ technical tradeoffs.
 
 | Framework | First-class target type | Guide |
 | --- | --- | --- |
-| FastAPI | No | [FastAPI](../../examples/python-fastapi-demo/) |
+| FastAPI | No | [FastAPI](python/fastapi.md) |
 | Express | No | [Express](node/express.md) |
 | Django | No | [Django](python/django.md) |
 

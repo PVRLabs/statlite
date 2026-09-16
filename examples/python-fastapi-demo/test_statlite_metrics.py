@@ -1,38 +1,38 @@
-"""Standard-library checks for the copyable StatLite Metrics helper."""
+"""Integration checks for the FastAPI StatLite Metrics demo."""
 
 from __future__ import annotations
 
-import asyncio
+import importlib
 import sys
 import unittest
 from pathlib import Path
 
+from fastapi.testclient import TestClient
+
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from statlite_metrics import DEFAULT_METRICS_PATH, SCHEMA, StatLiteMetrics
-
-
-class _Request:
-    def __init__(self, path: str) -> None:
-        self.url = type("URL", (), {"path": path})()
-
-
-class _Response:
-    status_code = 200
+import app as demo_app
+from statlite_metrics import SCHEMA
 
 
 class StatLiteMetricsTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.demo = importlib.reload(demo_app)
+        self.client = TestClient(self.demo.app, raise_server_exceptions=False)
+
     def test_snapshot_is_application_and_process_profile_without_host_fields(self) -> None:
-        snapshot = StatLiteMetrics().snapshot()
+        snapshot = self.client.get("/statlite/metrics").json()
 
         self.assertEqual(snapshot["schema"], SCHEMA)
         self.assertEqual(snapshot["status"], "UP")
-        self.assertIn("started_at", snapshot)
+        self.assertNotIn("started_at", snapshot)
         metrics = snapshot["metrics"]
         self.assertIn("process_cpu_usage", metrics)
         self.assertNotIn("cpu_usage", metrics)
-        self.assertIn("runtime_heap_used_bytes", metrics)
+        self.assertNotIn("runtime_heap_used_bytes", metrics)
+        self.assertNotIn("uptime_seconds", metrics)
+        self.assertNotIn("request_duration_seconds_max", metrics)
         for key in (
             "host_cpu_usage",
             "host_memory_used_bytes",
@@ -42,14 +42,17 @@ class StatLiteMetricsTests(unittest.TestCase):
         ):
             self.assertNotIn(key, metrics)
 
-    def test_metrics_scrape_does_not_increment_application_counters(self) -> None:
-        helper = StatLiteMetrics()
+    def test_real_responses_are_counted_and_metrics_endpoint_is_excluded(self) -> None:
+        self.assertEqual(self.client.get("/").status_code, 200)
+        self.assertEqual(self.client.get("/missing").status_code, 404)
+        self.assertEqual(self.client.get("/failure").status_code, 500)
 
-        async def call_next(_request: object) -> _Response:
-            return _Response()
+        first = self.client.get("/statlite/metrics").json()["metrics"]
+        second = self.client.get("/statlite/metrics?source=test").json()["metrics"]
 
-        asyncio.run(helper.middleware(_Request(DEFAULT_METRICS_PATH), call_next))
-        self.assertEqual(helper.snapshot()["metrics"]["requests_total"], 0)
-
-        asyncio.run(helper.middleware(_Request("/"), call_next))
-        self.assertEqual(helper.snapshot()["metrics"]["requests_total"], 1)
+        for snapshot in (first, second):
+            self.assertEqual(snapshot["requests_total"], 3)
+            self.assertEqual(snapshot["responses_404_total"], 1)
+            self.assertEqual(snapshot["responses_4xx_total"], 1)
+            self.assertEqual(snapshot["responses_5xx_total"], 1)
+            self.assertGreater(snapshot["request_duration_seconds_total"], 0)

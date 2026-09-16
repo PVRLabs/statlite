@@ -5,8 +5,6 @@ from __future__ import annotations
 import math
 import threading
 import time
-import tracemalloc
-from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
 
 
@@ -17,19 +15,13 @@ DEFAULT_METRICS_PATH = "/statlite/metrics"
 class StatLiteMetrics:
     """Collect the fixed StatLite Metrics v1 profile in process memory.
 
-    ``runtime_heap_used_bytes`` is the current size of Python allocations
-    traced by ``tracemalloc``. It is not RSS, a process memory limit, or a
-    maximum heap value. The field is omitted if tracing is unavailable.
-
     Counters are local to this object, so run one application process (for
     example, one Uvicorn worker) when using this simple implementation.
     """
 
     def __init__(self, metrics_path: str = DEFAULT_METRICS_PATH) -> None:
         self.metrics_path = metrics_path
-        self._started_at = datetime.now(timezone.utc)
-        self._started_monotonic = time.monotonic()
-        self._last_cpu_wall = self._started_monotonic
+        self._last_cpu_wall = time.monotonic()
         self._last_cpu_time = time.process_time()
         self._lock = threading.Lock()
 
@@ -38,14 +30,6 @@ class StatLiteMetrics:
         self._responses_4xx_total = 0
         self._responses_5xx_total = 0
         self._request_duration_seconds_total = 0.0
-        self._request_duration_seconds_max = 0.0
-
-        try:
-            if not tracemalloc.is_tracing():
-                tracemalloc.start()
-            self._tracemalloc_available = tracemalloc.is_tracing()
-        except RuntimeError:
-            self._tracemalloc_available = False
 
     async def middleware(
         self,
@@ -71,8 +55,6 @@ class StatLiteMetrics:
 
     def snapshot(self) -> dict[str, Any]:
         """Return one complete, JSON-serializable StatLite Metrics v1 response."""
-        runtime_heap_used_bytes = self._current_traced_memory()
-
         with self._lock:
             now = time.monotonic()
             process_cpu_time = time.process_time()
@@ -92,22 +74,14 @@ class StatLiteMetrics:
                 "request_duration_seconds_total": (
                     self._request_duration_seconds_total
                 ),
-                "request_duration_seconds_max": self._request_duration_seconds_max,
                 # CPU time consumed during the interval divided by wall time:
                 # 1.0 means one logical CPU core was fully used.
                 "process_cpu_usage": process_cpu_usage,
-                "uptime_seconds": max(0.0, now - self._started_monotonic),
             }
-
-            if runtime_heap_used_bytes is not None:
-                metrics["runtime_heap_used_bytes"] = runtime_heap_used_bytes
 
         return {
             "schema": SCHEMA,
             "status": "UP",
-            "started_at": self._started_at.isoformat(
-                timespec="microseconds"
-            ).replace("+00:00", "Z"),
             "metrics": metrics,
         }
 
@@ -118,9 +92,6 @@ class StatLiteMetrics:
         with self._lock:
             self._requests_total += 1
             self._request_duration_seconds_total += duration
-            self._request_duration_seconds_max = max(
-                self._request_duration_seconds_max, duration
-            )
 
             if status_code == 404:
                 self._responses_404_total += 1
@@ -128,12 +99,3 @@ class StatLiteMetrics:
                 self._responses_4xx_total += 1
             if status_code is not None and 500 <= status_code < 600:
                 self._responses_5xx_total += 1
-
-    def _current_traced_memory(self) -> int | None:
-        if not self._tracemalloc_available:
-            return None
-        try:
-            current, _peak = tracemalloc.get_traced_memory()
-        except RuntimeError:
-            return None
-        return current if current >= 0 else None
