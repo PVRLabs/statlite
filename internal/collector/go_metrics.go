@@ -67,6 +67,22 @@ func evaluateGoMetrics(ctx context.Context, endpoint string, client *prometheus.
 	return n.finish(now)
 }
 
+func (n *goMetricsNormalizer) optionalEvaluation(now time.Time) *goMetricsEvaluation {
+	result := &CollectionResult{}
+	if n.sawHeap && !n.invalidHeap && n.types[goHeapFamily] == "gauge" {
+		result.addSample("runtime_heap_used_bytes", MetricKindGauge, n.heap, "bytes")
+	}
+	if n.sawProcessStart && !n.invalidProcessStart && n.types[goProcessStartName] == "gauge" {
+		started := unixSeconds(n.processStart)
+		if !now.Before(started) {
+			result.ProcessStartTime = &started
+			result.addSample("process_start_time", MetricKindGauge, n.processStart, "unix_seconds")
+			result.addSample("process_uptime", MetricKindGauge, now.Sub(started).Seconds(), "seconds")
+		}
+	}
+	return &goMetricsEvaluation{samples: result.Samples, processStartTime: result.ProcessStartTime}
+}
+
 func (n *goMetricsNormalizer) acceptMetadata(metadata prometheus.Metadata) error {
 	want, recognized := map[string]string{
 		goHTTPFamily: "histogram", goHeapFamily: "gauge", goProcessStartName: "gauge",
@@ -196,23 +212,13 @@ func (n *goMetricsNormalizer) finish(now time.Time) (*goMetricsEvaluation, error
 		}
 		population[tuple.method+"\x00"+tuple.code] = populationValue{count: pair.count, sum: pair.sum}
 	}
-	result := &CollectionResult{}
+	optional := n.optionalEvaluation(now)
+	result := &CollectionResult{Samples: optional.samples, ProcessStartTime: optional.processStartTime}
 	result.addSample("http_requests_total", MetricKindCounter, requests, "requests")
 	result.addSample("http_404_total", MetricKindCounter, notFound, "requests")
 	result.addSample("http_4xx_total", MetricKindCounter, clientErrors, "requests")
 	result.addSample("http_5xx_total", MetricKindCounter, serverErrors, "requests")
 	result.addSample("http_request_time_total_seconds", MetricKindCounter, duration, "seconds")
-	if n.sawHeap && !n.invalidHeap && n.types[goHeapFamily] == "gauge" {
-		result.addSample("runtime_heap_used_bytes", MetricKindGauge, n.heap, "bytes")
-	}
-	if n.sawProcessStart && !n.invalidProcessStart && n.types[goProcessStartName] == "gauge" {
-		started := unixSeconds(n.processStart)
-		if !now.Before(started) {
-			result.ProcessStartTime = &started
-			result.addSample("process_start_time", MetricKindGauge, n.processStart, "unix_seconds")
-			result.addSample("process_uptime", MetricKindGauge, now.Sub(started).Seconds(), "seconds")
-		}
-	}
 	return &goMetricsEvaluation{samples: result.Samples, processStartTime: result.ProcessStartTime, httpPopulation: population}, nil
 }
 

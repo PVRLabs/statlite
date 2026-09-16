@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -53,6 +54,69 @@ func TestPollNowTracksFailureStatusAndStoresFailedPoll(t *testing.T) {
 	if status.LastFailedPollAt == nil {
 		t.Fatal("LastFailedPollAt = nil, want timestamp")
 	}
+}
+
+func TestGoCollectorContinuityBreakDoesNotBridgeQueryTimeDeltas(t *testing.T) {
+	var body atomic.Value
+	body.Store(goMonitorBody(10, 1))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		_, _ = fmt.Fprint(w, body.Load().(string))
+	}))
+	defer server.Close()
+	client, err := prometheus.NewClient(time.Second, prometheus.DefaultLimits, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := openTestStore(t)
+	defer store.Close()
+	mon := newTestMonitor(t, store, collector.NewGoCollector("app", server.URL, client))
+	poll := func(wantErr bool) {
+		t.Helper()
+		_, err := mon.PollNow(context.Background())
+		if (err != nil) != wantErr {
+			t.Fatalf("PollNow() error = %v, wantErr=%v", err, wantErr)
+		}
+	}
+
+	poll(false) // raw baseline
+	body.Store(goMonitorBody(12, 1.2))
+	poll(false) // logical cumulative count=2, duration=.2 (stored baseline)
+	body.Store("# TYPE go_memstats_heap_alloc_bytes gauge\ngo_memstats_heap_alloc_bytes 1\n")
+	poll(true) // withdrawal breaks continuity
+	body.Store(goMonitorBody(30, 3))
+	poll(false) // recovery raw baseline
+	body.Store(goMonitorBody(31, 3.1))
+	poll(false) // logical cumulative count=3, duration=.3
+	body.Store(goMonitorBody(32, 3.2))
+	poll(false) // logical cumulative count=4, duration=.4
+
+	series, err := mon.Series(context.Background(), time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var requestDeltas, durationDeltas []float64
+	for _, point := range series.Points {
+		if point.Requests != nil {
+			requestDeltas = append(requestDeltas, *point.Requests)
+		}
+		if point.AverageLatencySeconds != nil {
+			durationDeltas = append(durationDeltas, *point.AverageLatencySeconds)
+		}
+	}
+	if fmt.Sprint(requestDeltas) != "[1 1]" {
+		t.Fatalf("request deltas = %v, want [1 1] without withdrawn interval", requestDeltas)
+	}
+	if len(durationDeltas) != 2 || math.Abs(durationDeltas[0]-0.1) > 1e-12 || math.Abs(durationDeltas[1]-0.1) > 1e-12 {
+		t.Fatalf("latency points = %v, want [0.1 0.1] seconds", durationDeltas)
+	}
+}
+
+func goMonitorBody(count int, sum float64) string {
+	return fmt.Sprintf("# TYPE go_http_request_duration_seconds histogram\n"+
+		"go_http_request_duration_seconds_count{method=\"get\",code=\"200\"} %d\n"+
+		"go_http_request_duration_seconds_sum{method=\"get\",code=\"200\"} %v\n"+
+		"# TYPE process_start_time_seconds gauge\nprocess_start_time_seconds 1000\n", count, sum)
 }
 
 func TestSpringHealthWarningWithCountersAdvancesSuccessfulBaseline(t *testing.T) {
