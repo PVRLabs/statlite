@@ -208,6 +208,31 @@ func TestRunTypedInspectDispatchesOnlyToRequestedTarget(t *testing.T) {
 	}
 }
 
+func TestRunTypedGoInspectRendersLoadableExactEndpoint(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	endpoint := "http://app.test/custom/metrics/?scope=app"
+	code := runWithInspectors([]string{"inspect", "--type", "go", endpoint}, &stdout, &stderr,
+		func(context.Context, string) (*inspect.Result, error) {
+			return nil, errors.New("untyped inspector must not run")
+		},
+		func(_ context.Context, targetType inspect.TargetType, gotEndpoint string) (*inspect.Result, error) {
+			if targetType != inspect.TargetGo || gotEndpoint != endpoint {
+				t.Fatalf("typed inspection arguments = %q, %q", targetType, gotEndpoint)
+			}
+			return &inspect.Result{
+				TargetType: inspect.TargetGo, Endpoint: endpoint, Status: inspect.CompatibilityCompatible,
+				Capabilities: []string{"http_requests_total"},
+			}, nil
+		})
+	if code != 0 || stderr.Len() != 0 {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Detected: Go net/http Metrics") || !strings.Contains(stdout.String(), "type: go") || !strings.Contains(stdout.String(), "Compatibility: compatible") {
+		t.Fatalf("stdout = %q, want typed Go output", stdout.String())
+	}
+	assertSuggestedConfigLoads(t, stdout.String(), config.TargetTypeGo, endpoint)
+}
+
 func TestRenderInspectionSpringOutputAndConfigRoundTrip(t *testing.T) {
 	result := &inspect.Result{
 		TargetType:   inspect.TargetSpring,
@@ -355,8 +380,8 @@ func TestRunInspectTypeErrorsUseAccurateUsageMessages(t *testing.T) {
 		targetType string
 		want       string
 	}{
-		{targetType: "prometheus", want: `unsupported inspection type "prometheus" (supported: quarkus)`},
-		{targetType: "spring", want: `typed inspection type "spring" is not available (supported: quarkus)`},
+		{targetType: "prometheus", want: `unsupported inspection type "prometheus" (supported: quarkus, go)`},
+		{targetType: "spring", want: `typed inspection type "spring" is not available (supported: quarkus, go)`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.targetType, func(t *testing.T) {

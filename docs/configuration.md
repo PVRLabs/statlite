@@ -61,6 +61,7 @@ a Quarkus application base URL or an exact Quarkus metrics URL, select the type:
 ```bash
 statlite inspect --type quarkus 'http://localhost:9000'
 statlite inspect --type quarkus 'http://localhost:9000/q/metrics'
+statlite inspect --type go 'http://localhost:8080/metrics?scope=app'
 ```
 
 Typed Quarkus inspection accepts only StatLite's bounded Quarkus contract, not
@@ -68,6 +69,20 @@ arbitrary Prometheus or Micrometer exposition. A root application URL resolves
 to `/q/metrics`. A non-root URL is tried first as an exact endpoint and then,
 after a conclusive miss, with `/q/metrics` appended. A URL containing a query
 string is always an exact endpoint and is preserved.
+
+Typed Go inspection always treats its URL as the exact metrics endpoint. It
+does not append `/metrics` or probe another path, and it preserves the path,
+trailing slash, and query string exactly. It accepts only the certified
+`go_http_request_duration_seconds` histogram contract. A valid observed HTTP
+population is compatible. An exact histogram declaration with no observed
+request tuple is reported as partial and unconfirmed. Valid recognized Go
+runtime or process metrics without an observable HTTP population are also
+partial and unconfirmed, with guidance to generate traffic and inspect again.
+Unrelated exposition and contradictory or invalid HTTP data are incompatible.
+Invalid optional runtime or process concepts are omitted with a focused partial
+warning when the required HTTP contract is otherwise valid.
+Application health remains unavailable because a successful metrics scrape is
+evidence of reporting, not an authoritative health signal.
 
 On success, `inspect` prints the recognized capabilities, a minimal
 configuration, and the next command. Save the configuration as `statlite.yaml`

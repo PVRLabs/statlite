@@ -60,7 +60,7 @@ func runInspectWithTyped(args []string, stdout, stderr io.Writer, inspectApplica
 	inspectFlags.Usage = func() {
 		printInspectHelp(stderr)
 	}
-	typed := inspectFlags.String("type", "", "inspect a specific target type (currently: quarkus)")
+	typed := inspectFlags.String("type", "", "inspect a specific target type (currently: quarkus, go)")
 	if err := inspectFlags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -269,6 +269,7 @@ Usage:
   statlite [--config path] [--no-poll]
   statlite inspect <application-url>
   statlite inspect --type quarkus <application-or-metrics-url>
+  statlite inspect --type go <metrics-url>
   statlite --version
   statlite --help
 
@@ -295,9 +296,13 @@ Inspection is read-only and does not require or create statlite.yaml.
 Use --type quarkus with a Quarkus application URL or an exact customized
 Prometheus/OpenMetrics endpoint. A base URL uses the conventional /q/metrics path.
 
+Use --type go with the exact Prometheus/OpenMetrics endpoint implementing the
+supported Go net/http histogram contract. The path and query string are preserved.
+
 Quote the URL when pasting it from a browser, especially if it contains ? or &.
 Untyped inspection requires a base URL, so remove any query string or fragment first.
-Typed Quarkus inspection accepts a base URL or exact metrics endpoint URL.`)
+Typed Quarkus inspection accepts a base URL or exact metrics endpoint URL.
+Typed Go inspection accepts only an exact metrics endpoint URL.`)
 }
 
 const configurationDocsURL = "https://github.com/PVRLabs/statlite/blob/main/docs/configuration.md"
@@ -381,6 +386,12 @@ func inspectionPresentation(targetType inspect.TargetType) (inspectionTargetPres
 			targetType:   config.TargetTypeQuarkus,
 			errorContext: "quarkus target",
 		}, nil
+	case inspect.TargetGo:
+		return inspectionTargetPresentation{
+			displayName:  "Go net/http Metrics",
+			targetType:   config.TargetTypeGo,
+			errorContext: "go target",
+		}, nil
 	default:
 		return inspectionTargetPresentation{}, fmt.Errorf("unsupported inspection target type %q", targetType)
 	}
@@ -429,7 +440,7 @@ func printInspectFailure(w io.Writer, err error) {
 	case inspect.FailureMultiple:
 		fmt.Fprintln(w, "inspect: more than one supported integration was found")
 	case inspect.FailureIncompatible:
-		fmt.Fprintf(w, "inspect: the configured Quarkus metrics endpoint is incompatible: %v\n", failure.Err)
+		fmt.Fprintf(w, "inspect: the configured metrics endpoint is incompatible: %v\n", failure.Err)
 	case inspect.FailureTypeUnsupported, inspect.FailureTypeUnavailable:
 		fmt.Fprintf(w, "inspect: %v\n", failure)
 	default:

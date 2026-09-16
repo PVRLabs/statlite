@@ -33,6 +33,7 @@ type TargetType string
 const (
 	TargetSpring          TargetType = "spring"
 	TargetQuarkus         TargetType = "quarkus"
+	TargetGo              TargetType = "go"
 	TargetStatliteMetrics TargetType = "statlite-metrics"
 )
 
@@ -124,10 +125,12 @@ func Inspect(ctx context.Context, targetType TargetType, rawURL string) (*Result
 		return inspectSpring(ctx, rawURL)
 	case TargetQuarkus:
 		return inspectQuarkus(ctx, rawURL)
+	case TargetGo:
+		return inspectGo(ctx, rawURL)
 	default:
 		return nil, &Failure{
 			Kind: FailureTypeUnsupported,
-			Err:  fmt.Errorf("unsupported inspection type %q (supported: quarkus)", targetType),
+			Err:  fmt.Errorf("unsupported inspection type %q (supported: quarkus, go)", targetType),
 		}
 	}
 }
@@ -138,7 +141,7 @@ func Inspect(ctx context.Context, targetType TargetType, rawURL string) (*Result
 func inspectSpring(context.Context, string) (*Result, error) {
 	return nil, &Failure{
 		Kind: FailureTypeUnavailable,
-		Err:  errors.New("typed inspection type \"spring\" is not available (supported: quarkus)"),
+		Err:  errors.New("typed inspection type \"spring\" is not available (supported: quarkus, go)"),
 	}
 }
 

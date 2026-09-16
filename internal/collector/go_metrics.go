@@ -23,6 +23,16 @@ const (
 
 var errGoMetricsContract = errors.New("Go metrics contract is incompatible")
 
+// ErrGoIncompatible identifies exposition that does not establish the exact
+// supported Go net/http metrics contract.
+var ErrGoIncompatible = errGoMetricsContract
+
+type GoInspection struct {
+	Status       string
+	Capabilities []string
+	Warnings     []string
+}
+
 type goMetricTuple struct{ method, code string }
 type goMetricPair struct {
 	count, sum       float64
@@ -65,6 +75,75 @@ func evaluateGoMetrics(ctx context.Context, endpoint string, client *prometheus.
 		return nil, fmt.Errorf("scraping Go metrics: %w", err)
 	}
 	return n.finish(now)
+}
+
+// InspectGo evaluates one bounded scrape without creating continuity state.
+func InspectGo(ctx context.Context, endpoint string, client *prometheus.Client) (*GoInspection, error) {
+	if client == nil || endpoint == "" {
+		return nil, errors.New("Go metrics client is not configured")
+	}
+	n := newGoMetricsNormalizer(client.MaxAggregationStates())
+	if _, err := client.ScrapeWithMetadata(ctx, endpoint, n.acceptMetadata, n.acceptSample); err != nil {
+		return nil, fmt.Errorf("scraping Go metrics: %w", err)
+	}
+	now := time.Now().UTC()
+	evaluation, err := n.finish(now)
+	if err != nil {
+		optional := n.optionalEvaluation(now)
+		optionalCapabilities, optionalWarnings := n.optionalInspection(optional)
+		if n.contractErr == nil && len(n.tuples) == 0 && n.types[goHTTPFamily] == "histogram" && !n.sawFamily[goHTTPFamily] {
+			inspection := &GoInspection{Status: "partial", Capabilities: optionalCapabilities, Warnings: optionalWarnings}
+			inspection.Warnings = append(inspection.Warnings, "Go HTTP instrumentation is recognized but has no observed requests; compatibility remains unconfirmed until a count/sum tuple is exposed")
+			return inspection, nil
+		}
+		if n.contractErr == nil && len(n.tuples) == 0 && !n.sawFamily[goHTTPFamily] {
+			if len(optionalCapabilities) != 0 {
+				return &GoInspection{
+					Status:       "partial",
+					Capabilities: optionalCapabilities,
+					Warnings: append(optionalWarnings,
+						"Go runtime/process metrics are recognized, but the required HTTP histogram population is not observable; generate HTTP traffic and inspect again"),
+				}, nil
+			}
+			return nil, fmt.Errorf("%w: required go_http_request_duration_seconds histogram and valid recognized Go runtime/process metrics were not observed", errGoMetricsContract)
+		}
+		return nil, err
+	}
+	inspection := &GoInspection{Status: "compatible"}
+	for _, sample := range evaluation.samples {
+		inspection.Capabilities = append(inspection.Capabilities, sample.Key)
+	}
+	_, inspection.Warnings = n.optionalInspection(evaluation)
+	if len(inspection.Warnings) != 0 {
+		inspection.Status = "partial"
+	}
+	return inspection, nil
+}
+
+func (n *goMetricsNormalizer) optionalInspection(evaluation *goMetricsEvaluation) ([]string, []string) {
+	var capabilities, warnings []string
+	for _, sample := range evaluation.samples {
+		switch sample.Key {
+		case "runtime_heap_used_bytes", "process_start_time", "process_uptime":
+			capabilities = append(capabilities, sample.Key)
+		}
+	}
+	if (n.sawFamily[goHeapFamily] || n.types[goHeapFamily] != "") && !hasMetricCapability(capabilities, "runtime_heap_used_bytes") {
+		warnings = append(warnings, "optional Go runtime heap metric is invalid or missing required metadata and was omitted")
+	}
+	if (n.sawFamily[goProcessStartName] || n.types[goProcessStartName] != "") && !hasMetricCapability(capabilities, "process_start_time") {
+		warnings = append(warnings, "optional process start metric is invalid, unsafe, or missing required metadata and was omitted")
+	}
+	return capabilities, warnings
+}
+
+func hasMetricCapability(capabilities []string, key string) bool {
+	for _, capability := range capabilities {
+		if capability == key {
+			return true
+		}
+	}
+	return false
 }
 
 func (n *goMetricsNormalizer) optionalEvaluation(now time.Time) *goMetricsEvaluation {

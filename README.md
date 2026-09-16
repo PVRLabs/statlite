@@ -104,6 +104,7 @@ For other supported frameworks, select the type explicitly when needed:
 
 ```bash
 statlite inspect --type quarkus 'http://localhost:9000'
+statlite inspect --type go 'http://localhost:8080/metrics'
 ```
 
 Inspection checks conventional supported endpoints and is bounded and
