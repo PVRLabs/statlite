@@ -13,7 +13,7 @@ import (
 
 // GoCollector owns the transient full-tuple state needed to avoid attributing
 // traffic across missing, invalid, or changing Go histogram populations. It is
-// intentionally not wired to a public target type until Phase 2.
+// remains bounded to the exact Go HTTP contract validated by this collector.
 type GoCollector struct {
 	targetName string
 	endpoint   string

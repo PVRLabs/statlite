@@ -48,9 +48,19 @@ func newCollector(target config.TargetConfig, timeout time.Duration) (monitor.Co
 		return newStatliteMetricsCollector(target, timeout)
 	case config.TargetTypeQuarkus:
 		return newQuarkusCollector(target, timeout)
+	case config.TargetTypeGo:
+		return newGoCollector(target, timeout)
 	default:
 		return nil, fmt.Errorf("unsupported target type %q", target.Type)
 	}
+}
+
+func newGoCollector(target config.TargetConfig, timeout time.Duration) (monitor.Collector, error) {
+	client, err := prometheus.NewClient(timeout, prometheus.DefaultLimits, prometheusAuthConfig(target.Auth))
+	if err != nil {
+		return nil, fmt.Errorf("go metrics client: %w", err)
+	}
+	return collector.NewGoCollector(target.Name, target.URL, client), nil
 }
 
 func newSpringCollector(target config.TargetConfig, timeout time.Duration) (monitor.Collector, error) {

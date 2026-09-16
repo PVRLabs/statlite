@@ -688,6 +688,8 @@ function targetTypeHelp(value) {
     return "Monitors a Spring Boot application through Actuator health and metrics endpoints.";
   case "quarkus":
     return "Monitors a Quarkus application through its metrics endpoint; SmallRye Health is used when available.";
+  case "go":
+    return "Monitors a Go application that exposes StatLite’s certified net/http metrics contract.";
   case "statlite-metrics":
     return "Monitors an app that exposes metrics in StatLite’s standard format.";
   default:

@@ -30,6 +30,12 @@ func TestNewCollectorBuildsConfiguredTargetTypes(t *testing.T) {
 			wantTarget: "*collector.QuarkusCollector",
 		},
 		{
+			name:       "go",
+			target:     config.TargetConfig{Name: "api", Type: config.TargetTypeGo, URL: "https://example.com/metrics"},
+			wantType:   "go",
+			wantTarget: "*collector.GoCollector",
+		},
+		{
 			name:       "default spring",
 			target:     config.TargetConfig{Name: "spring", URL: "https://example.com/actuator"},
 			wantType:   "spring",
@@ -73,6 +79,49 @@ func TestNewCollectorRejectsInvalidStatliteMetricsURL(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "statlite metrics client") || !strings.Contains(err.Error(), "must use http or https") {
 		t.Fatalf("newCollector() error = %q, want statlite metrics URL context", err)
+	}
+}
+
+func TestNewCollectorBuildsGoCollectorWithBasicAuthAndExactEndpoint(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, password, ok := r.BasicAuth()
+		if !ok || user != "user" || password != "secret" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if r.URL.Path != "/custom/metrics" || r.URL.RawQuery != "scope=app" {
+			http.NotFound(w, r)
+			return
+		}
+		requests++
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		_, _ = fmt.Fprintf(w, "# TYPE go_http_request_duration_seconds histogram\n"+
+			"go_http_request_duration_seconds_sum{code=\"200\",method=\"get\"} %d\n"+
+			"go_http_request_duration_seconds_count{code=\"200\",method=\"get\"} %d\n"+
+			"# TYPE go_memstats_heap_alloc_bytes gauge\n"+
+			"go_memstats_heap_alloc_bytes 1024\n", requests, requests)
+	}))
+	defer server.Close()
+
+	targetCollector, err := newCollector(config.TargetConfig{
+		Name: "api",
+		Type: config.TargetTypeGo,
+		URL:  server.URL + "/custom/metrics?scope=app",
+		Auth: &config.AuthConfig{Type: "basic", Username: "user", Password: "secret"},
+	}, time.Second)
+	if err != nil {
+		t.Fatalf("newCollector() error = %v", err)
+	}
+	if _, err := targetCollector.Collect(context.Background()); err != nil {
+		t.Fatalf("first Collect() error = %v", err)
+	}
+	result, err := targetCollector.Collect(context.Background())
+	if err != nil {
+		t.Fatalf("second Collect() error = %v", err)
+	}
+	if requests != 2 || !hasSampleValue(result.Samples, "http_requests_total", 1) || !hasSampleValue(result.Samples, "runtime_heap_used_bytes", 1024) {
+		t.Fatalf("Go collection requests = %d, samples = %#v", requests, result.Samples)
 	}
 }
 
@@ -384,4 +433,13 @@ targets:
 
 func typeName(value any) string {
 	return reflect.TypeOf(value).String()
+}
+
+func hasSampleValue(samples []collector.MetricSample, key string, value float64) bool {
+	for _, sample := range samples {
+		if sample.Key == key && sample.Value == value {
+			return true
+		}
+	}
+	return false
 }

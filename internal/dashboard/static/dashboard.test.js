@@ -27,6 +27,13 @@ test("targetTypeHelp describes the Quarkus metrics endpoint", () => {
   );
 });
 
+test("targetTypeHelp describes the certified Go metrics contract", () => {
+  assert.equal(
+    dashboard.targetTypeHelp("go"),
+    "Monitors a Go application that exposes StatLite’s certified net/http metrics contract."
+  );
+});
+
 test("runtimeHelp describes generic application runtime memory", () => {
   assert.equal(
     dashboard.runtimeHelp("statlite-metrics"),

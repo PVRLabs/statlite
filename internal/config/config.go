@@ -16,6 +16,7 @@ const (
 	// When adding a target type, also update targetTypeHelp in the dashboard.
 	TargetTypeSpring          = "spring"
 	TargetTypeQuarkus         = "quarkus"
+	TargetTypeGo              = "go"
 	TargetTypeStatliteMetrics = "statlite-metrics"
 
 	SpringMetricsSourceAuto       = "auto"
@@ -213,16 +214,20 @@ func (c *Config) validateTargets() error {
 			if err := validateQuarkusTarget(i, target); err != nil {
 				return err
 			}
+		case TargetTypeGo:
+			if err := validateGoTarget(i, target); err != nil {
+				return err
+			}
 		case TargetTypeStatliteMetrics:
 			if err := validateStatliteMetricsTarget(i, target); err != nil {
 				return err
 			}
 		default:
-			return fmt.Errorf("targets[%d].type: unsupported type %q (supported: spring, quarkus, statlite-metrics)", i, targetType)
+			return fmt.Errorf("targets[%d].type: unsupported type %q (supported: spring, quarkus, go, statlite-metrics)", i, targetType)
 		}
 		if target.Auth != nil {
-			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus {
-				return fmt.Errorf("targets[%d].auth is currently supported only for type spring and quarkus", i)
+			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus && targetType != TargetTypeGo {
+				return fmt.Errorf("targets[%d].auth is currently supported only for type spring, quarkus, and go", i)
 			}
 			if target.Auth.Type != "basic" {
 				return fmt.Errorf("targets[%d].auth.type: unsupported type %q (only 'basic' is supported)", i, target.Auth.Type)
@@ -240,6 +245,25 @@ func (c *Config) validateTargets() error {
 		if (target.HealthURL != "" || target.healthURLSet) && targetType != TargetTypeQuarkus {
 			return fmt.Errorf("targets[%d].health_url is supported only for type quarkus", i)
 		}
+	}
+	return nil
+}
+
+func validateGoTarget(index int, target *TargetConfig) error {
+	if target.URL == "" {
+		return fmt.Errorf("targets[%d].url is required for type go", index)
+	}
+	if target.ActuatorBaseURL != "" || target.actuatorURLSet {
+		return fmt.Errorf("targets[%d].actuator_base_url is supported only for type spring", index)
+	}
+	if target.MetricsSource != "" || target.metricsSourceSet {
+		return fmt.Errorf("targets[%d].metrics_source is supported only for type spring", index)
+	}
+	if target.CollectHostMetrics || target.collectHostSet {
+		return fmt.Errorf("targets[%d].collect_host_metrics is supported only for type spring", index)
+	}
+	if err := validateMetricsURL(target.URL); err != nil {
+		return fmt.Errorf("targets[%d].url for type go: %w", index, err)
 	}
 	return nil
 }
@@ -324,6 +348,10 @@ func (t TargetConfig) UsesLegacyActuatorURLUserinfo() bool {
 }
 
 func validateQuarkusURL(raw string) error {
+	return validateMetricsURL(raw)
+}
+
+func validateMetricsURL(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil {
 		return fmt.Errorf("must be an http or https URL without user info")
