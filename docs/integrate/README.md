@@ -26,8 +26,8 @@ technical tradeoffs.
 | Framework | First-class target type | Guide |
 | --- | --- | --- |
 | FastAPI | No | [FastAPI](../../examples/python-fastapi-demo/) |
-| Express | No | [Express](node/express.md) (planned) |
-| Django | No | [Django](python/django.md) (planned) |
+| Express | No | [Express](node/express.md) |
+| Django | No | [Django](python/django.md) |
 
 These stable guide locations are suitable for linking from configuration
 tools. Each direct-integration guide uses `type: statlite-metrics`, the
