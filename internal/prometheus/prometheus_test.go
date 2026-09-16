@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -82,6 +83,95 @@ func TestParseSampleLimit(t *testing.T) {
 	l.MaxSamples = 2
 	_, err := Parse(strings.NewReader("a 1\nb 2\nc 3\n"), TextFormat, l, nil)
 	assertClass(t, err, FailureUnsafe)
+}
+
+func TestParseWithMetadataReportsTypeDeclarationsInOrder(t *testing.T) {
+	var events []string
+	_, err := ParseWithMetadata(strings.NewReader("# TYPE requests_total counter\nrequests_total 1\n"), TextFormat, testLimits(), func(m Metadata) error {
+		events = append(events, "type:"+m.Family+":"+m.Type)
+		return nil
+	}, func(s Sample) error {
+		events = append(events, "sample:"+s.Name)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"type:requests_total:counter", "sample:requests_total"}
+	if !reflect.DeepEqual(events, want) {
+		t.Fatalf("events = %#v, want %#v", events, want)
+	}
+}
+
+func TestParseRejectsMalformedTypeDeclaration(t *testing.T) {
+	for _, input := range []string{
+		"# TYPE requests_total\n",
+		"# TYPE bad-name counter\n",
+		"# TYPE requests_total mystery\n",
+	} {
+		if _, err := ParseWithMetadata(strings.NewReader(input), TextFormat, testLimits(), func(Metadata) error { return nil }, nil); err == nil {
+			t.Fatalf("ParseWithMetadata(%q) succeeded, want malformed TYPE error", input)
+		}
+	}
+}
+
+func TestParseIgnoresMalformedTypeCommentWithoutMetadataHandler(t *testing.T) {
+	input := "# TYPE vendor_metric custom\nmetric 1\n"
+	var got []Sample
+	stats, err := Parse(strings.NewReader(input), TextFormat, testLimits(), func(sample Sample) error {
+		got = append(got, sample)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.Samples != 1 || len(got) != 1 || got[0].Name != "metric" {
+		t.Fatalf("stats/samples = %#v/%#v, want legacy comment handling", stats, got)
+	}
+}
+
+func TestParseIgnoresCommentsWhoseNamesStartWithType(t *testing.T) {
+	if _, err := Parse(strings.NewReader("# TYPEwriter is an ordinary comment\nmetric 1\n"), TextFormat, testLimits(), nil); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestParseAcceptsUnrelatedOpenMetricsUnknownFamily(t *testing.T) {
+	var got []Sample
+	var gotMetadata []Metadata
+	input := "# TYPE some_metric unknown\nsome_metric 1\n# EOF\n"
+	stats, err := ParseWithMetadata(strings.NewReader(input), OpenMetricsFormat, testLimits(), func(metadata Metadata) error {
+		gotMetadata = append(gotMetadata, metadata)
+		return nil
+	}, func(sample Sample) error {
+		got = append(got, sample)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.Samples != 1 || len(got) != 1 || got[0].Name != "some_metric" || got[0].Value != 1 ||
+		len(gotMetadata) != 1 || gotMetadata[0] != (Metadata{Family: "some_metric", Type: "unknown"}) {
+		t.Fatalf("stats/metadata/samples = %#v/%#v/%#v, want unrelated unknown family accepted", stats, gotMetadata, got)
+	}
+}
+
+func TestParseMetricTypesAreFormatSpecific(t *testing.T) {
+	tests := []struct {
+		name   string
+		format Format
+		input  string
+	}{
+		{name: "OpenMetrics rejects untyped", format: OpenMetricsFormat, input: "# TYPE metric untyped\n# EOF\n"},
+		{name: "Prometheus text rejects unknown", format: TextFormat, input: "# TYPE metric unknown\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := ParseWithMetadata(strings.NewReader(tt.input), tt.format, testLimits(), func(Metadata) error { return nil }, nil); err == nil {
+				t.Fatalf("ParseWithMetadata(%q, %s) succeeded, want invalid metric type", tt.input, tt.format)
+			}
+		})
+	}
 }
 
 func TestClientNegotiatesAndDecompresses(t *testing.T) {

@@ -110,6 +110,11 @@ func newClient(timeout time.Duration, limits Limits, auth *BasicAuth, transport 
 // Scrape fetches and parses one exposition response. The handler is called as
 // samples are parsed; callers should retain only target-relevant state.
 func (c *Client) Scrape(ctx context.Context, endpoint string, handler Handler) (Stats, error) {
+	return c.ScrapeWithMetadata(ctx, endpoint, nil, handler)
+}
+
+// ScrapeWithMetadata is Scrape with TYPE declarations reported in stream order.
+func (c *Client) ScrapeWithMetadata(ctx context.Context, endpoint string, metadataHandler MetadataHandler, handler Handler) (Stats, error) {
 	u, err := url.Parse(endpoint)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil {
 		return Stats{}, failure(FailureInvalidURL, 0, "invalid Prometheus URL", err)
@@ -159,12 +164,16 @@ func (c *Client) Scrape(ctx context.Context, endpoint string, handler Handler) (
 		body = gz
 	}
 	body = &countingReader{r: body, max: c.limits.MaxDecompressedBytes, name: "decompressed response"}
-	stats, err := Parse(body, format, c.limits, handler)
+	stats, err := ParseWithMetadata(body, format, c.limits, metadataHandler, handler)
 	if err != nil {
 		return stats, err
 	}
 	return stats, nil
 }
+
+// MaxAggregationStates returns the configured bound available to a target's
+// transient aggregation state.
+func (c *Client) MaxAggregationStates() int { return c.limits.MaxAggregationStates }
 
 type Format string
 
@@ -233,9 +242,17 @@ type Sample struct {
 	Value  float64
 }
 type Handler func(Sample) error
+type MetadataHandler func(Metadata) error
+type Metadata struct{ Family, Type string }
 type Stats struct{ Samples int }
 
 func Parse(r io.Reader, format Format, limits Limits, handler Handler) (Stats, error) {
+	return ParseWithMetadata(r, format, limits, nil, handler)
+}
+
+// ParseWithMetadata parses samples and reports TYPE declarations in stream
+// order. Other comments remain intentionally invisible to callers.
+func ParseWithMetadata(r io.Reader, format Format, limits Limits, metadataHandler MetadataHandler, handler Handler) (Stats, error) {
 	if err := limits.validate(); err != nil {
 		return Stats{}, err
 	}
@@ -260,6 +277,15 @@ func Parse(r io.Reader, format Format, limits Limits, handler Handler) (Stats, e
 			continue
 		}
 		if strings.HasPrefix(line, "#") {
+			if metadataHandler != nil {
+				if metadata, ok, err := parseTypeMetadata(line, format); err != nil {
+					return stats, failure(FailureMalformed, 0, err.Error(), err)
+				} else if ok {
+					if err := metadataHandler(metadata); err != nil {
+						return stats, err
+					}
+				}
+			}
 			continue
 		}
 		sample, err := parseSample(line, format, limits)
@@ -294,6 +320,33 @@ func Parse(r io.Reader, format Format, limits Limits, handler Handler) (Stats, e
 		return stats, failure(FailureMalformed, 0, "OpenMetrics exposition is missing # EOF", nil)
 	}
 	return stats, nil
+}
+
+func parseTypeMetadata(line string, format Format) (Metadata, bool, error) {
+	if line != "# TYPE" && !strings.HasPrefix(line, "# TYPE ") && !strings.HasPrefix(line, "# TYPE\t") {
+		return Metadata{}, false, nil
+	}
+	fields := strings.Fields(line)
+	if len(fields) != 4 || fields[0] != "#" || fields[1] != "TYPE" || !validMetricName(fields[2]) {
+		return Metadata{}, false, errors.New("invalid Prometheus TYPE declaration")
+	}
+	if validMetricType(fields[3], format) {
+		return Metadata{Family: fields[2], Type: fields[3]}, true, nil
+	}
+	return Metadata{}, false, fmt.Errorf("invalid %s metric type %q", format, fields[3])
+}
+
+func validMetricType(metricType string, format Format) bool {
+	switch metricType {
+	case "counter", "gauge", "histogram", "summary":
+		return true
+	case "untyped":
+		return format == TextFormat
+	case "unknown", "info", "stateset", "gaugehistogram":
+		return format == OpenMetricsFormat
+	default:
+		return false
+	}
 }
 
 func parseSample(line string, format Format, limits Limits) (Sample, error) {
