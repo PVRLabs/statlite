@@ -2,8 +2,9 @@
 
 Starter configurations and runnable demo apps for monitoring applications with
 StatLite. See [Configuration](../docs/configuration.md) for the full settings
-reference and [StatLite Metrics v1](../docs/statlite-metrics-v1.md) for the
-fixed JSON endpoint profile.
+reference, [StatLite Metrics v1](../docs/statlite-metrics-v1.md) for the fixed
+JSON endpoint profile, and the [integration guides](../docs/integrate/) for
+FastAPI, Express, and Django application setup.
 
 ## Config files
 

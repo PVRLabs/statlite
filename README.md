@@ -112,7 +112,9 @@ query string or fragment.
 
 See [Configuration](docs/configuration.md) for exact endpoint forms, discovery
 limits, authentication limitations, all settings, and manual target
-configuration. See [`examples/`](examples/) for complete configurations.
+configuration. See the [StatLite Metrics integration guides](docs/integrate/)
+when the application needs to add the `/statlite/metrics` endpoint. See
+[`examples/`](examples/) for complete configurations.
 
 > [!IMPORTANT]
 > StatLite has no built-in dashboard or API authentication. Review the
@@ -130,7 +132,9 @@ configuration. See [`examples/`](examples/) for complete configurations.
   and restart concepts from an exact Prometheus/OpenMetrics endpoint. SmallRye
   Health is an optional capability when the application publishes it.
 - **[StatLite Metrics v1](docs/statlite-metrics-v1.md):** A small, fixed JSON
-  endpoint that applications in any language or framework can implement.
+  endpoint that applications in any language or framework can implement. See
+  the [direct integration guides](docs/integrate/) for FastAPI, Express, and
+  Django.
 - **StatLite self-monitoring:** StatLite can report its own health, traffic,
   process, and host metrics.
 
@@ -145,6 +149,7 @@ application's environment.
 - [Configuration](docs/configuration.md)
 - [Deprecations and compatibility](docs/deprecations.md)
 - [Supported integrations](docs/integrations.md)
+- [StatLite Metrics integration guides](docs/integrate/)
 - [Monitoring on resource-constrained servers](docs/low-resource-monitoring.md)
 - [StatLite Metrics v1](docs/statlite-metrics-v1.md)
 - [systemd deployment](docs/systemd.md)

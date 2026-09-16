@@ -14,7 +14,7 @@ not a generic Prometheus scraper or metrics database.
 | Spring Boot Actuator | Supported | Actuator JSON | `/actuator` management base URL | Actuator health is the normal Spring health source; application request, JVM, process, and optional host concepts are normalized into StatLite's fixed vocabulary. |
 | Spring Micrometer Prometheus | Supported | Prometheus/OpenMetrics exposition | Configured Prometheus endpoint | This is a Spring source option, not a generic `prometheus` target. |
 | Quarkus 3.39.x | Supported | Micrometer Prometheus/OpenMetrics exposition; optional SmallRye Health | Conventional `/q/metrics`; optional `/q/health` | Explicit `quarkus` target; datasource health is normalized when published. |
-| StatLite Metrics v1 | Supported | Fixed `statlite-metrics/v1` response | `/statlite/metrics` | Fixed producer contract for StatLite and compatible applications. |
+| StatLite Metrics v1 | Supported | Fixed `statlite-metrics/v1` response | `/statlite/metrics` | Fixed producer contract for StatLite and compatible applications. See the [direct integration guides](integrate/). |
 
 Support means that the integration has an owned endpoint and source contract,
 bounded collection behavior, normalization rules, and regression or
@@ -79,6 +79,11 @@ Quarkus 3.39.1, Java 21 LTS, the Micrometer Prometheus registry, and SmallRye
 Health.
 
 ## Scope boundaries
+
+For applications without a first-class framework target, use the [StatLite
+Metrics integration path](integrate/) when the application can own the fixed
+`/statlite/metrics` endpoint and its cumulative state. The guides cover
+FastAPI, Express, and Django; application integration is still required.
 
 StatLite does not currently provide a generic Prometheus target, arbitrary
 metric storage, Prometheus querying, remote write, or a Prometheus-compatible

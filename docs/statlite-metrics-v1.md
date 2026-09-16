@@ -76,7 +76,7 @@ contains a copyable helper, FastAPI middleware registration, endpoint code, and
 StatLite target configuration. Only `schema` and `status` are required; all
 individual metrics are optional.
 
-For the integration decision path and guides for other frameworks, see
+For the integration decision path and FastAPI, Express, and Django guides, see
 [Integrate an application with StatLite](integrate/). For the bounded-profile
 rationale, see [Why StatLite Metrics?](why-statlite-metrics.md).
 

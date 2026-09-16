@@ -42,7 +42,11 @@ statlite --config /etc/statlite/config.yaml
 ```
 
 See [`docs/integrations.md`](integrations.md) for the supported integration
-matrix. See `examples/` for starter templates (Actuator, Quarkus, StatLite Metrics, multi-target,
+matrix. For an application without a first-class target, see the [StatLite
+Metrics integration path](integrate/) and its FastAPI, Express, and Django
+guides. These guides add the required `/statlite/metrics` application
+endpoint; configuration only tells StatLite where to poll it. See `examples/`
+for starter templates (Actuator, Quarkus, StatLite Metrics, multi-target,
 self-monitoring), `examples/python-fastapi-demo/` for a runnable FastAPI app,
 and `examples/spring-actuator-demo/` for a standalone Spring Boot demo app.
 
