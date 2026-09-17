@@ -28,6 +28,9 @@ language or framework. Supporting a source format means only that the named
 adapter understands that source's documented contract; it does not enable
 arbitrary metric ingestion.
 
+See [Public integration testing](integration-testing.md) for how the shipped
+examples are exercised in the shared public workflow.
+
 ## Spring Boot
 
 Configure Spring applications with `type: spring` or omit `type` for the

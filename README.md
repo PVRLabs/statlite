@@ -149,6 +149,7 @@ application's environment.
 - [Configuration](docs/configuration.md)
 - [Deprecations and compatibility](docs/deprecations.md)
 - [Supported integrations](docs/integrations.md)
+- [Public integration testing](docs/integration-testing.md)
 - [StatLite Metrics integration guides](docs/integrate/)
 - [Monitoring on resource-constrained servers](docs/low-resource-monitoring.md)
 - [StatLite Metrics v1](docs/statlite-metrics-v1.md)
