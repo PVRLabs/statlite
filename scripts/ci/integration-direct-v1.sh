@@ -2,7 +2,7 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH=; cd -- "$(dirname -- "$0")" && pwd)
-REPO_DIR=$(CDPATH=; cd -- "$SCRIPT_DIR/.." && pwd)
+REPO_DIR=$(CDPATH=; cd -- "$SCRIPT_DIR/../.." && pwd)
 CASE=${1:-}
 STATLITE_BIN=${STATLITE_BIN:-"$REPO_DIR/statlite"}
 PYTHON_BIN=${PYTHON_BIN:-python}

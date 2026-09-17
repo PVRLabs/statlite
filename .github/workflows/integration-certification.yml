@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  direct-v1:
-    name: direct-v1 (${{ matrix.case }})
+  integration:
+    name: integration (${{ matrix.case }})
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
@@ -24,6 +24,8 @@ jobs:
             app_port: 18081
           - case: django
             app_port: 18082
+          - case: spring
+          - case: quarkus
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -61,17 +63,48 @@ jobs:
           cache: npm
           cache-dependency-path: examples/node-express-demo/package-lock.json
 
+      - name: Set up Java
+        if: matrix.case == 'spring' || matrix.case == 'quarkus'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
       - name: Install Express dependencies
         if: matrix.case == 'express'
         working-directory: examples/node-express-demo
         run: npm ci
 
+      - name: Build Spring demo
+        if: matrix.case == 'spring'
+        working-directory: examples/spring-actuator-demo
+        run: mvn --batch-mode --no-transfer-progress package
+
+      - name: Build Quarkus demo
+        if: matrix.case == 'quarkus'
+        working-directory: examples/quarkus-metrics-demo
+        run: mvn --batch-mode --no-transfer-progress package
+
       - name: Build StatLite
         run: go build -trimpath -o "$RUNNER_TEMP/statlite" ./cmd/statlite
 
       - name: Run direct-v1 integration journey
+        if: matrix.case == 'fastapi' || matrix.case == 'express' || matrix.case == 'django'
         env:
           CASE: ${{ matrix.case }}
           APP_PORT: ${{ matrix.app_port }}
           STATLITE_BIN: ${{ runner.temp }}/statlite
-        run: ./scripts/integration-direct-v1.sh "$CASE"
+        run: ./scripts/ci/integration-direct-v1.sh "$CASE"
+
+      - name: Run Spring integration journey
+        if: matrix.case == 'spring'
+        env:
+          STATLITE_BIN: ${{ runner.temp }}/statlite
+        run: ./scripts/ci/smoke-spring-actuator.sh
+
+      - name: Run Quarkus integration journey
+        if: matrix.case == 'quarkus'
+        env:
+          STATLITE_BIN: ${{ runner.temp }}/statlite
+        run: ./scripts/ci/integration-quarkus.sh

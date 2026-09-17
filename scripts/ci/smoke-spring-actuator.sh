@@ -6,7 +6,7 @@ set -eu
 # building both artifacts first.
 
 SCRIPT_DIR=$(CDPATH=; cd -- "$(dirname -- "$0")" && pwd)
-REPO_DIR=$(CDPATH=; cd -- "$SCRIPT_DIR/.." && pwd)
+REPO_DIR=$(CDPATH=; cd -- "$SCRIPT_DIR/../.." && pwd)
 SPRING_DIR="$REPO_DIR/examples/spring-actuator-demo"
 STATLITE_BIN=${STATLITE_BIN:-"$REPO_DIR/statlite"}
 SPRING_JAR=${SPRING_JAR:-}
@@ -28,14 +28,26 @@ cleanup() {
 	status=${1:-$?}
 	trap - EXIT HUP INT TERM
 	set +e
-	if [ -n "$STATLITE_PID" ]; then
-		kill "$STATLITE_PID" 2>/dev/null || true
-		wait "$STATLITE_PID" 2>/dev/null || true
-	fi
-	if [ -n "$SPRING_PID" ]; then
-		kill "$SPRING_PID" 2>/dev/null || true
-		wait "$SPRING_PID" 2>/dev/null || true
-	fi
+	stop_process() {
+		name=$1
+		pid=$2
+		[ -n "$pid" ] || return
+		if kill -0 "$pid" 2>/dev/null; then
+			kill "$pid" 2>/dev/null || true
+			i=0
+			while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 25 ]; do
+				sleep 0.2
+				i=$((i + 1))
+			done
+			if kill -0 "$pid" 2>/dev/null; then
+				printf 'forcing %s process %s to exit\n' "$name" "$pid" >&2
+				kill -KILL "$pid" 2>/dev/null || true
+			fi
+		fi
+		wait "$pid" 2>/dev/null || true
+	}
+	stop_process StatLite "$STATLITE_PID"
+	stop_process Spring "$SPRING_PID"
 	if [ "$status" -ne 0 ]; then
 		printf '%s\n' '--- Spring application log ---' >&2
 		tail -80 "$SPRING_LOG" >&2 || true
@@ -111,6 +123,9 @@ curl --noproxy '*' --max-time 5 -fsS "$SPRING_URL/actuator/health" |
 curl --noproxy '*' --max-time 5 -fsS "$SPRING_URL/actuator/metrics/http.server.requests" |
 	jq -e '.name == "http.server.requests"' >/dev/null
 
+"$STATLITE_BIN" inspect "$SPRING_URL" >"$WORK_DIR/inspect.txt" 2>&1
+grep -Fq 'Detected: Spring Boot Actuator' "$WORK_DIR/inspect.txt"
+
 printf 'Generating Spring demo traffic\n'
 (cd "$SPRING_DIR" && BASE_URL="$SPRING_URL" ./generate-traffic.sh)
 
@@ -137,7 +152,8 @@ if ! jq -e '
 		([.result.samples[] | select(.key == "http_requests_total" and .value >= 40)] | length) == 1 and
 		([.result.samples[] | select(.key == "http_404_total" and .value >= 5)] | length) == 1 and
 		([.result.samples[] | select(.key == "http_4xx_total" and .value >= 8)] | length) == 1 and
-		([.result.samples[] | select(.key == "http_5xx_total" and .value >= 3)] | length) == 1
+		([.result.samples[] | select(.key == "http_5xx_total" and .value >= 3)] | length) == 1 and
+		([.result.samples[] | select(.key == "http_request_time_total_seconds" and .value > 0)] | length) == 1
 	' "$WORK_DIR/traffic-poll.json" >/dev/null; then
 	printf '%s\n' 'Unexpected StatLite poll response:' >&2
 	jq . "$WORK_DIR/traffic-poll.json" >&2 || cat "$WORK_DIR/traffic-poll.json" >&2
