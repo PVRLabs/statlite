@@ -3,7 +3,6 @@
   StatLite
 </h1>
 
-[![GitHub stars](https://img.shields.io/github/stars/PVRLabs/statlite?style=flat)](https://github.com/PVRLabs/statlite/stargazers)
 [![GitHub release](https://img.shields.io/github/v/release/PVRLabs/statlite)](https://github.com/PVRLabs/statlite/releases)
 [![Go powered](https://img.shields.io/github/go-mod/go-version/PVRLabs/statlite?label=Go%20powered&logo=go&logoColor=white)](go.mod)
 [![Frameworks: Spring Boot · Quarkus](https://img.shields.io/badge/Frameworks-Spring%20Boot%20%C2%B7%20Quarkus-e7e7e7?labelColor=333)](docs/integrations.md)
