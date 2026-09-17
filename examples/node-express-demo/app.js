@@ -24,8 +24,9 @@ function createApp() {
 }
 
 if (require.main === module) {
-  createApp().listen(3000, "127.0.0.1", () => {
-    console.log("Express demo listening on http://127.0.0.1:3000");
+  const port = Number(process.env.PORT || 3000);
+  createApp().listen(port, "127.0.0.1", () => {
+    console.log(`Express demo listening on http://127.0.0.1:${port}`);
   });
 }
 

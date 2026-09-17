@@ -1,0 +1,77 @@
+name: integration certification
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  direct-v1:
+    name: direct-v1 (${{ matrix.case }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - case: fastapi
+            app_port: 18080
+          - case: express
+            app_port: 18081
+          - case: django
+            app_port: 18082
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Python
+        if: matrix.case == 'fastapi' || matrix.case == 'django'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14.6"
+          cache: pip
+          cache-dependency-path: |
+            examples/python-fastapi-demo/requirements.txt
+            examples/python-fastapi-demo/requirements-test.txt
+            examples/python-django-demo/requirements.txt
+
+      - name: Install FastAPI dependencies
+        if: matrix.case == 'fastapi'
+        run: python -m pip install -r examples/python-fastapi-demo/requirements-test.txt
+
+      - name: Install Django dependencies
+        if: matrix.case == 'django'
+        run: python -m pip install -r examples/python-django-demo/requirements.txt
+
+      - name: Set up Node
+        if: matrix.case == 'express'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.21.0"
+          cache: npm
+          cache-dependency-path: examples/node-express-demo/package-lock.json
+
+      - name: Install Express dependencies
+        if: matrix.case == 'express'
+        working-directory: examples/node-express-demo
+        run: npm ci
+
+      - name: Build StatLite
+        run: go build -trimpath -o "$RUNNER_TEMP/statlite" ./cmd/statlite
+
+      - name: Run direct-v1 integration journey
+        env:
+          CASE: ${{ matrix.case }}
+          APP_PORT: ${{ matrix.app_port }}
+          STATLITE_BIN: ${{ runner.temp }}/statlite
+        run: ./scripts/integration-direct-v1.sh "$CASE"
