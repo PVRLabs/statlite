@@ -15,6 +15,13 @@ a compatibility migration.
 |---|---|---|---|
 | Spring target field `actuator_base_url` | `v0.4.0` | `url` | Future breaking release |
 | Target type `statlite` | `v0.2.0` | `statlite-metrics` | Future breaking release |
+| Working-directory-relative `storage.sqlite_path` lookup (breaking migration) | `v0.4.3` | Config-directory-relative lookup or an absolute path | After the v0.4.3 migration window |
+
+> **Note:** Unlike the configuration deprecations above, the
+> `storage.sqlite_path` resolution change in v0.4.3 is a breaking behavior
+> change. The compatibility code only detects database files at the former
+> working-directory-relative location and warns; it does not preserve the old
+> lookup behavior.
 
 The release is the first version that warns about or documents the surface as
 deprecated. `v0.4.0` is currently unreleased.
@@ -48,6 +55,24 @@ logs a deprecation warning.
 
 **Removal:** Future breaking release. Remove the migration, warning, legacy
 constant, and associated tests together.
+
+## Storage paths
+
+### Working-directory-relative SQLite paths
+
+**Replacement:** Resolve relative `storage.sqlite_path` values from the
+directory of the config path supplied to StatLite, or configure an absolute
+path. When the config path is a symbolic link, the link's directory is used,
+not the directory containing its target.
+
+Before v0.4.3, StatLite resolved a relative SQLite path from its process
+working directory. When the new config-relative database file is missing but a
+file exists at the previous working-directory-relative location, StatLite logs
+a migration warning and continues with the new path. It does not automatically
+open or move the old database.
+
+**Removal:** Remove the legacy path check and its tests after the v0.4.3
+migration window. The config-relative path behavior remains.
 
 ## Database schema
 

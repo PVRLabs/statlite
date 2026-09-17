@@ -105,10 +105,16 @@ storage:
 
 `sqlite_path` must be writable by the StatLite process.
 
-> [!NOTE]
-> Relative `sqlite_path` values currently resolve from the directory where
-> StatLite is started, not from the directory containing `statlite.yaml`. Use
-> an absolute path for deployments.
+Relative `sqlite_path` values resolve from the directory in the config path
+supplied to StatLite, independent of the directory where StatLite is started.
+If that config path is a symbolic link, its directory is used rather than the
+directory containing the link target. Absolute paths, including
+environment-expanded absolute paths, are used as written. This differs from
+releases before v0.4.3, which resolved relative paths from the process working
+directory. During the compatibility window,
+StatLite warns and continues with the new path when it finds history only at
+the previous working-directory-relative location; it does not automatically
+open or move the old database file.
 
 Runtime SQLite files (`*.sqlite`, `*.sqlite-shm`, `*.sqlite-wal`) should not be
 committed.

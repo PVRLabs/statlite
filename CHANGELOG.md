@@ -3,6 +3,15 @@
 This file summarizes the main user-facing changes in each StatLite release.
 Detailed release notes are generated on GitHub from the commit history.
 
+## Unreleased
+
+- Relative `storage.sqlite_path` values now resolve from the directory in the
+  config path supplied to StatLite instead of the process working directory.
+  For a symlinked config path, this is the link's directory, not its target's.
+  When history exists only at the previous location, StatLite warns and
+  continues with the new path without moving or opening the old database. Use
+  an absolute path to keep a database at a fixed external location.
+
 ## v0.4.2 — 2026-09-15
 
 - Added a StatLite favicon to the dashboard and expanded framework compatibility

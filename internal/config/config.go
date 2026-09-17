@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -88,8 +89,40 @@ func Load(path string) (*Config, error) {
 	if err := Validate(&cfg); err != nil {
 		return nil, err
 	}
+	if !filepath.IsAbs(cfg.Storage.SQLitePath) {
+		legacySQLitePath, err := filepath.Abs(cfg.Storage.SQLitePath)
+		if err != nil {
+			return nil, fmt.Errorf("resolving legacy SQLite path: %w", err)
+		}
+		configPath, err := filepath.Abs(path)
+		if err != nil {
+			return nil, fmt.Errorf("resolving config path: %w", err)
+		}
+		cfg.Storage.SQLitePath = filepath.Join(filepath.Dir(configPath), cfg.Storage.SQLitePath)
+		cfg.warnIfLegacySQLiteDatabaseExists(legacySQLitePath)
+	}
 
 	return &cfg, nil
+}
+
+func (c *Config) warnIfLegacySQLiteDatabaseExists(legacyPath string) {
+	if legacyPath == c.Storage.SQLitePath {
+		return
+	}
+	if _, err := os.Stat(c.Storage.SQLitePath); !os.IsNotExist(err) {
+		return
+	}
+	legacyInfo, err := os.Stat(legacyPath)
+	if err != nil || legacyInfo.IsDir() {
+		return
+	}
+
+	// TODO(compat): Remove the pre-v0.4.3 working-directory SQLite path check
+	// after the migration window documented in docs/deprecations.md has passed.
+	c.deprecationWarnings = append(c.deprecationWarnings, fmt.Sprintf(
+		"storage.sqlite_path relative-path handling changed in StatLite v0.4.3. No database file exists at the new config-relative path %q, but an existing database file was found at the previous working-directory-relative path %q. StatLite will continue using %q. Existing history remains in %q. Move the database file or configure an absolute sqlite_path to keep using that history.",
+		c.Storage.SQLitePath, legacyPath, c.Storage.SQLitePath, legacyPath,
+	))
 }
 
 // Validate applies configuration defaults and checks that cfg is complete

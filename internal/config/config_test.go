@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -216,7 +217,8 @@ targets:
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Server.Listen != "127.0.0.1:9191" || cfg.Storage.SQLitePath != "./from-env.sqlite" || cfg.Polling.Interval != "30s" {
+	wantSQLitePath := filepath.Join(filepath.Dir(path), "from-env.sqlite")
+	if cfg.Server.Listen != "127.0.0.1:9191" || cfg.Storage.SQLitePath != wantSQLitePath || cfg.Polling.Interval != "30s" {
 		t.Fatalf("expanded general config = %#v, want environment values", cfg)
 	}
 	target := cfg.Targets[0]
@@ -242,8 +244,231 @@ targets:
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Storage.SQLitePath != "./${LITERAL_PATH}.sqlite" {
+	wantSQLitePath := filepath.Join(filepath.Dir(path), "${LITERAL_PATH}.sqlite")
+	if cfg.Storage.SQLitePath != wantSQLitePath {
 		t.Fatalf("Storage.SQLitePath = %q, want literal variable syntax", cfg.Storage.SQLitePath)
+	}
+}
+
+func TestLoadResolvesRelativeSQLitePathFromConfigDirectory(t *testing.T) {
+	root := t.TempDir()
+	root, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatalf("resolve temporary directory: %v", err)
+	}
+	configDir := filepath.Join(root, "configs")
+	if err := os.Mkdir(configDir, 0o700); err != nil {
+		t.Fatalf("create config directory: %v", err)
+	}
+	configPath := filepath.Join(configDir, "statlite.yaml")
+	content := `
+server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "../data/./statlite.sqlite"
+polling:
+  interval: "5m"
+targets:
+  - name: "app"
+    url: "http://example.com/actuator"
+`
+	if err := os.WriteFile(configPath, []byte(content), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	previousWorkingDirectory, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("change working directory: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(previousWorkingDirectory); err != nil {
+			t.Errorf("restore working directory: %v", err)
+		}
+	})
+
+	relativeConfigPath := filepath.Join("configs", "..", "configs", "statlite.yaml")
+	fromRelativePath, err := Load(relativeConfigPath)
+	if err != nil {
+		t.Fatalf("Load(%q) error = %v", relativeConfigPath, err)
+	}
+	fromAbsolutePath, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load(%q) error = %v", configPath, err)
+	}
+	want := filepath.Join(root, "data", "statlite.sqlite")
+	if fromRelativePath.Storage.SQLitePath != want {
+		t.Fatalf("relative config SQLitePath = %q, want %q", fromRelativePath.Storage.SQLitePath, want)
+	}
+	if fromAbsolutePath.Storage.SQLitePath != want {
+		t.Fatalf("absolute config SQLitePath = %q, want %q", fromAbsolutePath.Storage.SQLitePath, want)
+	}
+	if _, err := os.Stat(filepath.Join(root, "statlite.sqlite")); !os.IsNotExist(err) {
+		t.Fatalf("caller-directory database exists or cannot be checked: %v", err)
+	}
+}
+
+func TestLoadResolvesRelativeSQLitePathFromConfigSymlinkDirectory(t *testing.T) {
+	root := t.TempDir()
+	realConfigDir := filepath.Join(root, "real")
+	linkedConfigDir := filepath.Join(root, "linked")
+	for _, dir := range []string{realConfigDir, linkedConfigDir} {
+		if err := os.Mkdir(dir, 0o700); err != nil {
+			t.Fatalf("create directory: %v", err)
+		}
+	}
+	realConfigPath := filepath.Join(realConfigDir, "statlite.yaml")
+	linkedConfigPath := filepath.Join(linkedConfigDir, "statlite.yaml")
+	content := `
+server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "./statlite.sqlite"
+polling:
+  interval: "5m"
+targets:
+  - name: "app"
+    url: "http://example.com/actuator"
+`
+	if err := os.WriteFile(realConfigPath, []byte(content), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	if err := os.Symlink(realConfigPath, linkedConfigPath); err != nil {
+		t.Fatalf("symlink config: %v", err)
+	}
+
+	cfg, err := Load(linkedConfigPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	want := filepath.Join(linkedConfigDir, "statlite.sqlite")
+	if cfg.Storage.SQLitePath != want {
+		t.Fatalf("Storage.SQLitePath = %q, want symlink directory path %q", cfg.Storage.SQLitePath, want)
+	}
+}
+
+func TestLoadLeavesAbsoluteSQLitePathUnchanged(t *testing.T) {
+	absoluteSQLitePath := filepath.Join(t.TempDir(), "data", "..", "statlite.sqlite")
+	path := writeConfig(t, strings.Replace(`
+server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: SQLITE_PATH
+polling:
+  interval: "5m"
+targets:
+  - name: "app"
+    url: "http://example.com/actuator"
+`, "SQLITE_PATH", absoluteSQLitePath, 1))
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Storage.SQLitePath != absoluteSQLitePath {
+		t.Fatalf("Storage.SQLitePath = %q, want unchanged absolute path %q", cfg.Storage.SQLitePath, absoluteSQLitePath)
+	}
+}
+
+func TestLoadWarnsAboutLegacyWorkingDirectorySQLitePath(t *testing.T) {
+	tests := []struct {
+		name         string
+		newExists    bool
+		legacyExists bool
+		absolutePath bool
+		sameDir      bool
+		wantWarning  bool
+	}{
+		{name: "new database exists", newExists: true, legacyExists: true},
+		{name: "legacy database exists", legacyExists: true, wantWarning: true},
+		{name: "neither database exists"},
+		{name: "absolute path", legacyExists: true, absolutePath: true},
+		{name: "old and new paths are identical", newExists: true, legacyExists: true, sameDir: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			workingDir := filepath.Join(root, "work")
+			configDir := filepath.Join(root, "config")
+			if tt.sameDir {
+				configDir = workingDir
+			}
+			for _, dir := range []string{workingDir, configDir} {
+				if err := os.MkdirAll(dir, 0o700); err != nil {
+					t.Fatalf("create directory: %v", err)
+				}
+			}
+
+			legacyPath := filepath.Join(workingDir, "history.sqlite")
+			newPath := filepath.Join(configDir, "history.sqlite")
+			if tt.legacyExists {
+				if err := os.WriteFile(legacyPath, []byte("legacy"), 0o600); err != nil {
+					t.Fatalf("write legacy database: %v", err)
+				}
+			}
+			if tt.newExists && newPath != legacyPath {
+				if err := os.WriteFile(newPath, []byte("new"), 0o600); err != nil {
+					t.Fatalf("write new database: %v", err)
+				}
+			}
+
+			sqlitePath := "./history.sqlite"
+			if tt.absolutePath {
+				sqlitePath = filepath.Join(root, "absolute.sqlite")
+			}
+			configPath := filepath.Join(configDir, "statlite.yaml")
+			content := fmt.Sprintf(`
+server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: %q
+polling:
+  interval: "5m"
+targets:
+  - name: "app"
+    url: "http://example.com/actuator"
+`, sqlitePath)
+			if err := os.WriteFile(configPath, []byte(content), 0o600); err != nil {
+				t.Fatalf("write config: %v", err)
+			}
+
+			previousWorkingDirectory, err := os.Getwd()
+			if err != nil {
+				t.Fatalf("get working directory: %v", err)
+			}
+			if err := os.Chdir(workingDir); err != nil {
+				t.Fatalf("change working directory: %v", err)
+			}
+			t.Cleanup(func() {
+				if err := os.Chdir(previousWorkingDirectory); err != nil {
+					t.Errorf("restore working directory: %v", err)
+				}
+			})
+
+			cfg, err := Load(configPath)
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			warnings := cfg.DeprecationWarnings()
+			if tt.wantWarning {
+				if len(warnings) != 1 {
+					t.Fatalf("DeprecationWarnings() = %#v, want one migration warning", warnings)
+				}
+				for _, want := range []string{"changed in StatLite v0.4.3", cfg.Storage.SQLitePath, "previous working-directory-relative path", legacyPath, "will continue"} {
+					if !strings.Contains(warnings[0], want) {
+						t.Errorf("warning = %q, missing %q", warnings[0], want)
+					}
+				}
+				if _, err := os.Stat(cfg.Storage.SQLitePath); !os.IsNotExist(err) {
+					t.Fatalf("compatibility check created new database or stat failed: %v", err)
+				}
+			} else if len(warnings) != 0 {
+				t.Fatalf("DeprecationWarnings() = %#v, want none", warnings)
+			}
+		})
 	}
 }
 
