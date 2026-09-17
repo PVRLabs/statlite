@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: "17 9 * * 1"
 
 permissions:
   contents: read
@@ -76,6 +78,25 @@ jobs:
         working-directory: examples/node-express-demo
         run: npm ci
 
+      - name: Report FastAPI versions
+        if: matrix.case == 'fastapi'
+        run: |
+          python --version
+          python -c 'import fastapi, uvicorn; print(f"FastAPI {fastapi.__version__}"); print(f"Uvicorn {uvicorn.__version__}")'
+
+      - name: Report Express versions
+        if: matrix.case == 'express'
+        working-directory: examples/node-express-demo
+        run: |
+          node --version
+          node -p '"Express " + require("express/package.json").version'
+
+      - name: Report Django versions
+        if: matrix.case == 'django'
+        run: |
+          python --version
+          python -c 'import django; print(f"Django {django.get_version()}")'
+
       - name: Build Spring demo
         if: matrix.case == 'spring'
         working-directory: examples/spring-actuator-demo
@@ -85,6 +106,22 @@ jobs:
         if: matrix.case == 'quarkus'
         working-directory: examples/quarkus-metrics-demo
         run: mvn --batch-mode --no-transfer-progress package
+
+      - name: Report Spring Boot versions
+        if: matrix.case == 'spring'
+        working-directory: examples/spring-actuator-demo
+        run: |
+          java --version
+          unzip -p target/spring-actuator-demo-*.jar META-INF/MANIFEST.MF | grep '^Spring-Boot-Version:'
+
+      - name: Report Quarkus versions
+        if: matrix.case == 'quarkus'
+        working-directory: examples/quarkus-metrics-demo
+        run: |
+          java --version
+          quarkus_version=$(sed -n 's/.*<quarkus.platform.version>\(.*\)<\/quarkus.platform.version>.*/\1/p' pom.xml)
+          test -n "$quarkus_version"
+          echo "Quarkus $quarkus_version"
 
       - name: Build StatLite
         run: go build -trimpath -o "$RUNNER_TEMP/statlite" ./cmd/statlite
