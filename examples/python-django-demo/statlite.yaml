@@ -1,0 +1,15 @@
+server:
+  listen: "127.0.0.1:9091"
+
+storage:
+  sqlite_path: "./statlite-django-demo.sqlite"
+
+polling:
+  # Short interval for a responsive local demo. Use 30s or longer in production.
+  interval: "10s"
+  timeout: "5s"
+
+targets:
+  - name: "python-django-demo"
+    type: "statlite-metrics"
+    url: "http://127.0.0.1:8000/statlite/metrics"

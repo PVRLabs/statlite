@@ -4,6 +4,9 @@ This guide adds lightweight Node.js/Express application monitoring using the
 fixed `statlite-metrics/v1` JSON profile and one small, dependency-light
 helper.
 
+A [runnable and tested demo](../../../examples/node-express-demo/) accompanies
+the guide.
+
 ## When to use this integration
 
 Express does not have a first-class StatLite target type. Use this direct v1
@@ -238,6 +241,7 @@ endpoint exposes operational data.
 
 ## References and future first-class support
 
+- [Runnable Express demo](../../../examples/node-express-demo/)
 - [StatLite Metrics v1 specification](../../statlite-metrics-v1.md)
 - [Why StatLite Metrics?](../../why-statlite-metrics.md)
 - [Integration guide index](../)

@@ -451,18 +451,32 @@ func TestStatliteExampleConfigsLoad(t *testing.T) {
 	}
 }
 
-func TestFastAPIExampleConfigLoads(t *testing.T) {
-	path := filepath.Join("..", "..", "examples/python-fastapi-demo/statlite.yaml")
-	cfg, err := Load(path)
-	if err != nil {
-		t.Fatalf("Load(%q) error = %v", path, err)
+func TestDirectMetricsExampleConfigsLoad(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		url  string
+	}{
+		{name: "FastAPI", path: "examples/python-fastapi-demo/statlite.yaml", url: "http://127.0.0.1:8000/statlite/metrics"},
+		{name: "Express", path: "examples/node-express-demo/statlite.yaml", url: "http://127.0.0.1:3000/statlite/metrics"},
+		{name: "Django", path: "examples/python-django-demo/statlite.yaml", url: "http://127.0.0.1:8000/statlite/metrics"},
 	}
-	if len(cfg.Targets) != 1 {
-		t.Fatalf("Targets = %d, want 1", len(cfg.Targets))
-	}
-	target := cfg.Targets[0]
-	if target.Type != TargetTypeStatliteMetrics || target.URL != "http://127.0.0.1:8000/statlite/metrics" {
-		t.Fatalf("target = %#v, want FastAPI statlite-metrics target", target)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := filepath.Join("..", "..", tt.path)
+			cfg, err := Load(path)
+			if err != nil {
+				t.Fatalf("Load(%q) error = %v", path, err)
+			}
+			if len(cfg.Targets) != 1 {
+				t.Fatalf("Targets = %d, want 1", len(cfg.Targets))
+			}
+			target := cfg.Targets[0]
+			if target.Type != TargetTypeStatliteMetrics || target.URL != tt.url {
+				t.Fatalf("target = %#v, want %s statlite-metrics target", target, tt.name)
+			}
+		})
 	}
 }
 

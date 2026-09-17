@@ -3,6 +3,9 @@
 This guide adds lightweight Django application monitoring using the fixed
 `statlite-metrics/v1` JSON profile and one small, dependency-light helper.
 
+A [runnable and tested demo](../../../examples/python-django-demo/) accompanies
+the guide.
+
 ## When to use this integration
 
 Django does not have a first-class StatLite target type. Use this direct v1
@@ -217,7 +220,7 @@ Install the tested Django version and start one development-server process:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install 'Django==5.2.17'
-python manage.py runserver 127.0.0.1:8000
+python manage.py runserver 127.0.0.1:8000 --noreload
 ```
 
 Leave the application running. In another terminal, generate normal, missing,
@@ -273,6 +276,7 @@ endpoint exposes operational data.
 
 ## References and future first-class support
 
+- [Runnable Django demo](../../../examples/python-django-demo/)
 - [StatLite Metrics v1 specification](../../statlite-metrics-v1.md)
 - [Why StatLite Metrics?](../../why-statlite-metrics.md)
 - [Integration guide index](../)

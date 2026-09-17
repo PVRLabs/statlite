@@ -19,3 +19,5 @@ AGENTS.local.md
 .idea/
 .agent-logs/
 examples/python-fastapi-demo/__pycache__/
+examples/node-express-demo/node_modules/
+examples/python-django-demo/**/__pycache__/

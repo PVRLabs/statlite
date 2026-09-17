@@ -35,15 +35,35 @@ jobs:
           cache-dependency-path: |
             examples/python-fastapi-demo/requirements.txt
             examples/python-fastapi-demo/requirements-test.txt
+            examples/python-django-demo/requirements.txt
 
       - name: Run dashboard JavaScript unit tests
         run: node --test internal/dashboard/static/dashboard.test.js
 
-      - name: Install FastAPI demo test dependencies
-        run: python -m pip install -r examples/python-fastapi-demo/requirements-test.txt
+      - name: Set up Node for Express demo
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.21.0"
+          cache: npm
+          cache-dependency-path: examples/node-express-demo/package-lock.json
+
+      - name: Install Express demo dependencies
+        working-directory: examples/node-express-demo
+        run: npm ci
+
+      - name: Run Express integration tests
+        working-directory: examples/node-express-demo
+        run: npm test
+
+      - name: Install Python demo test dependencies
+        run: python -m pip install -r examples/python-fastapi-demo/requirements-test.txt -r examples/python-django-demo/requirements.txt
 
       - name: Run FastAPI integration tests
         run: python -m unittest examples/python-fastapi-demo/test_statlite_metrics.py
+
+      - name: Run Django integration tests
+        working-directory: examples/python-django-demo
+        run: python -m unittest test_statlite_metrics.py
 
       - name: Run Go tests
         run: go test ./...
