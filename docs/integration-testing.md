@@ -49,6 +49,10 @@ It runs for every pull request, every push to `main`, and weekly on Monday at
 09:17 UTC. Matrix cases use `fail-fast: false`, so one integration failure does
 not hide the results for the others.
 
+The release workflow reuses this same workflow as a prerequisite before it
+creates a release tag, so a release cannot proceed until all five public cases
+pass on the dispatched commit.
+
 These are focused public integration checks for the documented monitoring
 journey. They do not cover every framework version, production topology,
 deployment environment, or application behavior, and they are not a

@@ -51,9 +51,16 @@ jobs:
 
           echo "validated $RELEASE_VERSION at $GITHUB_SHA"
 
+  integration:
+    name: run public integration checks
+    needs: validate
+    permissions:
+      contents: read
+    uses: ./.github/workflows/integration-certification.yml
+
   tag:
     name: create or verify release tag
-    needs: validate
+    needs: [validate, integration]
     runs-on: ubuntu-latest
     permissions:
       contents: write
