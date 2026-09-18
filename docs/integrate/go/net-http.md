@@ -11,6 +11,32 @@ Go does not have a first-class StatLite target type. Use this direct v1
 integration when StatLite's fixed traffic, error, average-latency, status,
 restart, and process signals fit the application's operational needs.
 
+## Why this integration instead of a Go target?
+
+StatLite has experimented with a first-class Go target that reads
+Prometheus/OpenMetrics output. That research helped inform the current
+decision to use an application-owned `statlite-metrics/v1` integration for Go
+applications.
+
+The experiment showed that Go runtime and Prometheus metrics alone do not
+provide a consistent application-level contract across Go applications.
+Useful HTTP request, error, and latency metrics depend on the application,
+framework, and instrumentation choices, so a generic Go target would either
+support only a subset of applications or require broader configuration and
+detection logic.
+
+For now, StatLite uses this application-owned `statlite-metrics/v1`
+integration for Go applications. It keeps the contract explicit, small, and
+predictable while providing the HTTP metrics StatLite needs.
+
+A future first-class Go or framework-specific integration is still possible
+if a sufficiently stable and useful contract emerges.
+
+If you have a Go application or library with a stable metrics contract that
+could support a useful first-class StatLite integration, [open an issue](https://github.com/PVRLabs/statlite/issues/new/choose)
+or [start a GitHub Discussion](https://github.com/PVRLabs/statlite/discussions/new/choose).
+We are interested in concrete integration opportunities.
+
 This helper supports concurrent requests within one process, but its counters
 are process-local. Do not poll a load-balanced URL that alternates independent
 processes or replicas. Counters can decrease and `started_at` can alternate,

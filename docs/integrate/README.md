@@ -64,3 +64,15 @@ The [v1 specification](../statlite-metrics-v1.md) remains authoritative for
 the wire contract. See [configuration](../configuration.md) for all StatLite
 options and [target inspection](../configuration.md#discover-a-target-with-inspect)
 for the bounded, read-only discovery workflow.
+
+## Interested in a first-class integration?
+
+StatLite keeps integrations intentionally small and bounded. When a framework
+or platform has a stable, recognizable monitoring contract that maps well to
+StatLite's focused metrics, a first-class integration may make sense.
+
+If you maintain or use a framework, library, or application with a monitoring
+interface that could support a reliable StatLite integration, [open an issue](https://github.com/PVRLabs/statlite/issues/new/choose)
+or [start a GitHub Discussion](https://github.com/PVRLabs/statlite/discussions/new/choose).
+We are happy to evaluate the contract and work with maintainers and users on a
+focused integration.
