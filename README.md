@@ -45,7 +45,10 @@ See the [Docker guide](docs/docker.md) for persistent storage, container
 networking, local builds, and access guidance.
 
 StatLite is intentionally focused and is not a replacement for Prometheus and
-Grafana.
+Grafana. See [monitoring options for small applications and VPS
+deployments](docs/monitoring-options.md) for the practical tradeoffs between
+StatLite, a general-purpose self-hosted stack, telemetry pipelines, and hosted
+platforms.
 
 ## Install
 
