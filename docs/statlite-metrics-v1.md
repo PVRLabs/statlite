@@ -82,8 +82,9 @@ and StatLite target configuration. Its [runnable demo](../examples/python-fastap
 keeps the implementation and framework-level tests together. Only `schema`
 and `status` are required; all individual metrics are optional.
 
-For the integration decision path and FastAPI, Express, and Django guides, see
-[Integrate an application with StatLite](integrate/). For the bounded-profile
+For the integration decision path and FastAPI, Express, Django, Go `net/http`,
+and Gin guides, see [Integrate an application with StatLite](integrate/). For
+the bounded-profile
 rationale, see [Why StatLite Metrics?](why-statlite-metrics.md).
 
 ## Fields

@@ -86,13 +86,15 @@ Health.
 For applications without a first-class framework target, use the [StatLite
 Metrics integration path](integrate/) when the application can own the fixed
 `/statlite/metrics` endpoint and its cumulative state. The guides cover
-FastAPI, Express, and Django; application integration is still required.
+FastAPI, Express, Django, Go `net/http`, and Gin; application integration is
+still required.
 
 StatLite does not currently provide a generic Prometheus target, arbitrary
 metric storage, Prometheus querying, remote write, or a Prometheus-compatible
 time-series database. Supported integrations expose only the normalized
 concepts that StatLite can use for its dashboard, health, and diagnostics.
 
-Future Caddy, Go, Gin, Node, Python, and other framework adapters must omit
+Future first-class Caddy, Go, Gin, Node, Python, and other framework adapters
+must omit
 health when their certified integration contract has no explicit authoritative
 health signal. Metrics collection alone establishes reporting availability.

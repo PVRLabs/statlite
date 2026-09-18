@@ -4,7 +4,7 @@ Starter configurations and runnable demo apps for monitoring applications with
 StatLite. See [Configuration](../docs/configuration.md) for the full settings
 reference, [StatLite Metrics v1](../docs/statlite-metrics-v1.md) for the fixed
 JSON endpoint profile, and the [integration guides](../docs/integrate/) for
-FastAPI, Express, and Django application setup.
+FastAPI, Express, Django, Go `net/http`, and Gin application setup.
 
 ## Config files
 
@@ -29,5 +29,7 @@ go run ./cmd/statlite --config examples/actuator.yaml
 | [python-fastapi-demo](python-fastapi-demo/) | Runnable companion to the canonical [FastAPI guide](../docs/integrate/python/fastapi.md), with middleware and framework-level tests |
 | [node-express-demo](node-express-demo/) | Runnable companion to the canonical [Express guide](../docs/integrate/node/express.md), with middleware and framework-level tests |
 | [python-django-demo](python-django-demo/) | Runnable companion to the canonical [Django guide](../docs/integrate/python/django.md), with middleware and framework-level tests |
+| [go-net-http-demo](go-net-http-demo/) | Runnable companion to the canonical [Go `net/http` guide](../docs/integrate/go/net-http.md), with standard-library middleware and tests |
+| [go-gin-demo](go-gin-demo/) | Runnable companion to the canonical [Gin guide](../docs/integrate/go/gin.md), with Gin middleware, recovery ordering, and tests |
 
 Each demo directory has its own README with run and verification steps.

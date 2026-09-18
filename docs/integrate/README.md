@@ -36,6 +36,8 @@ application-owned integrations.
 | FastAPI | No | [FastAPI](python/fastapi.md) | [FastAPI demo](../../examples/python-fastapi-demo/) |
 | Express | No | [Express](node/express.md) | [Express demo](../../examples/node-express-demo/) |
 | Django | No | [Django](python/django.md) | [Django demo](../../examples/python-django-demo/) |
+| Go `net/http` | No | [Go `net/http`](go/net-http.md) | [Go net/http demo](../../examples/go-net-http-demo/) |
+| Gin | No | [Gin](go/gin.md) | [Go Gin demo](../../examples/go-gin-demo/) |
 
 These stable guide locations are suitable for linking from configuration
 tools. Each direct-integration guide uses `type: statlite-metrics`, the

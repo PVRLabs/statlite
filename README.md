@@ -135,8 +135,8 @@ when the application needs to add the `/statlite/metrics` endpoint. See
   Health is an optional capability when the application publishes it.
 - **[StatLite Metrics v1](docs/statlite-metrics-v1.md):** A small, fixed JSON
   endpoint that applications in any language or framework can implement. See
-  the [direct integration guides](docs/integrate/) for FastAPI, Express, and
-  Django.
+  the [direct integration guides](docs/integrate/) for FastAPI, Express,
+  Django, Go `net/http`, and Gin.
 - **StatLite self-monitoring:** StatLite can report its own health, traffic,
   process, and host metrics.
 
