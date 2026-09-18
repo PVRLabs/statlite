@@ -27,6 +27,10 @@ jobs:
             app_port: 18081
           - case: django
             app_port: 18082
+          - case: net-http
+            app_port: 8080
+          - case: gin
+            app_port: 8080
           - case: spring
           - case: quarkus
     steps:
@@ -38,6 +42,9 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: |
+            go.sum
+            examples/go-gin-demo/go.sum
 
       - name: Set up Python
         if: matrix.case == 'fastapi' || matrix.case == 'django'
@@ -98,6 +105,14 @@ jobs:
           python --version
           python -c 'import django; print(f"Django {django.get_version()}")'
 
+      - name: Report Go integration versions
+        if: matrix.case == 'net-http' || matrix.case == 'gin'
+        run: |
+          go version
+          if [ "${{ matrix.case }}" = gin ]; then
+            (cd examples/go-gin-demo && go list -m github.com/gin-gonic/gin)
+          fi
+
       - name: Build Spring demo
         if: matrix.case == 'spring'
         working-directory: examples/spring-actuator-demo
@@ -128,7 +143,7 @@ jobs:
         run: go build -trimpath -o "$RUNNER_TEMP/statlite" ./cmd/statlite
 
       - name: Run direct-v1 integration journey
-        if: matrix.case == 'fastapi' || matrix.case == 'express' || matrix.case == 'django'
+        if: matrix.case == 'fastapi' || matrix.case == 'express' || matrix.case == 'django' || matrix.case == 'net-http' || matrix.case == 'gin'
         env:
           CASE: ${{ matrix.case }}
           APP_PORT: ${{ matrix.app_port }}
