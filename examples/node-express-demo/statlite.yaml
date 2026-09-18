@@ -1,5 +1,5 @@
 server:
-  listen: "127.0.0.1:9091"
+  listen: "127.0.0.1:9090"
 
 storage:
   sqlite_path: "./statlite-express-demo.sqlite"

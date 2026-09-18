@@ -32,7 +32,7 @@ From the repository root, start StatLite with the demo configuration:
 go run ./cmd/statlite --config examples/python-django-demo/statlite.yaml
 ```
 
-Open <http://127.0.0.1:9091>. The demo polls every 10 seconds for responsive
+Open <http://127.0.0.1:9090>. The demo polls every 10 seconds for responsive
 local feedback. Use a 30-second or longer interval in production.
 
 ## Run the tests

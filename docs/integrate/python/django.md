@@ -247,7 +247,7 @@ statlite inspect 'http://127.0.0.1:8000/statlite/metrics'
 statlite --config statlite.yaml
 ```
 
-Open <http://127.0.0.1:9091>. Use a 30-second or longer polling interval in
+Open <http://127.0.0.1:9090>. Use a 30-second or longer polling interval in
 production.
 
 ## Optional metrics and deployment caveats

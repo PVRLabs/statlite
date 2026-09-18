@@ -78,7 +78,10 @@ enables the service, but does not start it.
 Configuration is `root:<service-group>` and `0640`. Its managed directory is
 `root:<service-group>` and `0750`; the data directory is
 `<service-user>:<service-group>` and `0750`. The unit uses the data directory
-as its working directory, so relative SQLite paths resolve there.
+as its working directory, but relative SQLite paths resolve from the managed
+configuration directory. For systemd deployments, we recommend an absolute
+`storage.sqlite_path` under the data directory, such as
+`/var/lib/statlite/statlite.sqlite` with the default layout.
 
 ## Safe reruns and unit reconciliation
 

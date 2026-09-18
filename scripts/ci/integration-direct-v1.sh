@@ -171,7 +171,7 @@ jq -e --arg integration "$INTEGRATION_ID" '
 
 STATLITE_CONFIG="$WORK_DIR/statlite.yaml"
 sed \
-	-e 's#listen: "127.0.0.1:9091"#listen: "127.0.0.1:19091"#' \
+	-e 's#listen: "127.0.0.1:9090"#listen: "127.0.0.1:19091"#' \
 	-e "s#127.0.0.1:$CONFIG_APP_PORT/statlite/metrics#127.0.0.1:$APP_PORT/statlite/metrics#" \
 	-e "s#sqlite_path:.*#sqlite_path: \"$WORK_DIR/statlite.sqlite\"#" \
 	"$CONFIG_TEMPLATE" >"$STATLITE_CONFIG"

@@ -248,7 +248,7 @@ statlite inspect 'http://127.0.0.1:8000/statlite/metrics'
 statlite --config statlite.yaml
 ```
 
-Open <http://127.0.0.1:9091>. Use a 30-second or longer polling interval in
+Open <http://127.0.0.1:9090>. Use a 30-second or longer polling interval in
 production. See the [runnable demo](../../../examples/python-fastapi-demo/)
 for maintained application, configuration, and test files.
 
