@@ -25,7 +25,9 @@ framework has a stable, recognizable contract and enough value or demand to
 maintain it. Direct v1 integration is a small, language-neutral choice for
 applications whose operational needs fit StatLite's fixed vocabulary. Read
 [Why StatLite Metrics?](../why-statlite-metrics.md) for the product and
-technical tradeoffs.
+technical tradeoffs. The [lightweight integration principles](principles.md)
+record the implementation philosophy and certification boundaries shared by
+application-owned integrations.
 
 ## Framework guides
 

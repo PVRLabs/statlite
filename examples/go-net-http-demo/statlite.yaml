@@ -1,0 +1,15 @@
+server:
+  listen: "127.0.0.1:9090"
+
+storage:
+  sqlite_path: "./statlite-go-net-http-demo.sqlite"
+
+polling:
+  # Short interval for a responsive local demo. Use 30s or longer in production.
+  interval: "10s"
+  timeout: "5s"
+
+targets:
+  - name: "go-net-http-demo"
+    type: "statlite-metrics"
+    url: "http://127.0.0.1:8080/statlite/metrics"
