@@ -69,7 +69,7 @@ GC, threads, and goroutines are secondary signals and generally do not justify
 prioritizing an integration by themselves. This is a prioritization guide, not
 a requirement that every target expose every HTTP concept. Deliberate strategic
 or runtime-focused targets can be exceptions when their constrained-environment
-value is clear; the planned Go baseline is one such product decision.
+value is clear; any future target still requires a separate product decision.
 
 ## Supported integration boundaries
 
@@ -93,10 +93,10 @@ these boundaries is an arbitrary metrics API.
 
 StatLite's public integration surface follows application runtimes and
 frameworks rather than telemetry standards. Target types represent
-technologies developers recognize and run, such as Spring Boot, Quarkus, Go,
-Gin, and Fiber. Only the target types listed as currently supported above are
-available today; other names describe product direction until their contracts
-are implemented and certified.
+technologies developers recognize and run. Only the target types listed as
+currently supported above are available today. Mentioning another technology
+does not make it a planned target; a new target requires a separate product
+decision, implementation, and certification.
 
 Each target type owns its supported application setup, configuration and
 connection behavior, compatibility inspection, normalization contract,
@@ -145,16 +145,16 @@ metrics reachability. A successful metrics scrape establishes that the target
 is reporting to StatLite, but is not equivalent to framework aggregate health.
 Spring Boot
 Actuator health is normally an established part of the `spring` integration;
-SmallRye Health for Quarkus and health endpoints for future Go or other
-framework targets remain optional capabilities. If Spring health retrieval
+SmallRye Health for Quarkus and health endpoints for any future framework
+target remain optional capabilities. If Spring health retrieval
 fails, StatLite retains independently usable metrics, leaves health
 unavailable, and records a focused warning. A poll without any usable metric
 sample remains a collection failure even when health responded.
 
-Future Caddy, Go, Gin, Node, Python, and other certified integrations must omit
-application and database health unless their supported contract provides an
-explicit authoritative signal. Successful collection is reporting
-availability, not permission to synthesize health.
+Any future certified integration must omit application and database health
+unless its supported contract provides an explicit authoritative signal.
+Successful collection is reporting availability, not permission to synthesize
+health.
 
 ### Dashboard status language
 
@@ -351,14 +351,16 @@ usage justifies them. Such possibilities are non-binding until implemented and
 certified; concrete work belongs in GitHub issues and must preserve the
 product's small, understandable core.
 
-The planned Go ecosystem direction begins with a narrow `go` target for
-reliably recognizable Go runtime and process concepts. Generic Go does not
-imply application HTTP traffic, error, or latency support. Gin and Fiber are
-the first intended framework-specific Go targets and may extend the Go
-baseline with HTTP concepts only after their recommended instrumentation
-contracts are investigated and certified.
+First-class `go` and `gin` targets are deferred. For standard
+`net/http` and Gin applications, the preferred integration is a copy-paste,
+application-owned [`statlite-metrics/v1`](statlite-metrics-v1.md) endpoint with
+`type: statlite-metrics`. Its process-local counters support concurrent
+requests within one process, but they do not aggregate across multiple
+processes or replicas; such deployments need application-owned shared
+aggregation, or a stable endpoint and separate StatLite target for each
+process.
 
-`go`, `gin`, and `fiber` are not currently supported target types. Their planned
-adapters may reuse bounded Prometheus/OpenMetrics parsing, but this direction
-does not imply generic Prometheus compatibility or authorize arbitrary metric
-ingestion.
+The `feature/go-targets` branch remains useful as a research/base branch for
+future bounded Prometheus/OpenMetrics targets such as Caddy. Reusing its
+plumbing does not make a Go target, Gin target, or generic Prometheus target
+planned or supported.

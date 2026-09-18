@@ -179,7 +179,10 @@ are skipped and reported as warnings without discarding otherwise valid metrics.
 
 ## Multiple processes
 
-In-memory helpers report metrics for one process or worker. Applications using
-multiple workers must either aggregate metrics themselves or expose each
-process separately. StatLite does not imply that it aggregates application
-workers.
+In-memory helpers report metrics for one process or worker and may update their
+counters concurrently while serving requests within that process. Applications
+using multiple processes or replicas must either provide application-owned
+shared aggregation or expose a stable endpoint and configure a separate
+StatLite target for each process. StatLite does not imply that it aggregates
+application workers. Polling one shared load-balanced URL can make counters
+appear to reset or decrease between polls.
