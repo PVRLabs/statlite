@@ -25,6 +25,7 @@ class StatLiteMetricsTests(unittest.TestCase):
         snapshot = self.client.get("/statlite/metrics").json()
 
         self.assertEqual(snapshot["schema"], SCHEMA)
+        self.assertEqual(snapshot["integration"], "fastapi")
         self.assertEqual(snapshot["status"], "UP")
         self.assertNotIn("started_at", snapshot)
         metrics = snapshot["metrics"]

@@ -61,6 +61,9 @@ fail() {
 
 [ -x "$STATLITE_BIN" ] || fail "StatLite binary is not executable: $STATLITE_BIN"
 
+# Bare integration IDs identify StatLite-maintained, documented helpers. Keep
+# integration_version absent unless behavior or compatibility must be
+# distinguished; do not assign behavior to third-party IDs without namespacing.
 case "$CASE" in
 fastapi)
 	APP_DIR="$REPO_DIR/examples/python-fastapi-demo"
@@ -70,6 +73,7 @@ fastapi)
 	APP_URL="http://127.0.0.1:$APP_PORT"
 	METRICS_URL="$APP_URL/statlite/metrics"
 	TARGET_NAME=python-fastapi-demo
+	INTEGRATION_ID=fastapi
 	(
 		cd "$APP_DIR"
 		exec "$PYTHON_BIN" -m uvicorn app:app --host 127.0.0.1 --port "$APP_PORT" --workers 1
@@ -84,6 +88,7 @@ express)
 	APP_URL="http://127.0.0.1:$APP_PORT"
 	METRICS_URL="$APP_URL/statlite/metrics"
 	TARGET_NAME=node-express-demo
+	INTEGRATION_ID=express
 	(
 		cd "$APP_DIR"
 		PORT="$APP_PORT" exec node app.js
@@ -98,6 +103,7 @@ django)
 	APP_URL="http://127.0.0.1:$APP_PORT"
 	METRICS_URL="$APP_URL/statlite/metrics"
 	TARGET_NAME=python-django-demo
+	INTEGRATION_ID=django
 	(
 		cd "$APP_DIR"
 		exec "$PYTHON_BIN" manage.py runserver "127.0.0.1:$APP_PORT" --noreload
@@ -152,8 +158,9 @@ jq -s -e '
 	.[0].metrics.request_duration_seconds_total == .[1].metrics.request_duration_seconds_total
 ' "$WORK_DIR/application-metrics.json" "$WORK_DIR/application-metrics-after.json" >/dev/null ||
 	fail "metrics endpoint polling changed application counters"
-jq -e '
+jq -e --arg integration "$INTEGRATION_ID" '
 	.schema == "statlite-metrics/v1" and
+	.integration == $integration and
 	(.status | type == "string" and length > 0) and
 	.metrics.requests_total >= 3 and
 	.metrics.responses_404_total >= 1 and

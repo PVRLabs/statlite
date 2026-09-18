@@ -30,6 +30,7 @@ class StatLiteMetricsTests(unittest.TestCase):
         snapshot = self.client.get("/statlite/metrics").json()
 
         self.assertEqual(snapshot["schema"], "statlite-metrics/v1")
+        self.assertEqual(snapshot["integration"], "django")
         self.assertEqual(snapshot["status"], "UP")
         self.assertNotIn("started_at", snapshot)
         self.assertIn("process_cpu_usage", snapshot["metrics"])

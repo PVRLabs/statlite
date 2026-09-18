@@ -35,6 +35,8 @@ Save this complete helper as `statlite_metrics.py`:
 ```python
 """Small, copyable StatLite Metrics v1 helper for a one-process FastAPI app."""
 
+# Source and updates: https://github.com/PVRLabs/statlite/blob/main/docs/integrate/python/fastapi.md
+
 from __future__ import annotations
 
 import math
@@ -116,6 +118,7 @@ class StatLiteMetrics:
 
         return {
             "schema": SCHEMA,
+            "integration": "fastapi",
             "status": "UP",
             "metrics": metrics,
         }
@@ -179,10 +182,11 @@ Snapshot collection performs no database or network I/O.
 ## Required, optional, and status fields
 
 The response always includes the required `schema: "statlite-metrics/v1"` and
-a non-empty `status`. The example's `status: "UP"` is the application's simple
-operational assertion at snapshot time. It does not assert that every
-dependency is healthy. A successful response proves reporting availability,
-not universal application or dependency health.
+a non-empty `status`. Its optional `integration: "fastapi"` identifies the
+canonical helper that produced the response. The example's `status: "UP"` is
+the application's simple operational assertion at snapshot time. It does not
+assert that every dependency is healthy. A successful response proves
+reporting availability, not universal application or dependency health.
 
 The helper deliberately omits `database_status`. Add it only when the
 application already maintains an authoritative, bounded and cached database

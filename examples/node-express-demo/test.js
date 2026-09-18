@@ -38,6 +38,7 @@ test("counts real responses and excludes metrics polling", async () => {
 
   for (const snapshot of [first, second]) {
     assert.equal(snapshot.schema, "statlite-metrics/v1");
+    assert.equal(snapshot.integration, "express");
     assert.equal(snapshot.status, "UP");
     assert.equal(snapshot.metrics.requests_total, 3);
     assert.equal(snapshot.metrics.responses_404_total, 1);

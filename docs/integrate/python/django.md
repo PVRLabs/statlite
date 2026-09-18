@@ -37,6 +37,8 @@ Save this complete helper as `statlite_metrics.py` in a Django application
 package:
 
 ```python
+# Source and updates: https://github.com/PVRLabs/statlite/blob/main/docs/integrate/python/django.md
+
 import threading
 import time
 
@@ -90,6 +92,7 @@ class StatLiteMetrics:
 
         return {
             "schema": "statlite-metrics/v1",
+            "integration": "django",
             "status": "UP",
             "metrics": metrics,
         }
@@ -178,10 +181,11 @@ database or network I/O.
 ## Required, optional, and status fields
 
 The response always includes the required `schema: "statlite-metrics/v1"` and
-a non-empty `status`. The example's `status: "UP"` is the application's simple
-operational assertion at snapshot time. It does not assert that every
-dependency is healthy. A successful response proves reporting availability,
-not universal application or dependency health.
+a non-empty `status`. Its optional `integration: "django"` identifies the
+canonical helper that produced the response. The example's `status: "UP"` is
+the application's simple operational assertion at snapshot time. It does not
+assert that every dependency is healthy. A successful response proves
+reporting availability, not universal application or dependency health.
 
 The helper deliberately omits `database_status`. Add it only when the
 application already maintains an authoritative, bounded and cached database

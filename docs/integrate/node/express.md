@@ -30,6 +30,8 @@ every supported Express release.
 Save this complete helper as `statlite-metrics.js`:
 
 ```js
+// Source and updates: https://github.com/PVRLabs/statlite/blob/main/docs/integrate/node/express.md
+
 const { performance } = require("node:perf_hooks");
 
 const METRICS_PATH = "/statlite/metrics";
@@ -76,6 +78,7 @@ function snapshot() {
 
   return {
     schema: "statlite-metrics/v1",
+    integration: "express",
     status: "UP",
     started_at: startedAt.toISOString(),
     metrics: {
@@ -156,10 +159,11 @@ database or network I/O.
 ## Required, optional, and status fields
 
 The response always includes the required `schema: "statlite-metrics/v1"` and
-a non-empty `status`. The example's `status: "UP"` is the application's simple
-operational assertion at snapshot time. It does not assert that every
-dependency is healthy. A successful response proves reporting availability,
-not universal application or dependency health.
+a non-empty `status`. Its optional `integration: "express"` identifies the
+canonical helper that produced the response. The example's `status: "UP"` is
+the application's simple operational assertion at snapshot time. It does not
+assert that every dependency is healthy. A successful response proves
+reporting availability, not universal application or dependency health.
 
 The helper omits `database_status`. Add it only from an authoritative,
 inexpensive or cached application signal. Do not query the database merely to

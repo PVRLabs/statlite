@@ -81,6 +81,7 @@ class StatLiteMetrics:
 
         return {
             "schema": SCHEMA,
+            "integration": "fastapi",
             "status": "UP",
             "metrics": metrics,
         }

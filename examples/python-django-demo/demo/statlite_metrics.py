@@ -51,6 +51,7 @@ class StatLiteMetrics:
 
         return {
             "schema": "statlite-metrics/v1",
+            "integration": "django",
             "status": "UP",
             "metrics": metrics,
         }

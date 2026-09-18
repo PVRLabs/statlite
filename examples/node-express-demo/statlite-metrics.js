@@ -44,6 +44,7 @@ function snapshot() {
 
   return {
     schema: "statlite-metrics/v1",
+    integration: "express",
     status: "UP",
     started_at: startedAt.toISOString(),
     metrics: {

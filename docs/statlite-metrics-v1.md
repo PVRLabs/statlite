@@ -20,6 +20,7 @@ A complete response looks like this:
 ```json
 {
   "schema": "statlite-metrics/v1",
+  "integration": "fastapi",
   "status": "UP",
   "database_status": "UP",
   "started_at": "2026-07-27T19:00:00Z",
@@ -50,10 +51,14 @@ The minimal valid response is:
 }
 ```
 
-`schema` and a non-empty `status` are required. `database_status`, `started_at`,
-`metrics`, and every individual metric are optional. `status` is
-application-defined; v1 does not impose a status enum. `started_at` uses RFC
-3339 and is recommended because it improves restart detection.
+`schema` and a non-empty `status` are required. `integration`,
+`database_status`, `started_at`, `metrics`, and every individual metric are
+optional. `status` is application-defined; v1 does not impose a status enum.
+`started_at` uses RFC 3339 and is recommended because it improves restart
+detection.
+
+The optional `integration` field is an additive v1 extension and does not
+change the `schema` value. Consumers that do not use it can safely ignore it.
 
 The required `status` field is the producer's application-level operational
 assertion for this profile. It is not proof that every dependency is healthy.
@@ -86,6 +91,7 @@ rationale, see [Why StatLite Metrics?](why-statlite-metrics.md).
 | Field | Type | Unit | Optional | Semantics |
 |---|---|---|---|---|
 | `schema` | string | N/A | No | Must be `statlite-metrics/v1`. |
+| `integration` | string | N/A | Yes | Non-empty identifier for the documented producer implementation family, such as `express`, `django`, or `fastapi`. It is informational provenance for troubleshooting, not runtime detection or an authenticated assertion. StatLite currently ignores it and it does not affect collection semantics. |
 | `status` | string | N/A | No | Non-empty application health/status text. |
 | `database_status` | string | N/A | Yes | Non-empty status text for an application database dependency when the producer can safely determine it. StatLite self-monitoring emits `UP` or `DOWN` from a cached SQLite `PingContext` check, refreshed on startup and every 60 seconds; a closed local store reports `DOWN` immediately. |
 | `started_at` | string | RFC 3339 timestamp | Yes | Process start time; recommended for restart detection. |
@@ -163,6 +169,11 @@ documentation.
 
 The configured StatLite target name is authoritative. The application should
 not provide `target_name`, polling timestamps, or other StatLite-owned metadata.
+Producers copied from a documented framework integration should emit that
+implementation family's stable, lowercase `integration` identifier. Custom
+producers may omit it. Consumers must treat it as untrusted informational
+metadata rather than proof of the producer's framework or runtime.
+
 Unknown fields are ignored for forward compatibility. Invalid optional fields
 are skipped and reported as warnings without discarding otherwise valid metrics.
 
