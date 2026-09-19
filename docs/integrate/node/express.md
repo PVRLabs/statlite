@@ -247,7 +247,7 @@ endpoint exposes operational data.
 
 - [Runnable Express demo](../../../examples/node-express-demo/)
 - [StatLite Metrics v1 specification](../../statlite-metrics-v1.md)
-- [Why StatLite Metrics?](../../why-statlite-metrics.md)
+- [Why StatLite Metrics?](../../monitoring-options.md#why-statlite-metrics)
 - [Integration guide index](../)
 - [StatLite configuration](../../configuration.md)
 - [Express middleware](https://expressjs.com/en/guide/using-middleware.html)

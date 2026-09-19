@@ -34,6 +34,29 @@ tracing, centralized logs, arbitrary custom metrics and queries, deep
 application performance monitoring, a large integration ecosystem, or
 fleet-scale operation.
 
+## Why StatLite Metrics?
+
+For applications without a first-class StatLite target, use StatLite Metrics
+v1 when the application can expose a small endpoint and its operational needs
+fit StatLite's fixed vocabulary. The profile provides traffic, HTTP errors,
+average latency, application and optional database status, restart and runtime
+signals, and basic process or host resources. See the [integration guide
+index](integrate/) to choose between a first-class integration and direct v1
+integration.
+
+The profile has a small, language-neutral vocabulary with no arbitrary labels,
+application-defined metric families, or producer-defined metric names. StatLite
+retrieves one bounded JSON snapshot with one `GET` request per poll. This keeps
+the producer implementation and its ongoing maintenance straightforward.
+
+Application status, optional database status, and reporting availability are
+separate concepts because they answer different operational questions. The
+[StatLite Metrics v1 specification](statlite-metrics-v1.md) defines their exact
+semantics and remains the authoritative contract. Applications that need
+arbitrary metrics, labels, traces, logs, or exploratory queries are better
+served by broader systems such as Prometheus or OpenTelemetry; see the
+comparisons below.
+
 ## Three ways to deploy monitoring
 
 The most useful comparison is not a generic feature scorecard. It is what must

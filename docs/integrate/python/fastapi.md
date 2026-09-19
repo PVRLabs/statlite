@@ -278,7 +278,7 @@ operational data.
 
 - [Runnable FastAPI demo](../../../examples/python-fastapi-demo/)
 - [StatLite Metrics v1 specification](../../statlite-metrics-v1.md)
-- [Why StatLite Metrics?](../../why-statlite-metrics.md)
+- [Why StatLite Metrics?](../../monitoring-options.md#why-statlite-metrics)
 - [Integration guide index](../)
 - [StatLite configuration](../../configuration.md)
 - [FastAPI middleware](https://fastapi.tiangolo.com/tutorial/middleware/)

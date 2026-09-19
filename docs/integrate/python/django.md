@@ -282,7 +282,7 @@ endpoint exposes operational data.
 
 - [Runnable Django demo](../../../examples/python-django-demo/)
 - [StatLite Metrics v1 specification](../../statlite-metrics-v1.md)
-- [Why StatLite Metrics?](../../why-statlite-metrics.md)
+- [Why StatLite Metrics?](../../monitoring-options.md#why-statlite-metrics)
 - [Integration guide index](../)
 - [StatLite configuration](../../configuration.md)
 - [Django middleware](https://docs.djangoproject.com/en/5.2/topics/http/middleware/)
