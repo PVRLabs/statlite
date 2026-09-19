@@ -73,19 +73,12 @@ The requirement does not imply that every other StatLite integration must
 expose health; framework adapters without an authoritative health signal omit
 it.
 
-## Python and FastAPI
+## Framework integrations
 
-Request metrics must be measured inside the application, where requests and
-responses pass through its middleware. The [FastAPI integration guide](integrate/python/fastapi.md)
-contains a complete copyable helper, middleware registration, endpoint code,
-and StatLite target configuration. Its [runnable demo](../examples/python-fastapi-demo/)
-keeps the implementation and framework-level tests together. Only `schema`
-and `status` are required; all individual metrics are optional.
-
-For the integration decision path and FastAPI, Express, Django, Go `net/http`,
-and Gin guides, see [Integrate an application with StatLite](integrate/). For
-the bounded-profile
-rationale, see [Why StatLite Metrics?](why-statlite-metrics.md).
+StatLite provides framework-specific guides for applications that expose this
+profile through their normal request lifecycle hooks. See
+[Integrate an application with StatLite](integrate/) for supported frameworks,
+copyable implementations, runnable examples, and setup instructions.
 
 ## Fields
 

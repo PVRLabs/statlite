@@ -1,10 +1,10 @@
 # Configuration
 
-StatLite supports Spring Boot Actuator, Quarkus Micrometer metrics, and the
-canonical fixed StatLite Metrics JSON profile for small applications that need
-basic health, traffic, latency, CPU, and runtime memory monitoring without a full
-observability stack.
-StatLite is not a Prometheus/Grafana replacement.
+StatLite supports Spring Boot Actuator and Quarkus Micrometer targets. Applications
+can also expose the fixed StatLite Metrics v1 JSON profile.
+Depending on the integration and available signals, StatLite monitors application
+status, traffic, latency, CPU, and runtime memory without a full
+observability stack. StatLite is not a Prometheus/Grafana replacement.
 
 ## Basic configuration
 
@@ -42,13 +42,11 @@ statlite --config /etc/statlite/config.yaml
 ```
 
 See [`docs/integrations.md`](integrations.md) for the supported integration
-matrix. For an application without a first-class target, see the [StatLite
-Metrics integration path](integrate/) and its FastAPI, Express, Django, Go
-`net/http`, and Gin guides. These guides add the required
-`/statlite/metrics` application
-endpoint; configuration only tells StatLite where to poll it. See `examples/`
-for starter templates (Actuator, Quarkus, StatLite Metrics, multi-target,
-self-monitoring), `examples/python-fastapi-demo/` for a runnable FastAPI app,
+matrix and first-class targets. For applications using StatLite Metrics v1,
+see [Integrate an application with StatLite](integrate/) for framework guides
+and examples. These integrations expose a `/statlite/metrics` endpoint;
+configuration only tells StatLite where to poll it. See `examples/` for starter
+templates (Actuator, Quarkus, StatLite Metrics, multi-target, self-monitoring)
 and `examples/spring-actuator-demo/` for a standalone Spring Boot demo app.
 
 ## Discover a target with `inspect`
