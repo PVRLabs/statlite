@@ -69,7 +69,8 @@ run locally, where monitoring data is stored, and what the operator must manage.
 | Who controls retention? | The operator, through local configuration and disk capacity | The operator or the selected backend | The selected backend or service plan |
 | Local operational work | One deliberately focused component | Multiple flexible components | Local collection plus any backend the operator manages |
 | Typical strength | Small, complete, local monitoring | Flexible metrics, querying, and dashboards | Portable telemetry pipelines or broad managed observability |
-| Common examples | StatLite | Prometheus and Grafana | OpenTelemetry, Datadog, and New Relic |
+
+<sub>Examples: self-hosted stack: Prometheus + Grafana; collection with another backend: OpenTelemetry Collector, Datadog Agent, New Relic Infrastructure Agent.</sub>
 
 This distinction matters when comparing memory figures. StatLite's roughly 10
 to 15 MiB idle RSS represents its complete process, including collection,
