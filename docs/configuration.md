@@ -370,7 +370,6 @@ Selected target and time range are stored in the query string, so you can bookma
 | `examples/statlite.yaml` | Monitor another StatLite instance with `statlite-metrics` |
 | `examples/multi-target.yaml` | Illustrative multi-target mix (Actuator + StatLite Metrics + self) |
 | `examples/quarkus-metrics-demo/` | Pinned Quarkus Micrometer metrics fixture and traffic recipe |
-| `examples/python-fastapi-demo/` | Runnable FastAPI StatLite Metrics v1 demo |
 | `examples/spring-actuator-demo/` | Standalone Spring Boot demo app that emits Actuator and Micrometer metrics |
 
 ## Systemd

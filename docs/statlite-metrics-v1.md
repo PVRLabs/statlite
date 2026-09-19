@@ -157,10 +157,6 @@ them when it deliberately exposes the execution environment visible to its
 process; StatLite displays those values with that application target rather
 than creating a separate target.
 
-The FastAPI helper is illustrative; this document remains the canonical wire
-contract, while the FastAPI guide is the canonical framework integration
-documentation.
-
 The configured StatLite target name is authoritative. The application should
 not provide `target_name`, polling timestamps, or other StatLite-owned metadata.
 Producers copied from a documented framework integration should emit that
