@@ -222,6 +222,56 @@ Hosted platform
 application or host -> local agent -> provider-operated storage and dashboard
 ```
 
+## Boundaries and extension paths
+
+StatLite's small model leaves room for practical deployment choices without
+turning the core process into a general-purpose monitoring system.
+
+### Multi-process applications
+
+The direct StatLite Metrics helpers intentionally keep counters process-local
+and simple. Today, a multi-process deployment should use stable per-process
+targets or aggregation owned by the application. For larger deployments, a
+small separate aggregation process is being considered: it would combine
+per-process StatLite Metrics into one normal StatLite target.
+
+A separate process keeps worker discovery and aggregation complexity outside
+StatLite, preserves the fixed `statlite-metrics/v1` contract, and can be tested
+independently. It can also work across frameworks. First-class framework
+integrations may be added where there is sufficient demand and a stable
+framework contract; maintainers and vendors are welcome to collaborate on
+those paths. This is an extension direction under consideration, not a
+committed release or timeline.
+
+### Where StatLite runs
+
+StatLite does not have to run on the monitored host. Running it beside the
+application is often the simplest arrangement: polling can remain local and
+private, without sending metrics over an external network. Running StatLite on
+another machine is also valid when separating the monitoring host is
+desirable. Independent reachability checks can complement either arrangement
+when uptime from another network location matters.
+
+### Private access and authentication
+
+StatLite currently assumes a private or otherwise protected monitoring path,
+rather than exposing its dashboard and metrics endpoint directly to the
+Internet. Depending on the deployment, that path can use loopback or private
+networking, a VPN, an SSH tunnel, or a firewall. The dashboard can sit behind
+an authenticated reverse proxy, while application metrics endpoints should
+normally be protected by loopback or private networking, firewall rules, or a
+proxy route that does not require StatLite itself to authenticate. Keeping
+access protection at the deployment boundary helps keep the StatLite core
+small and focused.
+
+### Alerts and automation
+
+StatLite does not currently send alerts or pages. A lightweight,
+machine-readable recent-events or API surface is being explored so cron jobs
+and external automation can react to StatLite events without requiring a full
+notification subsystem inside StatLite. Broader paging and escalation systems
+remain outside StatLite's intended scope.
+
 ## What StatLite deliberately leaves out
 
 StatLite stays small partly because it deliberately does less. It is not
