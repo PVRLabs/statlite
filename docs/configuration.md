@@ -305,24 +305,6 @@ chown statlite:statlite /etc/statlite/config.yaml
 
 StatLite strips credentials from source endpoints before showing them in the dashboard or API responses.
 
-### StatLite self-monitoring
-
-```yaml
-targets:
-  - name: "statlite-self"
-    type: "statlite-metrics"
-    url: "http://127.0.0.1:9090/statlite/metrics"
-```
-
-`type: "statlite-metrics"` polls another StatLite (or this process) via
-`/statlite/metrics`, the canonical fixed `statlite-metrics/v1` profile. The
-same profile is also available to supported external application integrations;
-it is not a general metrics protocol.
-
-`type: "statlite"` is deprecated; use `type: "statlite-metrics"`. See
-[Deprecations and compatibility](deprecations.md#target-type-statlite) for the
-temporary startup migration.
-
 ### StatLite Metrics v1
 
 ```yaml
@@ -339,15 +321,36 @@ StatLite performs one bounded JSON GET per poll; Basic Auth is not part of v1.
 
 Root `statlite.yaml` uses this pattern so Quick Start works with no extra config.
 
-### Host resources
+### StatLite self-monitoring
 
-The `statlite-self` target reports the local host CPU, memory, and filesystem
-containing StatLite's SQLite database through `/statlite/metrics`. It is the
-single target for StatLite's application, process, and host-resource charts.
+```yaml
+targets:
+  - name: "statlite-self"
+    type: "statlite-metrics"
+    url: "http://127.0.0.1:9090/statlite/metrics"
+```
+
+`type: "statlite-metrics"` polls another StatLite (or this process) via
+`/statlite/metrics`, the canonical fixed `statlite-metrics/v1` profile. The
+same profile is also available to supported external application integrations;
+it is not a general metrics protocol.
+
+Self-monitoring is useful for observing the local execution environment visible
+to StatLite, including CPU, memory, and filesystem space. The `statlite-self`
+target reports the CPU, memory, and filesystem resources visible to the
+StatLite process, including the filesystem containing its SQLite database,
+through `/statlite/metrics`. It is the single target for StatLite's application,
+process, and local-resource charts.
+
+![StatLite host monitoring dashboard](images/host-monitoring.webp)
 
 For a remote application, a central StatLite instance cannot obtain that
 machine's host resources unless the application emits the optional host fields
 in `statlite-metrics/v1` or another StatLite instance runs on the remote host.
+
+`type: "statlite"` is deprecated; use `type: "statlite-metrics"`. See
+[Deprecations and compatibility](deprecations.md#target-type-statlite) for the
+temporary startup migration.
 
 ## Dashboard URL state
 
