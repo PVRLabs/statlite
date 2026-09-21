@@ -3,9 +3,11 @@
 StatLite supports [Spring Boot Actuator](#spring-boot-actuator) and
 [Quarkus Micrometer metrics](#quarkus-micrometer-metrics) targets. Applications
 can also expose the fixed [StatLite Metrics v1](statlite-metrics-v1.md) JSON
-profile. Depending on the integration and available signals, StatLite monitors
-application status, traffic, latency, CPU, and runtime memory without a full
-observability stack. StatLite is not a Prometheus/Grafana replacement.
+profile, with [ready-to-use integration guides](integrate/) for FastAPI,
+Express, Django, Go `net/http`, and Gin. Depending on the integration and
+available signals, StatLite monitors application status, traffic, latency, CPU,
+and runtime memory without a full observability stack. StatLite is not a
+Prometheus/Grafana replacement.
 
 ## Basic configuration
 
