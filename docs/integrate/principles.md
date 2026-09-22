@@ -38,6 +38,19 @@ server, protocol upgrade, optional writer interface, deployment topology, or
 unusual lifecycle. Do not turn every discovered edge case into a new
 certification requirement.
 
+## Optimize canonical helpers for the simple deployment first
+
+Canonical helpers should provide useful application metrics with minimal code
+and dependencies for one process or worker. Do not add complexity for
+multi-process managers, replica aggregation, worker discovery, PID tracking,
+fork detection, or framework-specific lifecycle edge cases unless there is
+demonstrated demand.
+
+Document those boundaries clearly. Multi-worker, prefork, and replica
+deployments are outside the supported model of the simple copyable helpers.
+Users who need those deployment models should open an issue or discussion so a
+focused integration can be evaluated from concrete requirements.
+
 ## Keep application-owned code understandable
 
 Copyable helpers and middleware are intentionally application code. Prefer
@@ -96,8 +109,8 @@ application.
 
 In-memory helpers may support concurrent traffic within one process, but
 their counters remain process-local. They do not aggregate workers, processes,
-containers, or replicas. Multi-process deployments require application-owned
-shared aggregation or stable per-process endpoints and StatLite targets.
+containers, or replicas. Multi-process, prefork, and replica deployments are
+outside the supported model of these simple helpers.
 
 Simplicity and comprehensibility are product constraints. Do not solve
 speculative compatibility problems unless they materially affect real users.

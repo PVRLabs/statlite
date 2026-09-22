@@ -76,6 +76,10 @@ established `/q/metrics` location; it does not identify arbitrary Micrometer
 exposition as Quarkus. Basic Auth uses the shared `auth.type: basic`
 configuration for both endpoints.
 
+Spring Boot and Quarkus memory is JVM heap used. It is runtime-managed
+application memory, not process RSS, container memory, or a configured maximum
+heap size.
+
 The public pinned fixture is
 [`examples/quarkus-metrics-demo/`](../examples/quarkus-metrics-demo/). It uses
 Quarkus 3.39.1, Java 21 LTS, the Micrometer Prometheus registry, and SmallRye

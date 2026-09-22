@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 import threading
 import time
+import tracemalloc
+from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
 
 
@@ -21,9 +23,14 @@ class StatLiteMetrics:
 
     def __init__(self, metrics_path: str = DEFAULT_METRICS_PATH) -> None:
         self.metrics_path = metrics_path
-        self._last_cpu_wall = time.monotonic()
+        self._started_at = datetime.now(timezone.utc)
+        self._started_monotonic = time.monotonic()
+        self._last_cpu_wall = self._started_monotonic
         self._last_cpu_time = time.process_time()
         self._lock = threading.Lock()
+
+        if not tracemalloc.is_tracing():
+            tracemalloc.start()
 
         self._requests_total = 0
         self._responses_404_total = 0
@@ -55,6 +62,7 @@ class StatLiteMetrics:
 
     def snapshot(self) -> dict[str, Any]:
         """Return one complete, JSON-serializable StatLite Metrics v1 response."""
+        runtime_heap_used_bytes, _peak = tracemalloc.get_traced_memory()
         with self._lock:
             now = time.monotonic()
             process_cpu_time = time.process_time()
@@ -77,12 +85,17 @@ class StatLiteMetrics:
                 # CPU time consumed during the interval divided by wall time:
                 # 1.0 means one logical CPU core was fully used.
                 "process_cpu_usage": process_cpu_usage,
+                "runtime_heap_used_bytes": runtime_heap_used_bytes,
+                "uptime_seconds": max(0.0, now - self._started_monotonic),
             }
 
         return {
             "schema": SCHEMA,
             "integration": "fastapi",
             "status": "UP",
+            "started_at": self._started_at.isoformat(timespec="microseconds").replace(
+                "+00:00", "Z"
+            ),
             "metrics": metrics,
         }
 

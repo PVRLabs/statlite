@@ -27,23 +27,11 @@ test("targetTypeHelp describes the Quarkus metrics endpoint", () => {
   );
 });
 
-test("runtimeHelp describes generic application runtime memory", () => {
-  assert.equal(
-    dashboard.runtimeHelp("statlite-metrics"),
-    "Process CPU usage and memory managed by the application runtime, not total process memory."
-  );
-});
-
-test("runtimeHelp identifies JVM heap memory for JVM targets", () => {
-  const suffix = " Runtime memory is current JVM heap usage.";
-  assert.equal(
-    dashboard.runtimeHelp("spring"),
-    "Process CPU usage and memory managed by the application runtime, not total process memory." + suffix
-  );
-  assert.equal(
-    dashboard.runtimeHelp("quarkus"),
-    "Process CPU usage and memory managed by the application runtime, not total process memory." + suffix
-  );
+test("runtimeHelp describes integration-dependent CPU and runtime memory", () => {
+  const expected = "CPU usage and runtime memory reported by the target. Their exact measurements depend on the integration and may differ from OS process CPU and total process memory.";
+  assert.equal(dashboard.runtimeHelp("statlite-metrics"), expected);
+  assert.equal(dashboard.runtimeHelp("spring"), expected);
+  assert.equal(dashboard.runtimeHelp("quarkus"), expected);
 });
 
 test("periodic refresh keeps charts for a transient empty series", () => {

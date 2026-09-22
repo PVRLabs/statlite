@@ -1,7 +1,9 @@
 """Integration checks for the Django StatLite Metrics demo."""
 
 import os
+import time
 import unittest
+from datetime import datetime
 
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "demo.settings")
@@ -32,10 +34,11 @@ class StatLiteMetricsTests(unittest.TestCase):
         self.assertEqual(snapshot["schema"], "statlite-metrics/v1")
         self.assertEqual(snapshot["integration"], "django")
         self.assertEqual(snapshot["status"], "UP")
-        self.assertNotIn("started_at", snapshot)
+        self.assertIsNotNone(datetime.fromisoformat(snapshot["started_at"].replace("Z", "+00:00")))
         self.assertIn("process_cpu_usage", snapshot["metrics"])
-        self.assertNotIn("runtime_heap_used_bytes", snapshot["metrics"])
-        self.assertNotIn("uptime_seconds", snapshot["metrics"])
+        self.assertIsInstance(snapshot["metrics"]["runtime_heap_used_bytes"], int)
+        self.assertGreaterEqual(snapshot["metrics"]["runtime_heap_used_bytes"], 0)
+        self.assertGreaterEqual(snapshot["metrics"]["uptime_seconds"], 0)
 
     def test_real_responses_are_counted_and_metrics_endpoint_is_excluded(self):
         self.assertEqual(self.client.get("/").status_code, 200)
@@ -51,3 +54,17 @@ class StatLiteMetricsTests(unittest.TestCase):
             self.assertEqual(snapshot["responses_4xx_total"], 1)
             self.assertEqual(snapshot["responses_5xx_total"], 1)
             self.assertGreater(snapshot["request_duration_seconds_total"], 0)
+
+    def test_process_metrics_remain_valid_across_snapshots(self):
+        first = self.client.get("/statlite/metrics").json()
+        time.sleep(0.001)
+        second = self.client.get("/statlite/metrics").json()
+
+        self.assertEqual(second["started_at"], first["started_at"])
+        self.assertGreaterEqual(
+            second["metrics"]["uptime_seconds"], first["metrics"]["uptime_seconds"]
+        )
+        for snapshot in (first, second):
+            memory = snapshot["metrics"]["runtime_heap_used_bytes"]
+            self.assertIsInstance(memory, int)
+            self.assertGreaterEqual(memory, 0)

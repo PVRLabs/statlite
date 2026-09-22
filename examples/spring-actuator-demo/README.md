@@ -93,6 +93,9 @@ The dashboard should show:
 - process start time
 - restart detection after the Spring Boot process is restarted
 
+Memory is current JVM heap used. It is runtime-managed application memory, not
+process RSS, container memory, or the configured maximum heap size.
+
 ## Restart test
 
 1. Start the Spring Boot application.

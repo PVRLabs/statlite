@@ -45,4 +45,5 @@ python -m unittest test_statlite_metrics.py
 
 The tests exercise Django's actual normal, framework-generated 404, and 500
 response behavior. They also verify that repeated `/statlite/metrics` polling
-does not increment application counters.
+does not increment application counters. Memory is current Python allocation
+size traced by `tracemalloc`, not process RSS or a memory limit.

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import importlib
 import sys
+import time
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -27,12 +29,13 @@ class StatLiteMetricsTests(unittest.TestCase):
         self.assertEqual(snapshot["schema"], SCHEMA)
         self.assertEqual(snapshot["integration"], "fastapi")
         self.assertEqual(snapshot["status"], "UP")
-        self.assertNotIn("started_at", snapshot)
+        self.assertIsNotNone(datetime.fromisoformat(snapshot["started_at"].replace("Z", "+00:00")))
         metrics = snapshot["metrics"]
         self.assertIn("process_cpu_usage", metrics)
         self.assertNotIn("cpu_usage", metrics)
-        self.assertNotIn("runtime_heap_used_bytes", metrics)
-        self.assertNotIn("uptime_seconds", metrics)
+        self.assertIsInstance(metrics["runtime_heap_used_bytes"], int)
+        self.assertGreaterEqual(metrics["runtime_heap_used_bytes"], 0)
+        self.assertGreaterEqual(metrics["uptime_seconds"], 0)
         self.assertNotIn("request_duration_seconds_max", metrics)
         for key in (
             "host_cpu_usage",
@@ -57,3 +60,17 @@ class StatLiteMetricsTests(unittest.TestCase):
             self.assertEqual(snapshot["responses_4xx_total"], 1)
             self.assertEqual(snapshot["responses_5xx_total"], 1)
             self.assertGreater(snapshot["request_duration_seconds_total"], 0)
+
+    def test_process_metrics_remain_valid_across_snapshots(self) -> None:
+        first = self.client.get("/statlite/metrics").json()
+        time.sleep(0.001)
+        second = self.client.get("/statlite/metrics").json()
+
+        self.assertEqual(second["started_at"], first["started_at"])
+        self.assertGreaterEqual(
+            second["metrics"]["uptime_seconds"], first["metrics"]["uptime_seconds"]
+        )
+        for snapshot in (first, second):
+            memory = snapshot["metrics"]["runtime_heap_used_bytes"]
+            self.assertIsInstance(memory, int)
+            self.assertGreaterEqual(memory, 0)

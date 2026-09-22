@@ -12,9 +12,9 @@ the guide.
 Express does not have a first-class StatLite target type. Use this direct v1
 integration when StatLite's fixed traffic, error, average-latency, status,
 restart, and process signals fit the application's operational needs. This
-dependency-light example is a single-process integration. Cluster mode and
-process managers need application-owned shared aggregation or stable
-per-worker routing.
+dependency-light example supports one process or worker. Cluster mode,
+multi-process managers, and replica deployments are outside this drop-in
+integration.
 
 StatLite cannot determine request counts, HTTP errors, or request latency from
 outside the application. The middleware below measures those values where
@@ -227,8 +227,10 @@ process. Cluster mode and process managers give each worker separate counters
 and a separate `started_at`. When load-balanced polls alternate workers,
 counters can decrease and `started_at` can change, producing misleading deltas
 or apparent restarts rather than merely a partial aggregate. StatLite does not
-aggregate workers. A multi-process deployment must provide application-owned
-shared aggregation or a stable per-worker endpoint and target topology.
+aggregate workers. Multi-process, cluster, and replica deployments are outside
+this helper's supported model. If you need one of those setups,
+[open an issue](https://github.com/PVRLabs/statlite/issues/new/choose) or
+[start a GitHub Discussion](https://github.com/PVRLabs/statlite/discussions/new/choose).
 
 Add host fields only when the application can accurately describe its visible
 execution environment. Do not substitute process RSS for

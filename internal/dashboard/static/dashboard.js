@@ -110,7 +110,7 @@ function buildCharts() {
   state.charts.runtime = new Chart(document.getElementById("runtime-chart"), {
     type: "line",
     data: { labels: [], datasets: [
-      { label: "Runtime memory MB", unit: "mb", data: [], borderColor: palette.heap, ...lineStyle, yAxisID: "y", tension: 0.25, spanGaps: false },
+      { label: "Runtime memory", unit: "mb", data: [], borderColor: palette.heap, ...lineStyle, yAxisID: "y", tension: 0.25, spanGaps: false },
       { label: "Process CPU", unit: "percent", data: [], borderColor: palette.cpu, ...lineStyle, yAxisID: "y1", tension: 0.25, spanGaps: false }
     ] },
     options: runtimeOptions()
@@ -696,12 +696,7 @@ function targetTypeHelp(value) {
 }
 
 function runtimeHelp(value) {
-  const help = "Process CPU usage and memory managed by the application runtime, not total process memory.";
-  const targetType = String(value || "").toLowerCase();
-  if (targetType === "spring" || targetType === "quarkus") {
-    return help + " Runtime memory is current JVM heap usage.";
-  }
-  return help;
+  return "CPU usage and runtime memory reported by the target. Their exact measurements depend on the integration and may differ from OS process CPU and total process memory.";
 }
 
 function setText(id, value) {

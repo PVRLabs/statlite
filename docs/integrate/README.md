@@ -44,6 +44,23 @@ These frameworks do not have first-class target types; their guides use
 from configuration tools. Each guide uses the conventional `/statlite/metrics`
 endpoint and requires an application setup step.
 
+## Memory reported by each integration
+
+The dashboard presents one normalized application-memory series. Each runtime
+provides the closest useful, low-overhead value through
+`runtime_heap_used_bytes`:
+
+| Integration | Memory value |
+| --- | --- |
+| FastAPI and Django | Current Python allocations traced by `tracemalloc` |
+| Express | Current V8 heap used from `process.memoryUsage().heapUsed` |
+| Go `net/http` and Gin | Current allocated Go heap from `runtime.MemStats.Alloc` |
+
+These values are runtime-managed application memory. They are not process RSS,
+container memory, memory limits, or maximum heap values. First-class Spring
+Boot and Quarkus integrations report JVM heap used. StatLite self-monitoring
+reports current allocated Go heap with the same meaning as the Go helpers.
+
 ## Common guide structure
 
 Framework guides use this sequence:

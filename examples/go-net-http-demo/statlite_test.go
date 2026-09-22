@@ -59,10 +59,25 @@ func TestMetricsContractAndCounters(t *testing.T) {
 	if snapshot.Metrics.UptimeSeconds < 0 {
 		t.Fatalf("uptime_seconds = %f, want non-negative", snapshot.Metrics.UptimeSeconds)
 	}
+	if snapshot.Metrics.ProcessCPUUsage < 0 {
+		t.Fatalf("process_cpu_usage = %f, want non-negative", snapshot.Metrics.ProcessCPUUsage)
+	}
+	if snapshot.Metrics.RuntimeHeapUsedBytes == 0 {
+		t.Fatal("runtime_heap_used_bytes = 0, want current Go heap allocation")
+	}
 
 	afterSecondPoll := getSnapshot(t, server.URL+statLiteMetricsPath)
 	if afterSecondPoll.Metrics.RequestsTotal != snapshot.Metrics.RequestsTotal {
 		t.Fatalf("metrics request changed requests_total from %d to %d", snapshot.Metrics.RequestsTotal, afterSecondPoll.Metrics.RequestsTotal)
+	}
+	if afterSecondPoll.StartedAt != snapshot.StartedAt {
+		t.Fatalf("started_at changed from %q to %q", snapshot.StartedAt, afterSecondPoll.StartedAt)
+	}
+	if afterSecondPoll.Metrics.UptimeSeconds < snapshot.Metrics.UptimeSeconds {
+		t.Fatalf("uptime_seconds decreased from %f to %f", snapshot.Metrics.UptimeSeconds, afterSecondPoll.Metrics.UptimeSeconds)
+	}
+	if afterSecondPoll.Metrics.RuntimeHeapUsedBytes == 0 {
+		t.Fatal("runtime_heap_used_bytes disappeared on repeated collection")
 	}
 }
 

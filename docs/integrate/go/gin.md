@@ -9,14 +9,16 @@ helper.
 
 Gin does not have a first-class StatLite target type. Use this direct v1
 integration when StatLite's fixed traffic, error, average-latency, status,
-restart, and process signals fit the application's operational needs.
+restart, CPU, and memory signals fit the application's operational needs.
+
+Memory is current allocated Go heap from `runtime.MemStats.Alloc`. It is not
+process RSS, container memory, a memory limit, or a maximum heap value.
 
 This helper supports concurrent requests and goroutines within one process,
 but its counters are process-local. Do not poll a load-balanced URL that
 alternates independent processes or replicas. Counters can decrease and
 `started_at` can alternate, creating misleading deltas or apparent restarts.
-Use application-owned shared aggregation or one stable endpoint and StatLite
-target per process.
+Multi-process and replica deployments are outside this drop-in integration.
 
 The example was exercised with Go 1.27.1 and Gin 1.12.0. This guide claims
 that tested baseline, not compatibility with every Go or Gin release.
@@ -33,6 +35,8 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"runtime"
+	runtimemetrics "runtime/metrics"
 	"strings"
 	"sync"
 	"time"
@@ -47,6 +51,8 @@ type statLiteRecorder struct {
 	startedAt           time.Time
 	serializedStartedAt time.Time
 	status              string
+	previousCPUSeconds  float64
+	previousCPUTime     time.Time
 
 	requestsTotal               uint64
 	responses404Total           uint64
@@ -62,11 +68,14 @@ func newStatLiteRecorder(startedAt time.Time, status string) *statLiteRecorder {
 	if status == "" {
 		panic("StatLite application status must not be empty")
 	}
-	return &statLiteRecorder{
+	recorder := &statLiteRecorder{
 		startedAt:           startedAt,
 		serializedStartedAt: startedAt.UTC(),
 		status:              status,
+		previousCPUTime:     startedAt,
 	}
+	recorder.previousCPUSeconds = readGoCPUSeconds()
+	return recorder
 }
 
 func (r *statLiteRecorder) middleware(c *gin.Context) {
@@ -138,18 +147,36 @@ type statLiteMetrics struct {
 	Responses4xxTotal           uint64  `json:"responses_4xx_total"`
 	Responses5xxTotal           uint64  `json:"responses_5xx_total"`
 	RequestDurationSecondsTotal float64 `json:"request_duration_seconds_total"`
+	ProcessCPUUsage             float64 `json:"process_cpu_usage"`
+	RuntimeHeapUsedBytes        uint64  `json:"runtime_heap_used_bytes"`
 	UptimeSeconds               float64 `json:"uptime_seconds"`
 }
 
 func (r *statLiteRecorder) snapshot() statLiteSnapshot {
+	now := time.Now()
+	currentCPUSeconds := readGoCPUSeconds()
+	var memory runtime.MemStats
+	runtime.ReadMemStats(&memory)
+
 	r.mu.Lock()
+	elapsed := now.Sub(r.previousCPUTime).Seconds()
+	processCPUUsage := 0.0
+	if elapsed >= 0 && currentCPUSeconds >= r.previousCPUSeconds {
+		if elapsed > 0 {
+			processCPUUsage = (currentCPUSeconds - r.previousCPUSeconds) / elapsed
+		}
+		r.previousCPUSeconds = currentCPUSeconds
+		r.previousCPUTime = now
+	}
 	metrics := statLiteMetrics{
 		RequestsTotal:               r.requestsTotal,
 		Responses404Total:           r.responses404Total,
 		Responses4xxTotal:           r.responses4xxTotal,
 		Responses5xxTotal:           r.responses5xxTotal,
 		RequestDurationSecondsTotal: r.requestDurationSecondsTotal,
-		UptimeSeconds:               time.Since(r.startedAt).Seconds(),
+		ProcessCPUUsage:             processCPUUsage,
+		RuntimeHeapUsedBytes:        memory.Alloc,
+		UptimeSeconds:               now.Sub(r.startedAt).Seconds(),
 	}
 	serializedStartedAt := r.serializedStartedAt
 	status := r.status
@@ -166,6 +193,15 @@ func (r *statLiteRecorder) snapshot() statLiteSnapshot {
 		Metrics:     metrics,
 	}
 }
+
+func readGoCPUSeconds() float64 {
+	samples := []runtimemetrics.Sample{
+		{Name: "/cpu/classes/user:cpu-seconds"},
+		{Name: "/cpu/classes/gc/total:cpu-seconds"},
+	}
+	runtimemetrics.Read(samples)
+	return samples[0].Value.Float64() + samples[1].Value.Float64()
+}
 ```
 
 The recorder locks only while updating or copying state. JSON encoding and
@@ -174,6 +210,13 @@ application provides the non-empty status. A successful metrics response
 proves reporting availability, not that every database or dependency is
 healthy. Add `database_status` only when the application has an authoritative,
 inexpensive or cached signal.
+
+The helper reports a best-effort CPU estimate from Go application and
+garbage-collection runtime counters. It is useful for spikes, trends, and
+correlation, but it is not exact OS process CPU accounting. The helper also
+reports current allocated Go heap as `runtime_heap_used_bytes`, stable start
+identity, and uptime using only the standard library. It omits host and database
+fields.
 
 ## Register recovery in the required order
 
@@ -287,9 +330,10 @@ Restarting the application resets counters and changes `started_at`.
 
 Concurrent requests and goroutines within one process are supported. Separate
 processes or replicas have independent in-memory counters, and StatLite does
-not automatically aggregate them. A multi-process deployment requires
-application-owned shared aggregation or a stable endpoint and separate
-StatLite target for every process.
+not aggregate them. Those deployments are outside this helper's supported
+model. If you need one of those setups,
+[open an issue](https://github.com/PVRLabs/statlite/issues/new/choose) or
+[start a GitHub Discussion](https://github.com/PVRLabs/statlite/discussions/new/choose).
 
 Polling one load-balanced URL across independent processes is unsupported.
 Cumulative counters can decrease and process start identity can alternate,

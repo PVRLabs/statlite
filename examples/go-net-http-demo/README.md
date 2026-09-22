@@ -47,3 +47,7 @@ go test -race ./...
 The tests include real HTTP server checks for streaming flush and connection
 hijacking. They also prove that an escaping panic is not recorded, while
 application recovery inside the StatLite middleware can write and record 500.
+The reported memory value is current allocated Go heap from
+`runtime.MemStats.Alloc`, not process RSS or a memory limit.
+CPU is a best-effort estimate from Go runtime counters. It is useful for
+spikes, trends, and correlation, but is not exact OS process CPU accounting.

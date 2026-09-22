@@ -50,4 +50,5 @@ python -m unittest examples/python-fastapi-demo/test_statlite_metrics.py
 
 The tests exercise FastAPI's actual normal, 404, and unhandled 500 response
 behavior. They also verify that `/statlite/metrics`, including a query string,
-does not increment application counters.
+does not increment application counters. Memory is current Python allocation
+size traced by `tracemalloc`, not process RSS or a memory limit.

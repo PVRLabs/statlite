@@ -50,4 +50,6 @@ test("counts real responses and excludes metrics polling", async () => {
     assert.ok(snapshot.metrics.uptime_seconds > 0);
     assert.ok(Date.parse(snapshot.started_at) > 0);
   }
+  assert.equal(second.started_at, first.started_at);
+  assert.ok(second.metrics.uptime_seconds >= first.metrics.uptime_seconds);
 });

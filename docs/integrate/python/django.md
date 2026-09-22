@@ -10,17 +10,15 @@ the guide.
 
 Django does not have a first-class StatLite target type. Use this direct v1
 integration when StatLite's fixed traffic, error, average-latency, status,
-and process CPU signals fit the application's operational needs. This
+CPU, memory, and restart signals fit the application's operational needs. This
 dependency-light example is a single-worker integration. A single Django
 worker can be a reasonable choice for a small VPS or an application beginning
-to receive traffic, but common Gunicorn, uWSGI, and other multi-worker
-deployments need application-owned shared aggregation or stable per-worker
-routing.
+to receive traffic. Gunicorn, uWSGI, and other multi-worker, prefork, or replica
+deployments are outside this drop-in integration.
 
-The helper intentionally does not emit `started_at` or `uptime_seconds`:
-helper initialization time and lifetime are not necessarily process start time
-and process uptime. Add those optional restart-identity signals only when the
-application can provide accurate process-level values.
+The helper captures one stable application start time during initialization,
+uses it for restart detection, and reports elapsed uptime. It uses Python's
+standard-library `tracemalloc` support for a useful application-memory value.
 
 StatLite cannot determine request counts, HTTP errors, or request latency from
 outside the application. The middleware below measures those values where
@@ -41,6 +39,8 @@ package:
 
 import threading
 import time
+import tracemalloc
+from datetime import datetime, timezone
 
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
@@ -52,8 +52,12 @@ METRICS_PATH = "/statlite/metrics"
 class StatLiteMetrics:
     def __init__(self):
         self._lock = threading.Lock()
+        self._started_at = datetime.now(timezone.utc)
+        self._started_monotonic = time.monotonic()
         self._previous_cpu = time.process_time()
-        self._previous_cpu_time = time.monotonic()
+        self._previous_cpu_time = self._started_monotonic
+        if not tracemalloc.is_tracing():
+            tracemalloc.start()
         self._requests = 0
         self._responses_404 = 0
         self._responses_4xx = 0
@@ -72,6 +76,7 @@ class StatLiteMetrics:
                 self._responses_5xx += 1
 
     def snapshot(self):
+        runtime_heap_used_bytes, _peak = tracemalloc.get_traced_memory()
         with self._lock:
             now = time.monotonic()
             cpu = time.process_time()
@@ -88,12 +93,17 @@ class StatLiteMetrics:
                 "responses_5xx_total": self._responses_5xx,
                 "request_duration_seconds_total": self._duration_seconds,
                 "process_cpu_usage": process_cpu_usage,
+                "runtime_heap_used_bytes": runtime_heap_used_bytes,
+                "uptime_seconds": max(0.0, now - self._started_monotonic),
             }
 
         return {
             "schema": "statlite-metrics/v1",
             "integration": "django",
             "status": "UP",
+            "started_at": self._started_at.isoformat(timespec="microseconds").replace(
+                "+00:00", "Z"
+            ),
             "metrics": metrics,
         }
 
@@ -194,13 +204,12 @@ health signal. Read that cached value in `snapshot`; do not call
 database while serving a StatLite poll.
 
 All `metrics` fields and `started_at` are optional under v1. This helper emits
-cumulative response metrics and process CPU use in CPU cores. It omits
-`started_at` and `uptime_seconds` because a helper's initialization time and
-lifetime are not necessarily the process start time and process uptime required
-by v1. It also omits runtime heap because Python's standard library does not
-expose total interpreter-managed heap without enabling extra tracking, and
-process RSS is not runtime heap. Unsupported host CPU, memory, and disk fields
-are also omitted.
+cumulative response metrics, process CPU use in CPU cores, current traced
+Python allocations as `runtime_heap_used_bytes`, uptime, and a stable
+initialization timestamp as `started_at`. The timestamp changes when the
+application restarts. Traced allocations are a useful Python application-memory
+signal, not process RSS or a memory limit. Unsupported host CPU, memory, and
+disk fields are omitted.
 
 ## Configure StatLite
 
@@ -254,12 +263,12 @@ production.
 
 This in-memory helper is supported by default only for a single Django worker.
 Gunicorn, uWSGI, and other multi-worker servers give each worker separate
-counters. When load-balanced polls alternate workers, counters can decrease,
-producing misleading deltas rather than merely a partial aggregate. If an
-application extends the response with an accurate process `started_at`, that
-value can also alternate and appear to show restarts. StatLite does not
-aggregate workers. A multi-worker deployment must provide application-owned
-shared aggregation or a stable per-worker endpoint and target topology.
+counters. When load-balanced polls alternate workers, counters can decrease
+and each worker's `started_at` can alternate, producing misleading deltas or
+apparent restarts. StatLite does not aggregate workers. A multi-worker
+deployment is outside this helper's supported model. If you need a multi-worker,
+prefork, or replica setup, [open an issue](https://github.com/PVRLabs/statlite/issues/new/choose)
+or [start a GitHub Discussion](https://github.com/PVRLabs/statlite/discussions/new/choose).
 
 The example is synchronous. An application with an asynchronous middleware
 stack should implement and test an async-capable equivalent rather than rely on

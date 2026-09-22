@@ -1,5 +1,7 @@
 import threading
 import time
+import tracemalloc
+from datetime import datetime, timezone
 
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
@@ -11,8 +13,12 @@ METRICS_PATH = "/statlite/metrics"
 class StatLiteMetrics:
     def __init__(self):
         self._lock = threading.Lock()
+        self._started_at = datetime.now(timezone.utc)
+        self._started_monotonic = time.monotonic()
         self._previous_cpu = time.process_time()
-        self._previous_cpu_time = time.monotonic()
+        self._previous_cpu_time = self._started_monotonic
+        if not tracemalloc.is_tracing():
+            tracemalloc.start()
         self._requests = 0
         self._responses_404 = 0
         self._responses_4xx = 0
@@ -31,6 +37,7 @@ class StatLiteMetrics:
                 self._responses_5xx += 1
 
     def snapshot(self):
+        runtime_heap_used_bytes, _peak = tracemalloc.get_traced_memory()
         with self._lock:
             now = time.monotonic()
             cpu = time.process_time()
@@ -47,12 +54,17 @@ class StatLiteMetrics:
                 "responses_5xx_total": self._responses_5xx,
                 "request_duration_seconds_total": self._duration_seconds,
                 "process_cpu_usage": process_cpu_usage,
+                "runtime_heap_used_bytes": runtime_heap_used_bytes,
+                "uptime_seconds": max(0.0, now - self._started_monotonic),
             }
 
         return {
             "schema": "statlite-metrics/v1",
             "integration": "django",
             "status": "UP",
+            "started_at": self._started_at.isoformat(timespec="microseconds").replace(
+                "+00:00", "Z"
+            ),
             "metrics": metrics,
         }
 

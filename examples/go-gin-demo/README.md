@@ -54,3 +54,8 @@ or duration semantics. Arbitrary raw hijacks without those headers are outside
 the certified metrics path. The tests also demonstrate that a panic after a
 response is committed retains the committed status rather than being
 synthesized as a 500.
+
+The reported memory value is current allocated Go heap from
+`runtime.MemStats.Alloc`, not process RSS or a memory limit.
+CPU is a best-effort estimate from Go runtime counters. It is useful for
+spikes, trends, and correlation, but is not exact OS process CPU accounting.

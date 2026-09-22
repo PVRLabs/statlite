@@ -8,16 +8,14 @@ the guide.
 ## When to use this integration
 
 FastAPI does not have a first-class StatLite target type. Use this direct v1
-integration when StatLite's fixed traffic, error, average-latency, status, and
-process CPU signals fit the application's operational needs. This in-memory
-helper is a single-process or single-worker integration. Multiple Uvicorn or
-Gunicorn workers need application-owned shared aggregation or stable
-per-worker routing.
+integration when StatLite's fixed traffic, error, average-latency, status, CPU,
+memory, and restart signals fit the application's operational needs. This
+in-memory helper supports one application process or worker. Multi-worker,
+prefork, and replica deployments are outside this drop-in integration.
 
-The helper intentionally does not emit `started_at` or `uptime_seconds`.
-Helper initialization time and lifetime are not necessarily process start time
-and process uptime. Add those optional restart-identity signals only when the
-application can provide accurate process-level values.
+The helper captures one stable application start time during initialization,
+uses it for restart detection, and reports elapsed uptime. It uses Python's
+standard-library `tracemalloc` support for a useful application-memory value.
 
 StatLite cannot determine request counts, HTTP errors, or request latency from
 outside the application. The middleware below measures those values where
@@ -42,6 +40,8 @@ from __future__ import annotations
 import math
 import threading
 import time
+import tracemalloc
+from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
 
 
@@ -58,9 +58,14 @@ class StatLiteMetrics:
 
     def __init__(self, metrics_path: str = DEFAULT_METRICS_PATH) -> None:
         self.metrics_path = metrics_path
-        self._last_cpu_wall = time.monotonic()
+        self._started_at = datetime.now(timezone.utc)
+        self._started_monotonic = time.monotonic()
+        self._last_cpu_wall = self._started_monotonic
         self._last_cpu_time = time.process_time()
         self._lock = threading.Lock()
+
+        if not tracemalloc.is_tracing():
+            tracemalloc.start()
 
         self._requests_total = 0
         self._responses_404_total = 0
@@ -92,6 +97,7 @@ class StatLiteMetrics:
 
     def snapshot(self) -> dict[str, Any]:
         """Return one complete, JSON-serializable StatLite Metrics v1 response."""
+        runtime_heap_used_bytes, _peak = tracemalloc.get_traced_memory()
         with self._lock:
             now = time.monotonic()
             process_cpu_time = time.process_time()
@@ -114,12 +120,17 @@ class StatLiteMetrics:
                 # CPU time consumed during the interval divided by wall time:
                 # 1.0 means one logical CPU core was fully used.
                 "process_cpu_usage": process_cpu_usage,
+                "runtime_heap_used_bytes": runtime_heap_used_bytes,
+                "uptime_seconds": max(0.0, now - self._started_monotonic),
             }
 
         return {
             "schema": SCHEMA,
             "integration": "fastapi",
             "status": "UP",
+            "started_at": self._started_at.isoformat(timespec="microseconds").replace(
+                "+00:00", "Z"
+            ),
             "metrics": metrics,
         }
 
@@ -194,14 +205,13 @@ health signal. Read that cached value in `snapshot`; do not query the database
 while serving a StatLite poll.
 
 All `metrics` fields and `started_at` are optional under v1. This helper emits
-cumulative response metrics and process CPU use in CPU cores. It omits
-`started_at` and `uptime_seconds` because a helper's initialization time and
-lifetime are not necessarily the process values required by v1. It also omits
-runtime heap because Python's standard library does not expose total
-interpreter-managed heap without enabling allocation tracing, and StatLite
-should not enable that global overhead. Process RSS is not runtime heap. The
-v1 compatibility field `request_duration_seconds_max` is also omitted because
-StatLite accepts but does not use it. Unsupported host fields are omitted.
+cumulative response metrics, process CPU use in CPU cores, current traced
+Python allocations as `runtime_heap_used_bytes`, uptime, and a stable
+initialization timestamp as `started_at`. The timestamp changes when the
+application restarts. Traced allocations are a useful Python application-memory
+signal, not process RSS or a memory limit. The v1 compatibility field
+`request_duration_seconds_max` is omitted because StatLite accepts but does not
+use it. Unsupported host fields are omitted.
 
 ## Configure StatLite
 
@@ -256,12 +266,12 @@ for maintained application, configuration, and test files.
 
 This in-memory helper is supported by default only for one application process
 or one Uvicorn worker. Multiple workers have separate counters. When
-load-balanced polls alternate workers, counters can decrease, producing
-misleading deltas rather than merely a partial aggregate. If an application
-adds accurate process identity fields, those values can also alternate and
-appear to show restarts. StatLite does not aggregate workers. A multi-worker
-deployment must provide application-owned shared aggregation or a stable
-per-worker endpoint and target topology.
+load-balanced polls alternate workers, counters can decrease and each worker's
+`started_at` can alternate, producing misleading deltas or apparent restarts.
+StatLite does not aggregate workers. Multi-worker, prefork, and replica
+deployments are outside this helper's supported model. If you need one of those
+setups, [open an issue](https://github.com/PVRLabs/statlite/issues/new/choose)
+or [start a GitHub Discussion](https://github.com/PVRLabs/statlite/discussions/new/choose).
 
 Add host fields only when the application can accurately describe its visible
 execution environment. If a reverse proxy mounts the application below a

@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"runtime"
+	runtimemetrics "runtime/metrics"
 	"sync"
 	"time"
 )
@@ -18,6 +20,8 @@ type statLiteRecorder struct {
 	startedAt           time.Time
 	serializedStartedAt time.Time
 	status              string
+	previousCPUSeconds  float64
+	previousCPUTime     time.Time
 
 	requestsTotal               uint64
 	responses404Total           uint64
@@ -33,11 +37,14 @@ func newStatLiteRecorder(startedAt time.Time, status string) *statLiteRecorder {
 	if status == "" {
 		panic("StatLite application status must not be empty")
 	}
-	return &statLiteRecorder{
+	recorder := &statLiteRecorder{
 		startedAt:           startedAt,
 		serializedStartedAt: startedAt.UTC(),
 		status:              status,
+		previousCPUTime:     startedAt,
 	}
+	recorder.previousCPUSeconds = readGoCPUSeconds()
+	return recorder
 }
 
 func (r *statLiteRecorder) middleware(next http.Handler) http.Handler {
@@ -100,18 +107,36 @@ type statLiteMetrics struct {
 	Responses4xxTotal           uint64  `json:"responses_4xx_total"`
 	Responses5xxTotal           uint64  `json:"responses_5xx_total"`
 	RequestDurationSecondsTotal float64 `json:"request_duration_seconds_total"`
+	ProcessCPUUsage             float64 `json:"process_cpu_usage"`
+	RuntimeHeapUsedBytes        uint64  `json:"runtime_heap_used_bytes"`
 	UptimeSeconds               float64 `json:"uptime_seconds"`
 }
 
 func (r *statLiteRecorder) snapshot() statLiteSnapshot {
+	now := time.Now()
+	currentCPUSeconds := readGoCPUSeconds()
+	var memory runtime.MemStats
+	runtime.ReadMemStats(&memory)
+
 	r.mu.Lock()
+	elapsed := now.Sub(r.previousCPUTime).Seconds()
+	processCPUUsage := 0.0
+	if elapsed >= 0 && currentCPUSeconds >= r.previousCPUSeconds {
+		if elapsed > 0 {
+			processCPUUsage = (currentCPUSeconds - r.previousCPUSeconds) / elapsed
+		}
+		r.previousCPUSeconds = currentCPUSeconds
+		r.previousCPUTime = now
+	}
 	metrics := statLiteMetrics{
 		RequestsTotal:               r.requestsTotal,
 		Responses404Total:           r.responses404Total,
 		Responses4xxTotal:           r.responses4xxTotal,
 		Responses5xxTotal:           r.responses5xxTotal,
 		RequestDurationSecondsTotal: r.requestDurationSecondsTotal,
-		UptimeSeconds:               time.Since(r.startedAt).Seconds(),
+		ProcessCPUUsage:             processCPUUsage,
+		RuntimeHeapUsedBytes:        memory.Alloc,
+		UptimeSeconds:               now.Sub(r.startedAt).Seconds(),
 	}
 	serializedStartedAt := r.serializedStartedAt
 	status := r.status
@@ -127,6 +152,15 @@ func (r *statLiteRecorder) snapshot() statLiteSnapshot {
 		StartedAt:   serializedStartedAt.Format(time.RFC3339Nano),
 		Metrics:     metrics,
 	}
+}
+
+func readGoCPUSeconds() float64 {
+	samples := []runtimemetrics.Sample{
+		{Name: "/cpu/classes/user:cpu-seconds"},
+		{Name: "/cpu/classes/gc/total:cpu-seconds"},
+	}
+	runtimemetrics.Read(samples)
+	return samples[0].Value.Float64() + samples[1].Value.Float64()
 }
 
 type responseStatusWriter struct {
