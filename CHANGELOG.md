@@ -3,7 +3,7 @@
 This file summarizes the main user-facing changes in each StatLite release.
 Detailed release notes are generated on GitHub from the commit history.
 
-## v0.4.3 (unreleased)
+## v0.4.3 (2026-09-22)
 
 - Added first-class integration guidance and runnable examples for FastAPI,
   Django, Express, Go `net/http`, and Gin using StatLite Metrics v1.
