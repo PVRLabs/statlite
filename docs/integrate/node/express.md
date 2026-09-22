@@ -253,5 +253,6 @@ endpoint exposes operational data.
 - [Express middleware](https://expressjs.com/en/guide/using-middleware.html)
 - [Node.js process APIs](https://nodejs.org/api/process.html)
 
-A first-class Express target would be considered only if demand and a stable,
-recognizable framework contract justify maintaining it.
+Interested in a first-class Express target? [Open an issue](https://github.com/PVRLabs/statlite/issues/new/choose)
+or [start a GitHub Discussion](https://github.com/PVRLabs/statlite/discussions/new/choose).
+We're open to exploring it.

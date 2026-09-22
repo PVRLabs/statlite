@@ -283,5 +283,6 @@ operational data.
 - [StatLite configuration](../../configuration.md)
 - [FastAPI middleware](https://fastapi.tiangolo.com/tutorial/middleware/)
 
-A first-class FastAPI target would be considered only if demand and a stable,
-recognizable framework contract justify maintaining it.
+Interested in a first-class FastAPI target? [Open an issue](https://github.com/PVRLabs/statlite/issues/new/choose)
+or [start a GitHub Discussion](https://github.com/PVRLabs/statlite/discussions/new/choose).
+We're open to exploring it.

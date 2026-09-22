@@ -288,5 +288,6 @@ endpoint exposes operational data.
 - [Django middleware](https://docs.djangoproject.com/en/5.2/topics/http/middleware/)
 - [Django request and response objects](https://docs.djangoproject.com/en/5.2/ref/request-response/)
 
-A first-class Django target would be considered only if demand and a stable,
-recognizable framework contract justify maintaining it.
+Interested in a first-class Django target? [Open an issue](https://github.com/PVRLabs/statlite/issues/new/choose)
+or [start a GitHub Discussion](https://github.com/PVRLabs/statlite/discussions/new/choose).
+We're open to exploring it.
