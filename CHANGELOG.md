@@ -3,8 +3,14 @@
 This file summarizes the main user-facing changes in each StatLite release.
 Detailed release notes are generated on GitHub from the commit history.
 
-## Unreleased
+## v0.4.3 (unreleased)
 
+- Added first-class integration guidance and runnable examples for FastAPI,
+  Django, Express, Go `net/http`, and Gin using StatLite Metrics v1.
+- Added public integration journeys and tests covering the direct-v1 examples,
+  with clearer monitoring boundaries and framework-selection guidance.
+- Expanded the direct-v1 runtime baseline with process CPU and allocated Go
+  heap signals, and clarified the process-local deployment model.
 - Relative `storage.sqlite_path` values now resolve from the directory in the
   config path supplied to StatLite instead of the process working directory.
   For a symlinked config path, this is the link's directory, not its target's.
