@@ -75,8 +75,9 @@ monitoring baseline; and the SQLite configuration-path correction.
 - GitHub release workflow: PASS, run `35757499873`
 - GitHub release asset verification: PASS, [GitHub Release](https://github.com/PVRLabs/statlite/releases/tag/v0.4.3)
 - Published GHCR images: PASS; multi-platform manifests, versions, and release-container smoke test passed
-- Post-release development bump: prepared locally as `v0.4.4-dev`; CI and push pending
-- Homebrew tap and install verification: pending
+- Post-release development bump: PASS, commit `0baff46`; test run `35758411367`
+- Homebrew tap and install verification: PASS, updater run `35758793856`; the
+  formula upgraded from `0.4.2` to `0.4.3`, audit and install checks passed
 - Release announcement: pending
 
 ## Blockers, limitations, and accepted risks
