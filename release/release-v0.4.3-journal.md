@@ -4,11 +4,11 @@
 
 - Release version: `v0.4.3`
 - Release date started: 2026-09-22
-- Release issue: pending remote GitHub access
+- Release issue: not recorded
 - Candidate branch: `main`
-- Candidate commit: pending release-preparation commit
-- Final tagged commit: pending
-- Reviewer/operator: pending
+- Candidate commit: `862dbd4aa010e15a184b119a4bc821e3bd8e7c9e`
+- Final tagged commit: `862dbd4aa010e15a184b119a4bc821e3bd8e7c9e`
+- Reviewer/operator: release operator, user-approved
 
 ### Goal and user-facing scope
 
@@ -43,44 +43,53 @@ monitoring baseline; and the SQLite configuration-path correction.
 ## Candidate preparation
 
 - Prepare command: `python3 statlite-private/scripts/release.py prepare v0.4.3`
-- Prepare result: pending
-- Candidate binary: pending
-- Candidate SHA-256: pending
-- Prepare manifest: pending
-- Generated release notes: pending review
-- Candidate branch and commit: pending
+- Prepare result: PASS for the tagged candidate
+- Candidate binary: `/private/tmp/statlite-0.4.3`
+- Candidate SHA-256: `f63b3f0bc8b9b1e59c4ef6178c0a0906171b47dba27f7eaa05542e7734590c10`
+- Prepare manifest: `/private/tmp/statlite-0.4.3-prepare.json`
+- Generated release notes: PASS; published by the release workflow
+- Candidate branch and commit: `main` at `862dbd4aa010e15a184b119a4bc821e3bd8e7c9e`
 
 ## Certification
 
-- Required suites: pending
-- Accepted reports: pending review
-- Public integration CI: pending remote CI result
+- Required suites: carried forward from the complete `0ad75e9` certification matrix
+- Accepted reports: Spring Boot, Quarkus, historical upgrade, rebased stress,
+  and dashboard browser reports indexed in `statlite-private/certification/RESULTS.md`
+- Public integration CI: PASS in runs `35757311609` and `35757311653`
+- Carry-forward decision: the final public changes only finalized the checked-in
+  version and dated changelog heading. The operator accepted skipping a second
+  private certification run; the final candidate was independently prepared and
+  release CI passed.
 
 ## Manual product review
 
-- Exact candidate `--version`: pending
-- `/healthz`: pending
-- Dashboard and browser console: pending
-- `/statlite/metrics` and self-monitoring: pending
-- Integration inspection/configuration review: pending
+- Exact candidate `--version`: PASS, `statlite v0.4.3`
+- `/healthz`: PASS, version and storage status verified
+- Dashboard and browser console: PASS, dashboard title and browser certification verified
+- `/statlite/metrics` and self-monitoring: PASS, `statlite-metrics/v1` verified
+- Integration inspection/configuration review: PASS in public integration CI
 
 ## Release binding and publication
 
-- Final tagged commit: pending
-- GitHub release workflow: pending
-- GitHub release asset verification: pending
-- Published GHCR images: pending
-- Post-release development bump: pending
+- Final tagged commit: PASS, `v0.4.3` resolves to `862dbd4aa010e15a184b119a4bc821e3bd8e7c9e`
+- GitHub release workflow: PASS, run `35757499873`
+- GitHub release asset verification: PASS, [GitHub Release](https://github.com/PVRLabs/statlite/releases/tag/v0.4.3)
+- Published GHCR images: PASS; multi-platform manifests, versions, and release-container smoke test passed
+- Post-release development bump: prepared locally as `v0.4.4-dev`; CI and push pending
 - Homebrew tap and install verification: pending
 - Release announcement: pending
 
 ## Blockers, limitations, and accepted risks
 
-- GitHub CLI authentication is currently invalid and GitHub API access is
-  unavailable from this workspace. Release issue, branch push, CI verification,
-  tag creation, publication, and post-release checks remain pending.
-- No technical risk has been accepted yet.
+- Private certification was not rerun against the final tagged commit by
+  explicit operator decision. The accepted reports cover the preceding exact
+  release-style candidate; the intervening public changes were limited to
+  release metadata, and the final candidate passed prepare, public integration,
+  archive, asset, image, and container checks.
+- The ordinary non-rebased stress report with empty short ranges was not
+  accepted. The rebased report was accepted, and the certification instructions
+  now require checking the cached database age and representative-range field.
 
 ## Evidence and sign-off
 
-- Reviewer and date: pending
+- Reviewer and date: release operator, 2026-09-22
