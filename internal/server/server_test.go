@@ -310,7 +310,7 @@ func TestRootServesDashboardPage(t *testing.T) {
 		`id="footer-refresh"`,
 		"Application health",
 		"UP is StatLite’s positive app status",
-		"no authoritative database health signal was provided",
+		"Not reported means database health was not reported by this integration.",
 		"Current status",
 		`aria-label="Target"`,
 		`id="target-select"`,

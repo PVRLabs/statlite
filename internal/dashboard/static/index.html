@@ -325,6 +325,7 @@ main {
   color: var(--muted);
   border: 1px solid var(--panel-border);
 }
+.pill.neutral { background: rgba(148, 163, 184, 0.12); color: var(--muted); border-color: rgba(148, 163, 184, 0.24); }
 .pill.ok { background: rgba(47, 211, 107, 0.12); color: var(--pvr-green); border-color: rgba(47, 211, 107, 0.24); }
 .pill.warn { background: rgba(245, 158, 11, 0.12); color: var(--amber); border-color: rgba(245, 158, 11, 0.24); }
 .pill.bad { background: rgba(239, 68, 68, 0.12); color: var(--red); border-color: rgba(239, 68, 68, 0.24); }
@@ -531,7 +532,7 @@ pre {
 
   <section class="status-grid" aria-label="Current status">
     <div class="metric"><div class="label label-help">App health <button type="button" class="help" aria-label="Application health help" aria-describedby="application-health-tooltip" aria-expanded="false">i</button><span id="application-health-tooltip" class="tooltip" role="tooltip">UP is StatLite’s positive app status. It means explicit application health is positive or metrics collection is succeeding. The current signal source appears here after the first poll.</span></div><div id="health" class="value"><span class="pill">...</span></div></div>
-    <div class="metric"><div class="label label-help">DB health <button type="button" class="help" aria-label="DB health help" aria-expanded="false">i</button><span class="tooltip" role="tooltip">Health explicitly reported by the target for its database dependency. Unavailable means no authoritative database health signal was provided.</span></div><div id="db-health" class="value"><span class="pill">...</span></div></div>
+    <div class="metric"><div class="label label-help">DB health <button type="button" class="help" aria-label="DB health help" aria-describedby="db-health-tooltip" aria-expanded="false">i</button><span id="db-health-tooltip" class="tooltip" role="tooltip">Health explicitly reported by the target for its database dependency. Not reported means database health was not reported by this integration.</span></div><div id="db-health" class="value"><span class="pill">...</span></div></div>
     <div class="metric"><div class="label">Started</div><div id="process-start" class="value small">...</div></div>
     <div class="metric"><div class="label label-help">Restart <button type="button" class="help" aria-label="Restart detection help" aria-expanded="false">i</button><span class="tooltip" role="tooltip">Detected from process start time or counter resets; detection can lag by one poll.</span></div><div id="restart-detected" class="value small">...</div></div>
     <div class="metric"><div class="label">Last poll success</div><div id="last-success" class="value small">...</div></div>

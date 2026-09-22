@@ -177,6 +177,10 @@ These are presentation labels only. Health fields remain optional and preserve
 only explicit source values; reporting, unavailable, and not-yet-reporting
 remain the underlying collection concepts.
 
+The **DB health** card shows `Not reported` in neutral gray when the integration
+provides no database health signal. Reported healthy states are green; reported
+non-healthy states use warning or error styling.
+
 ## Deployment topology
 
 For a collocated deployment, configure application targets (`spring`, `quarkus`,

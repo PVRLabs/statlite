@@ -377,19 +377,46 @@ test("application health card keeps one value line and explains details in its h
   }
 });
 
-test("database health remains raw and reports absence as unavailable", () => {
+test("database health reports an absent signal as Not reported", () => {
   const originalDocument = global.document;
   const document = dashboardDocument();
   global.document = document;
 
   try {
-    dashboard.renderDatabaseHealth("OUT_OF_SERVICE");
-    assert.match(document.getElementById("db-health").innerHTML, /bad.*OUT_OF_SERVICE/);
-    assert.match(document.getElementById("db-health").attributes["aria-label"], /reported by the target: OUT_OF_SERVICE/);
-
     dashboard.renderDatabaseHealth("");
-    assert.match(document.getElementById("db-health").innerHTML, />Unavailable</);
-    assert.match(document.getElementById("db-health").attributes["aria-label"], /Authoritative database health unavailable/);
+    assert.match(document.getElementById("db-health").innerHTML, />Not reported</);
+    assert.equal(document.getElementById("db-health").title, "Database health was not reported by this integration.");
+    assert.equal(document.getElementById("db-health").attributes["aria-label"], "Database health was not reported by this integration.");
+  } finally {
+    global.document = originalDocument;
+  }
+});
+
+test("database health uses neutral styling for an absent signal", () => {
+  const originalDocument = global.document;
+  const document = dashboardDocument();
+  global.document = document;
+
+  try {
+    dashboard.renderDatabaseHealth("");
+    assert.match(document.getElementById("db-health").innerHTML, /class="pill neutral"/);
+    assert.doesNotMatch(document.getElementById("db-health").innerHTML, /class="pill (?:warn|bad)"/);
+  } finally {
+    global.document = originalDocument;
+  }
+});
+
+test("database health keeps reported states and their tones", () => {
+  const originalDocument = global.document;
+  const document = dashboardDocument();
+  global.document = document;
+
+  try {
+    for (const [status, tone] of [["UP", "ok"], ["OK", "ok"], ["DEGRADED", "warn"], ["DOWN", "bad"], ["OUT_OF_SERVICE", "bad"]]) {
+      dashboard.renderDatabaseHealth(status);
+      assert.match(document.getElementById("db-health").innerHTML, new RegExp('class="pill ' + tone + '">' + status + '<'));
+      assert.equal(document.getElementById("db-health").attributes["aria-label"], "Database health reported by the target: " + status);
+    }
   } finally {
     global.document = originalDocument;
   }

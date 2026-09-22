@@ -395,6 +395,38 @@ func TestSpringActuatorCollectorRetainsMetricsWhenHealthFails(t *testing.T) {
 	}
 }
 
+func TestSpringActuatorCollectorPreservesReportedDBFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/actuator/health":
+			w.WriteHeader(http.StatusServiceUnavailable)
+			writeActuatorJSON(t, w, map[string]interface{}{
+				"status": "DOWN",
+				"components": map[string]interface{}{
+					"db": map[string]string{"status": "OUT_OF_SERVICE"},
+				},
+			})
+		case "/actuator/metrics/process.cpu.usage":
+			writeActuatorJSON(t, w, metricBody("process.cpu.usage", nil, map[string]float64{"VALUE": 0.25}, nil))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client, err := NewActuatorClient(server.URL+"/actuator", time.Second, nil)
+	if err != nil {
+		t.Fatalf("NewActuatorClient() error = %v", err)
+	}
+	result, err := NewSpringActuatorCollector("app", client, false).Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if result.HealthStatus != "DOWN" || result.DBHealthStatus != "OUT_OF_SERVICE" {
+		t.Fatalf("health statuses = %q/%q, want DOWN/OUT_OF_SERVICE", result.HealthStatus, result.DBHealthStatus)
+	}
+}
+
 func TestSpringActuatorCollectorRejectsInvalidGaugesAsUsableMetrics(t *testing.T) {
 	tests := []struct {
 		name      string

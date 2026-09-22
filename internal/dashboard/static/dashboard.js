@@ -400,10 +400,12 @@ function renderApplicationHealth(presentation) {
 function renderDatabaseHealth(value) {
   const rawHealth = String(value || "").trim();
   const health = document.getElementById("db-health");
-  health.innerHTML = pillHTML(rawHealth || "Unavailable");
+  health.innerHTML = rawHealth
+    ? pillHTML(rawHealth)
+    : '<span class="pill neutral">Not reported</span>';
   const label = rawHealth
     ? "Database health reported by the target: " + rawHealth
-    : "Authoritative database health unavailable";
+    : "Database health was not reported by this integration.";
   health.title = label;
   health.setAttribute("aria-label", label);
 }
