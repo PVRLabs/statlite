@@ -20,7 +20,6 @@ const palette = {
   latency: "#2fd36b",
   heap: "#60a5fa",
   cpu: "#2fd36b",
-  total: "#f59e0b",
   http404: "#f59e0b",
   http4xx: "#a78bfa",
   http5xx: "#ef4444",
@@ -119,23 +118,22 @@ function buildCharts() {
     type: "line",
     data: { labels: [], datasets: [
       { label: "RAM used", unit: "gb", data: [], borderColor: palette.heap, ...lineStyle, yAxisID: "y", tension: 0.25, spanGaps: false },
-      { label: "RAM total", unit: "gb", data: [], borderColor: palette.total, ...lineStyle, yAxisID: "y", tension: 0.25, spanGaps: false },
+      { label: "RAM total", unit: "gb", data: [], borderColor: palette.ticks, ...lineStyle, borderWidth: 1, borderDash: [5, 4], pointRadius: 0, pointHoverRadius: 4, yAxisID: "y", tension: 0.25, spanGaps: false },
       { label: "Host CPU", unit: "percent", data: [], borderColor: palette.cpu, ...lineStyle, yAxisID: "y1", tension: 0.25, spanGaps: false }
     ] },
     options: resourceOptions()
   });
-  state.charts.hostDisk = resourceChart("host-disk-chart", "Disk");
+  state.charts.hostDisk = diskChart("host-disk-chart");
 }
 
-function resourceChart(id, label) {
+function diskChart(id) {
   return new Chart(document.getElementById(id), {
     type: "line",
     data: { labels: [], datasets: [
-      { label: label + " used", unit: "gb", data: [], borderColor: palette.heap, ...lineStyle, yAxisID: "y", tension: 0.25, spanGaps: false },
-      { label: label + " total", unit: "gb", data: [], borderColor: palette.total, ...lineStyle, yAxisID: "y", tension: 0.25, spanGaps: false },
-      { label: label + " usage", unit: "percent", data: [], borderColor: palette.cpu, ...lineStyle, yAxisID: "y1", tension: 0.25, spanGaps: false }
+      { label: "Disk used", unit: "gb", data: [], borderColor: palette.heap, ...lineStyle, yAxisID: "y", tension: 0.25, spanGaps: false },
+      { label: "Disk total", unit: "gb", data: [], borderColor: palette.ticks, ...lineStyle, borderWidth: 1, borderDash: [5, 4], pointRadius: 0, pointHoverRadius: 4, yAxisID: "y", tension: 0.25, spanGaps: false }
     ] },
-    options: resourceOptions()
+    options: diskOptions()
   });
 }
 
@@ -181,6 +179,15 @@ function resourceOptions() {
     x: { ticks: { color: palette.ticks, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { display: false } },
     y: { beginAtZero: true, position: "left", title: { display: true, text: "GB", color: palette.ticks }, ticks: { color: palette.ticks }, grid: { color: palette.grid } },
     y1: { beginAtZero: true, max: 100, position: "right", title: { display: true, text: "%", color: palette.ticks }, ticks: { color: palette.ticks }, grid: { drawOnChartArea: false } }
+  };
+  return options;
+}
+
+function diskOptions() {
+  const options = chartOptions();
+  options.scales = {
+    x: { ticks: { color: palette.ticks, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { display: false } },
+    y: { beginAtZero: true, position: "left", title: { display: true, text: "GB", color: palette.ticks }, ticks: { color: palette.ticks }, grid: { color: palette.grid } }
   };
   return options;
 }
@@ -511,8 +518,7 @@ function renderSeries(series) {
   ]);
   updateChart(state.charts.hostDisk, labels, [
     points.map((point) => bytesToGB(point.host_disk_used_bytes)),
-    points.map((point) => bytesToGB(point.host_disk_total_bytes)),
-    points.map((point) => point.host_disk_usage == null ? null : point.host_disk_usage * 100)
+    points.map((point) => bytesToGB(point.host_disk_total_bytes))
   ]);
 
   const capabilities = detectCapabilities(points);
@@ -550,10 +556,8 @@ function setSectionVisible(id, visible) {
 }
 
 function validDiskPoint(point) {
-  return Number.isFinite(point.host_disk_usage) &&
-    Number.isFinite(point.host_disk_used_bytes) &&
+  return Number.isFinite(point.host_disk_used_bytes) &&
     Number.isFinite(point.host_disk_total_bytes) &&
-    point.host_disk_usage >= 0 && point.host_disk_usage <= 1 &&
     point.host_disk_used_bytes >= 0 && point.host_disk_total_bytes > 0 &&
     point.host_disk_used_bytes <= point.host_disk_total_bytes;
 }

@@ -151,19 +151,19 @@ test("detectCapabilities keeps sparse memory but requires a valid disk pair", ()
   assert.equal(sparseMemory.hostMemory, true);
   assert.equal(sparseMemory.hostDisk, false);
 
-  assert.equal(dashboard.validDiskPoint({
+  const diskWithoutPercentage = dashboard.detectCapabilities([{
     host_disk_used_bytes: 10,
-    host_disk_total_bytes: 20,
-    host_disk_usage: 0.5
-  }), true);
+    host_disk_total_bytes: 20
+  }]);
+  assert.equal(diskWithoutPercentage.hostDisk, true);
+
   assert.equal(dashboard.validDiskPoint({
     host_disk_used_bytes: 10,
     host_disk_total_bytes: 20
-  }), false);
+  }), true);
   assert.equal(dashboard.validDiskPoint({
     host_disk_used_bytes: 30,
-    host_disk_total_bytes: 20,
-    host_disk_usage: 1.5
+    host_disk_total_bytes: 20
   }), false);
 });
 
@@ -601,7 +601,7 @@ test("stale refresh responses cannot replace the current target", async () => {
 
 function chartStubs() {
   const chart = (datasets) => ({ data: { labels: [], datasets: Array.from({ length: datasets }, () => ({ data: [] })) }, update() {} });
-  return { requests: chart(1), errors: chart(3), latency: chart(1), runtime: chart(2), hostRuntime: chart(3), hostDisk: chart(3) };
+  return { requests: chart(1), errors: chart(3), latency: chart(1), runtime: chart(2), hostRuntime: chart(3), hostDisk: chart(2) };
 }
 
 function rangeButton(range) {
