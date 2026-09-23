@@ -108,7 +108,8 @@ SELECT
   p.status,
   p.health_status,
   p.db_health_status,
-  p.error_summary
+  p.error_summary,
+  p.metrics_source
 FROM polls p
 JOIN targets t ON t.id = p.target_id
 WHERE t.name = ?
@@ -120,7 +121,7 @@ LIMIT 1
 	var snapshot Snapshot
 	var appRunID sql.NullInt64
 	var startedAt, finishedAt string
-	var healthStatus, dbHealthStatus, errorSummary sql.NullString
+	var healthStatus, dbHealthStatus, errorSummary, metricsSource sql.NullString
 	if err := row.Scan(
 		&snapshot.PollID,
 		&snapshot.TargetID,
@@ -131,6 +132,7 @@ LIMIT 1
 		&healthStatus,
 		&dbHealthStatus,
 		&errorSummary,
+		&metricsSource,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, sql.ErrNoRows
@@ -160,6 +162,9 @@ LIMIT 1
 	}
 	if dbHealthStatus.Valid {
 		snapshot.Result.DBHealthStatus = dbHealthStatus.String
+	}
+	if metricsSource.Valid {
+		snapshot.Result.MetricsSource = metricsSource.String
 	}
 
 	if err := s.loadSamples(ctx, snapshot.PollID, &snapshot.Result); err != nil {

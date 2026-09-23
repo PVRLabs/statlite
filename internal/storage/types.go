@@ -10,7 +10,7 @@ import (
 
 type Snapshot struct {
 	PollID       int64                      `json:"poll_id"`
-	TargetID     int64                      `json:"target_id"`
+	TargetID     int64                      `json:"-"`
 	AppRunID     *int64                     `json:"app_run_id,omitempty"`
 	Status       string                     `json:"status"`
 	ErrorSummary string                     `json:"error_summary,omitempty"`

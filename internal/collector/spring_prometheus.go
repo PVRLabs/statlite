@@ -36,8 +36,12 @@ func InspectSpringPrometheus(ctx context.Context, endpoint string, client *prome
 func (c *SpringActuatorCollector) collectMetrics(ctx context.Context, session *springPollSession, result *CollectionResult) bool {
 	source := c.selectedSource
 	if source == SpringMetricsSourceActuator {
+		result.MetricsSource = string(SpringMetricsSourceActuator)
 		c.collectActuatorMetrics(ctx, session, result)
 		return true
+	}
+	if source == SpringMetricsSourcePrometheus {
+		result.MetricsSource = string(SpringMetricsSourcePrometheus)
 	}
 	values, err := c.scrapePrometheus(ctx)
 	if source == SpringMetricsSourcePrometheus {
@@ -55,11 +59,13 @@ func (c *SpringActuatorCollector) collectMetrics(ctx context.Context, session *s
 
 	if err == nil && values.compatible() {
 		c.selectedSource = SpringMetricsSourcePrometheus
+		result.MetricsSource = string(SpringMetricsSourcePrometheus)
 		c.addPrometheusSamples(result, values)
 		return true
 	}
 	if err == nil || SpringPrometheusDefinitelyAbsent(err) {
 		c.selectedSource = SpringMetricsSourceActuator
+		result.MetricsSource = string(SpringMetricsSourceActuator)
 		c.collectActuatorMetrics(ctx, session, result)
 		return true
 	}

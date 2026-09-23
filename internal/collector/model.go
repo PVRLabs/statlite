@@ -23,6 +23,7 @@ const (
 
 type CollectionResult struct {
 	TargetName       string           `json:"target_name"`
+	MetricsSource    string           `json:"-"`
 	PollStartedAt    time.Time        `json:"poll_started_at"`
 	PollFinishedAt   time.Time        `json:"poll_finished_at"`
 	HealthStatus     string           `json:"health_status,omitempty"`

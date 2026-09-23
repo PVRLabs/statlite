@@ -35,10 +35,13 @@ func TestSpringAutoSelectsPrometheusOnceAndNormalizes(t *testing.T) {
 	defer server.Close()
 
 	c := newConfiguredSpringTestCollector(t, server.URL+"/actuator", SpringMetricsSourceAuto)
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		result, err := c.Collect(context.Background())
 		if err != nil {
 			t.Fatalf("Collect() error = %v", err)
+		}
+		if result.MetricsSource != string(SpringMetricsSourcePrometheus) {
+			t.Fatalf("MetricsSource = %q, want prometheus", result.MetricsSource)
 		}
 		assertSample(t, result, "http_requests_total", MetricKindCounter, 10, "requests")
 		assertSample(t, result, "http_404_total", MetricKindCounter, 2, "requests")
@@ -286,10 +289,19 @@ func TestSpringAutoFallsBackOnlyOnDefinitiveResults(t *testing.T) {
 			}))
 			defer server.Close()
 			c := newConfiguredSpringTestCollector(t, server.URL+"/actuator", SpringMetricsSourceAuto)
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				result, err := c.Collect(context.Background())
 				if (err != nil) != tt.wantError {
 					t.Fatalf("Collect() error = %v, wantError=%v", err, tt.wantError)
+				}
+				wantSource := ""
+				if tt.wantActuator > 0 {
+					wantSource = string(SpringMetricsSourceActuator)
+				} else if !tt.wantError {
+					wantSource = string(SpringMetricsSourcePrometheus)
+				}
+				if result.MetricsSource != wantSource {
+					t.Fatalf("MetricsSource = %q, want %q", result.MetricsSource, wantSource)
 				}
 				if tt.wantActuator == 0 && len(result.Events) == 0 {
 					t.Fatal("unresolved source missing warning")

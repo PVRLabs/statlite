@@ -150,3 +150,44 @@ func TestAppRunTypeOnlyOnNewRowsAfterLegacyBinding(t *testing.T) {
 		t.Fatalf("legacy app run type after restart = %v, err=%v", legacyType, err)
 	}
 }
+
+func TestPollMetricsSourceRoundTripsWithoutChangingTargetIdentity(t *testing.T) {
+	store, err := Open(t.Context(), t.TempDir()+"/statlite.sqlite")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	ctx := t.Context()
+	const targetName = "spring-source"
+	if err := store.RegisterTargets(ctx, []TargetIdentity{{Name: targetName, Type: "spring"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, source := range []string{"prometheus", "actuator", ""} {
+		startedAt := time.Date(2026, 9, 23, 12, i, 0, 0, time.UTC)
+		pollID, err := store.SaveCollectionResult(ctx, &collector.CollectionResult{
+			TargetName: targetName, MetricsSource: source,
+			PollStartedAt: startedAt, PollFinishedAt: startedAt.Add(time.Second),
+		})
+		if err != nil {
+			t.Fatalf("SaveCollectionResult(%q): %v", source, err)
+		}
+		var stored sql.NullString
+		if err := store.db.QueryRowContext(ctx, `SELECT metrics_source FROM polls WHERE id = ?`, pollID).Scan(&stored); err != nil {
+			t.Fatal(err)
+		}
+		if stored.Valid != (source != "") || (stored.Valid && stored.String != source) {
+			t.Fatalf("stored source = %v, want %q", stored, source)
+		}
+		snapshot, err := store.LatestSnapshot(ctx, targetName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if snapshot.Result.MetricsSource != source {
+			t.Fatalf("read-back source = %q, want %q", snapshot.Result.MetricsSource, source)
+		}
+	}
+	if err := store.RegisterTargets(ctx, []TargetIdentity{{Name: targetName, Type: "spring"}}); err != nil {
+		t.Fatalf("re-register unchanged integration after source changes: %v", err)
+	}
+}

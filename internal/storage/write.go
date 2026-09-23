@@ -185,10 +185,11 @@ INSERT INTO polls (
   status,
   health_status,
   db_health_status,
-  error_summary
+  error_summary,
+  metrics_source
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-`, targetID, nullableInt64(appRunID), formatSortableTime(result.PollStartedAt), formatSortableTime(result.PollFinishedAt), status, nullableString(result.HealthStatus), nullableString(result.DBHealthStatus), nullableString(errorSummary))
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+`, targetID, nullableInt64(appRunID), formatSortableTime(result.PollStartedAt), formatSortableTime(result.PollFinishedAt), status, nullableString(result.HealthStatus), nullableString(result.DBHealthStatus), nullableString(errorSummary), nullableString(result.MetricsSource))
 	if err != nil {
 		return 0, fmt.Errorf("insert poll: %w", err)
 	}
