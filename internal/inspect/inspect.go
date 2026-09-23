@@ -270,11 +270,15 @@ func parseApplicationURL(raw string) (*url.URL, error) {
 	parsed, err := urlshape.ParseHTTP(raw)
 	if err != nil {
 		var shapeErr *urlshape.Error
-		if errors.As(err, &shapeErr) && shapeErr.Kind == urlshape.KindScheme {
-			return nil, fmt.Errorf("application URL must use http or https")
-		}
-		if errors.As(err, &shapeErr) && shapeErr.Kind == urlshape.KindHost {
-			return nil, fmt.Errorf("application URL must include a host")
+		if errors.As(err, &shapeErr) {
+			switch shapeErr.Kind {
+			case urlshape.KindScheme:
+				return nil, fmt.Errorf("application URL must use http or https")
+			case urlshape.KindHost:
+				return nil, fmt.Errorf("application URL must include a host")
+			case urlshape.KindFragment:
+				return nil, fmt.Errorf("application URL must not include a fragment")
+			}
 		}
 		return nil, fmt.Errorf("parsing application URL: %w", err)
 	}
@@ -283,9 +287,6 @@ func parseApplicationURL(raw string) (*url.URL, error) {
 	}
 	if parsed.RawQuery != "" || parsed.ForceQuery {
 		return nil, fmt.Errorf("application URL must not include a query")
-	}
-	if parsed.Fragment != "" {
-		return nil, fmt.Errorf("application URL must not include a fragment")
 	}
 	if parsed.Opaque != "" {
 		return nil, fmt.Errorf("application URL must use hierarchical URL form")
