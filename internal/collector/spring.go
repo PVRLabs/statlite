@@ -212,25 +212,20 @@ func (c *SpringActuatorCollector) Collect(ctx context.Context) (*CollectionResul
 
 func validateSpringSamples(result *CollectionResult) {
 	valid := result.Samples[:0]
+	hasProcessStart := false
 	for _, sample := range result.Samples {
 		if springSampleValid(sample) {
 			valid = append(valid, sample)
+			if sample.Key == "process_start_time" {
+				hasProcessStart = true
+			}
 			continue
 		}
 		result.addEvent(EventSeverityWarning, "metric_invalid", sample.Key, fmt.Sprintf("omitted %s because value %v is outside its valid range", sample.Key, sample.Value))
 	}
 	result.Samples = valid
-	if result.ProcessStartTime != nil {
-		hasProcessStart := false
-		for _, sample := range valid {
-			if sample.Key == "process_start_time" {
-				hasProcessStart = true
-				break
-			}
-		}
-		if !hasProcessStart {
-			result.ProcessStartTime = nil
-		}
+	if result.ProcessStartTime != nil && !hasProcessStart {
+		result.ProcessStartTime = nil
 	}
 }
 

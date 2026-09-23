@@ -668,10 +668,6 @@ function renderError(error) {
   document.getElementById("latest-json").textContent = String(error);
 }
 
-function setPill(id, value) {
-  document.getElementById(id).innerHTML = pillHTML(value);
-}
-
 function pillHTML(value) {
   const text = value || "Unknown";
   return '<span class="pill ' + statusTone(text) + '">' + escapeHTML(text) + '</span>';

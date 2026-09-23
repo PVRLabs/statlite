@@ -125,20 +125,6 @@ func (c *ActuatorClient) FetchHealth(ctx context.Context) (*HealthResponse, erro
 	return c.decodeHealth(c.fetchRaw(ctx, "health", nil))
 }
 
-// getHealthJSON accepts a valid Spring Boot health payload even when its HTTP
-// status is non-2xx. Spring Boot maps DOWN and OUT_OF_SERVICE health statuses
-// to 503 by default; those statuses describe the monitored application rather
-// than a failure to poll it.
-func (c *ActuatorClient) getHealthJSON(ctx context.Context, health *HealthResponse) error {
-	endpointPath := "health"
-	decoded, err := c.decodeHealth(c.fetchRaw(ctx, endpointPath, nil))
-	if err != nil {
-		return err
-	}
-	*health = *decoded
-	return nil
-}
-
 func (c *ActuatorClient) decodeHealth(raw actuatorRawResult) (*HealthResponse, error) {
 	endpointPath := "health"
 	if raw.err != nil {

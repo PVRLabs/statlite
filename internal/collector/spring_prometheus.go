@@ -33,12 +33,12 @@ func InspectSpringPrometheus(ctx context.Context, endpoint string, client *prome
 	return v.compatible(), nil
 }
 
-func (c *SpringActuatorCollector) collectMetrics(ctx context.Context, session *springPollSession, result *CollectionResult) bool {
+func (c *SpringActuatorCollector) collectMetrics(ctx context.Context, session *springPollSession, result *CollectionResult) {
 	source := c.selectedSource
 	if source == SpringMetricsSourceActuator {
 		result.MetricsSource = string(SpringMetricsSourceActuator)
 		c.collectActuatorMetrics(ctx, session, result)
-		return true
+		return
 	}
 	if source == SpringMetricsSourcePrometheus {
 		result.MetricsSource = string(SpringMetricsSourcePrometheus)
@@ -47,30 +47,29 @@ func (c *SpringActuatorCollector) collectMetrics(ctx context.Context, session *s
 	if source == SpringMetricsSourcePrometheus {
 		if err != nil {
 			result.addEvent(EventSeverityWarning, "metrics_fetch_failed", "", fmt.Sprintf("collecting Spring Prometheus metrics: %v", err))
-			return false
+			return
 		}
 		if !values.compatible() {
 			result.addEvent(EventSeverityWarning, "metrics_source_incompatible", "", "Spring Prometheus endpoint does not expose the required supported metric families")
-			return false
+			return
 		}
 		c.addPrometheusSamples(result, values)
-		return true
+		return
 	}
 
 	if err == nil && values.compatible() {
 		c.selectedSource = SpringMetricsSourcePrometheus
 		result.MetricsSource = string(SpringMetricsSourcePrometheus)
 		c.addPrometheusSamples(result, values)
-		return true
+		return
 	}
 	if err == nil || SpringPrometheusDefinitelyAbsent(err) {
 		c.selectedSource = SpringMetricsSourceActuator
 		result.MetricsSource = string(SpringMetricsSourceActuator)
 		c.collectActuatorMetrics(ctx, session, result)
-		return true
+		return
 	}
 	result.addEvent(EventSeverityWarning, "metrics_source_unresolved", "", fmt.Sprintf("Spring metrics source remains unresolved: %v", err))
-	return false
 }
 
 func (c *SpringActuatorCollector) scrapePrometheus(ctx context.Context) (*springPrometheusValues, error) {
