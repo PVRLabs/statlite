@@ -1,11 +1,14 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/pvrlabs/statlite/internal/urlshape"
 )
 
 func TestLoadDefaultsPollingTimeout(t *testing.T) {
@@ -81,7 +84,7 @@ targets:
 	if err == nil {
 		t.Fatal("Load() error = nil, want collect_host_metrics target type error")
 	}
-	if !strings.Contains(err.Error(), "collect_host_metrics is supported only for type spring") {
+	if !strings.Contains(err.Error(), "collect_host_metrics: is supported only for type spring") {
 		t.Fatalf("Load() error = %q, want collect_host_metrics target type error", err)
 	}
 }
@@ -94,25 +97,25 @@ func TestLoadRejectsMisplacedSpringFieldsForStatliteMetrics(t *testing.T) {
 		{
 			name:       "empty deprecated actuator URL",
 			fields:     "\n    actuator_base_url: \"\"",
-			want:       "actuator_base_url is supported only for type spring",
+			want:       "actuator_base_url: is supported only for type spring",
 			includeURL: true,
 		},
 		{
 			name:       "empty metrics source",
 			fields:     "\n    metrics_source: \"\"",
-			want:       "metrics_source is supported only for type spring",
+			want:       "metrics_source: is supported only for type spring",
 			includeURL: true,
 		},
 		{
 			name:       "explicit false host metrics",
 			fields:     "\n    collect_host_metrics: false",
-			want:       "collect_host_metrics is supported only for type spring",
+			want:       "collect_host_metrics: is supported only for type spring",
 			includeURL: true,
 		},
 		{
 			name:   "required URL error takes precedence",
 			fields: "\n    actuator_base_url: http://example.com/actuator",
-			want:   "url is required for type statlite-metrics",
+			want:   "url: is required for type statlite-metrics",
 		},
 	}
 	for _, tt := range tests {
@@ -150,21 +153,21 @@ func TestValidateRejectsProgrammaticUnsupportedTargetFields(t *testing.T) {
 			targetType:      TargetTypeStatliteMetrics,
 			url:             "http://example.com/statlite/metrics",
 			actuatorBaseURL: "http://example.com/actuator",
-			want:            "actuator_base_url is supported only for type spring",
+			want:            "actuator_base_url: is supported only for type spring",
 		},
 		{
 			name:            "Quarkus actuator URL",
 			targetType:      TargetTypeQuarkus,
 			url:             "http://example.com/q/metrics",
 			actuatorBaseURL: "http://example.com/actuator",
-			want:            "actuator_base_url is supported only for type spring",
+			want:            "actuator_base_url: is supported only for type spring",
 		},
 		{
 			name:       "Spring health URL",
 			targetType: TargetTypeSpring,
 			url:        "http://example.com/actuator",
 			healthURL:  "http://example.com/health",
-			want:       "health_url is supported only for type quarkus",
+			want:       "health_url: is supported only for type quarkus",
 		},
 	}
 	for _, tt := range tests {
@@ -185,6 +188,100 @@ func TestValidateRejectsProgrammaticUnsupportedTargetFields(t *testing.T) {
 				t.Fatalf("Validate() error = %v, want %q", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestValidateTargetURLsHaveSupportedStructure(t *testing.T) {
+	types := []string{TargetTypeSpring, TargetTypeQuarkus, TargetTypeStatliteMetrics}
+	invalidURLs := []struct{ value, reason string }{
+		{"ftp://example.com/metrics", `unsupported URL scheme "ftp"`},
+		{"http:///metrics", "must include a host"},
+		{"http://user:pass@example.com/metrics", "embedded credentials"},
+		{"http://example.com/metrics?x=1", "query string"},
+		{"http://example.com/metrics#part", "fragment"},
+		{"http://example.com/metrics#", "fragment"},
+		{"http:example.com/metrics", "must include a host"},
+		{"http://example.com:bad/metrics", "invalid URL"},
+		{"http://example.com:0/metrics", "port must be a number from 1 through 65535"},
+		{"http://example.com:99999/metrics", "port must be a number from 1 through 65535"},
+	}
+	for _, targetType := range types {
+		for _, invalid := range invalidURLs {
+			if strings.Contains(invalid.value, "?") && targetType != TargetTypeSpring {
+				continue
+			}
+			t.Run(targetType+"/"+invalid.value, func(t *testing.T) {
+				cfg := validConfig(targetType, invalid.value)
+				err := Validate(cfg)
+				if err == nil || !strings.Contains(err.Error(), `invalid target "orders": url:`) || !strings.Contains(err.Error(), invalid.reason) {
+					t.Fatalf("Validate() error = %v, want named target URL error containing %q", err, invalid.reason)
+				}
+				var validation *TargetValidationError
+				if !errors.As(err, &validation) {
+					t.Fatalf("Validate() error type = %T, want *TargetValidationError", err)
+				}
+				var shapeError *urlshape.Error
+				sharedURLFailure := errors.As(err, &shapeError)
+				configOnlyFailure := strings.Contains(invalid.reason, "embedded credentials") || strings.Contains(invalid.reason, "query string")
+				if sharedURLFailure == configOnlyFailure {
+					t.Fatalf("Validate() error chain = %T, shared URL classification = %v, want config-only classification %v", err, sharedURLFailure, configOnlyFailure)
+				}
+			})
+		}
+	}
+}
+
+func TestValidateStructurallyValidUnreachableURL(t *testing.T) {
+	cfg := validConfig(TargetTypeSpring, "http://127.0.0.1:1/actuator")
+	if err := Validate(cfg); err != nil {
+		t.Fatalf("Validate() error = %v, want structurally valid endpoint to pass without probing", err)
+	}
+}
+
+func TestValidateAcceptsPercentEncodedHashInTargetURLs(t *testing.T) {
+	for _, targetType := range []string{TargetTypeSpring, TargetTypeQuarkus, TargetTypeStatliteMetrics} {
+		t.Run(targetType, func(t *testing.T) {
+			cfg := validConfig(targetType, "http://example.com/metrics%23suffix")
+			if err := Validate(cfg); err != nil {
+				t.Fatalf("Validate() error = %v, want encoded # treated as path data", err)
+			}
+		})
+	}
+}
+
+func TestValidatePollingDurationsMustBePositive(t *testing.T) {
+	for _, field := range []string{"interval", "timeout"} {
+		for _, value := range []string{"0s", "-1s"} {
+			t.Run(field+"/"+value, func(t *testing.T) {
+				cfg := validConfig(TargetTypeSpring, "http://example.com/actuator")
+				if field == "interval" {
+					cfg.Polling.Interval = value
+				} else {
+					cfg.Polling.Timeout = value
+				}
+				err := Validate(cfg)
+				if err == nil || !strings.Contains(err.Error(), "must be greater than zero") {
+					t.Fatalf("Validate() error = %v, want positive duration error", err)
+				}
+			})
+		}
+	}
+}
+
+func TestValidateAcceptsUnreachableURLAndServiceNameListen(t *testing.T) {
+	cfg := validConfig(TargetTypeQuarkus, "http://127.0.0.1:1/custom/metrics")
+	cfg.Server.Listen = "localhost:http"
+	if err := Validate(cfg); err != nil {
+		t.Fatalf("Validate() error = %v, want nonblank listen value and unprobed endpoint", err)
+	}
+}
+
+func validConfig(targetType, targetURL string) *Config {
+	return &Config{
+		Server:  ServerConfig{Listen: "127.0.0.1:9090"},
+		Storage: StorageConfig{SQLitePath: "./statlite.sqlite"},
+		Polling: PollingConfig{Interval: "30s", Timeout: "10s"},
+		Targets: []TargetConfig{{Type: targetType, Name: "orders", URL: targetURL}},
 	}
 }
 
@@ -740,8 +837,8 @@ targets:
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
-	if !strings.Contains(err.Error(), "unsupported type") {
-		t.Fatalf("Load() error = %q, want unsupported type", err)
+	if !strings.Contains(err.Error(), `type: unsupported value "json"`) {
+		t.Fatalf("Load() error = %q, want unsupported target type", err)
 	}
 	for _, targetType := range []string{"spring", "statlite-metrics"} {
 		if !strings.Contains(err.Error(), targetType) {
@@ -769,8 +866,8 @@ targets:
 			if err == nil {
 				t.Fatal("Load() error = nil, want error")
 			}
-			if !strings.Contains(err.Error(), "unsupported type") {
-				t.Fatalf("Load() error = %q, want unsupported type", err)
+			if !strings.Contains(err.Error(), "type: unsupported value") {
+				t.Fatalf("Load() error = %q, want unsupported target type", err)
 			}
 		})
 	}
@@ -800,7 +897,7 @@ targets:
 			if err == nil {
 				t.Fatal("Load() error = nil, want error")
 			}
-			if !strings.Contains(err.Error(), "currently supported only for type spring") {
+			if !strings.Contains(err.Error(), "auth: is supported only for type spring and quarkus") {
 				t.Fatalf("Load() error = %q, want spring-only auth error", err)
 			}
 		})
@@ -828,8 +925,16 @@ targets:
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
-	if !strings.Contains(err.Error(), "unsupported type") {
-		t.Fatalf("Load() error = %q, want unsupported type", err)
+	if !strings.Contains(err.Error(), "auth.type: unsupported value") {
+		t.Fatalf("Load() error = %q, want unsupported auth type", err)
+	}
+}
+
+func TestValidateRejectsColonInBasicAuthUsername(t *testing.T) {
+	cfg := validConfig(TargetTypeSpring, "http://example.com/actuator")
+	cfg.Targets[0].Auth = &AuthConfig{Type: "basic", Username: "foo:bar", Password: "baz"}
+	if err := Validate(cfg); err == nil || !strings.Contains(err.Error(), "auth.username: must not contain ':'") {
+		t.Fatalf("Validate() error = %v, want Basic Auth username delimiter error", err)
 	}
 }
 

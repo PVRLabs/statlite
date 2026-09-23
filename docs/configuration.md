@@ -135,8 +135,8 @@ polling:
   timeout: "10s"
 ```
 
-* `interval`: how often each target is polled (Go duration, required).
-* `timeout`: per-poll HTTP timeout (Go duration; default `10s` if omitted).
+* `interval`: how often each target is polled (positive Go duration, required).
+* `timeout`: per-poll HTTP timeout (positive Go duration; default `10s` if omitted).
 
 Use `30s` or longer for production deployments. Shorter intervals increase
 HTTP requests, SQLite writes, and database growth, and are best reserved for
@@ -151,6 +151,10 @@ targets with a compatible stored baseline use the configured interval normally.
 ## Targets
 
 At least one target is required. Names must be unique.
+
+Target URLs must use `http://` or `https://`, include a host, and omit
+fragments; only Quarkus and StatLite Metrics URLs may include queries, and
+canonical target URLs do not support embedded credentials.
 
 ### Spring Boot Actuator
 

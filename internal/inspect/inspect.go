@@ -16,6 +16,7 @@ import (
 
 	"github.com/pvrlabs/statlite/internal/collector"
 	"github.com/pvrlabs/statlite/internal/prometheus"
+	"github.com/pvrlabs/statlite/internal/urlshape"
 )
 
 const (
@@ -266,15 +267,16 @@ func parseApplicationURL(raw string) (*url.URL, error) {
 	if strings.TrimSpace(raw) != raw || raw == "" {
 		return nil, fmt.Errorf("application URL must be a nonblank absolute URL without surrounding whitespace")
 	}
-	parsed, err := url.Parse(raw)
+	parsed, err := urlshape.ParseHTTP(raw)
 	if err != nil {
+		var shapeErr *urlshape.Error
+		if errors.As(err, &shapeErr) && shapeErr.Kind == urlshape.KindScheme {
+			return nil, fmt.Errorf("application URL must use http or https")
+		}
+		if errors.As(err, &shapeErr) && shapeErr.Kind == urlshape.KindHost {
+			return nil, fmt.Errorf("application URL must include a host")
+		}
 		return nil, fmt.Errorf("parsing application URL: %w", err)
-	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return nil, fmt.Errorf("application URL must use http or https")
-	}
-	if parsed.Host == "" || parsed.Hostname() == "" {
-		return nil, fmt.Errorf("application URL must include a host")
 	}
 	if parsed.User != nil {
 		return nil, fmt.Errorf("application URL must not include user information")

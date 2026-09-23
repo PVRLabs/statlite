@@ -48,8 +48,8 @@ targets:
 			}
 			message := string(output)
 			for _, want := range []string{
-				`targets[0].type`,
-				`unsupported type`,
+				`invalid target "obsolete-self": type:`,
+				`unsupported value`,
 				`"` + retiredType + `"`,
 				`spring`,
 				`statlite-metrics`,
@@ -374,7 +374,7 @@ func TestRunInspectTypeErrorsUseAccurateUsageMessages(t *testing.T) {
 
 func TestRenderInspectionRejectsInvalidSuggestedConfig(t *testing.T) {
 	_, err := renderInspection(&inspect.Result{TargetType: inspect.TargetSpring})
-	if err == nil || !strings.Contains(err.Error(), "url is required") {
+	if err == nil || !strings.Contains(err.Error(), "url: is required") {
 		t.Fatalf("renderInspection() error = %v, want config validation error", err)
 	}
 }
@@ -456,7 +456,7 @@ func TestRunInspectHelp(t *testing.T) {
 	}
 }
 
-func TestRunMissingImplicitConfigSuggestsInspect(t *testing.T) {
+func TestRunMissingImplicitConfigShowsConfigurationHelp(t *testing.T) {
 	workingDir := t.TempDir()
 	oldDir, err := os.Getwd()
 	if err != nil {
@@ -471,11 +471,133 @@ func TestRunMissingImplicitConfigSuggestsInspect(t *testing.T) {
 	if code := run(nil, &stdout, &stderr); code != 1 {
 		t.Fatalf("run() exit code = %d, want 1; stderr=%q", code, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "statlite inspect <application-url>") {
-		t.Fatalf("stderr = %q, want missing-config inspect suggestion", stderr.String())
+	if !strings.Contains(stderr.String(), configurationDocsURL) {
+		t.Fatalf("stderr = %q, want configuration documentation", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "statlite inspect") {
+		t.Fatalf("stderr = %q, missing configuration must not imply endpoint diagnosis is needed", stderr.String())
 	}
 	if _, err := os.Stat(filepath.Join(workingDir, "statlite.sqlite")); !os.IsNotExist(err) {
 		t.Fatalf("statlite.sqlite stat error = %v, want file to remain absent", err)
+	}
+}
+
+func TestRunStructuralConfigFailureShowsFocusedGuidanceOnce(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "statlite.yaml")
+	content := `server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "./statlite.sqlite"
+polling:
+  interval: "30s"
+targets:
+  - name: "orders"
+    type: "spring"
+    url: "ftp://orders.example.com/actuator"
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"--config", path}, &stdout, &stderr); code != 1 {
+		t.Fatalf("run() exit code = %d, want 1; stderr=%q", code, stderr.String())
+	}
+	output := stderr.String()
+	for _, want := range []string{`invalid target "orders": url: unsupported URL scheme "ftp"`, configurationDocsURL} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stderr = %q, want %q", output, want)
+		}
+	}
+	if strings.Count(output, configurationDocsURL) != 1 {
+		t.Fatalf("stderr = %q, want documentation guidance exactly once", output)
+	}
+	if strings.Contains(output, "statlite inspect") {
+		t.Fatalf("stderr = %q, structural URL error must not recommend inspect", output)
+	}
+}
+
+func TestRunMalformedCredentialURLDoesNotEchoSecrets(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "statlite.yaml")
+	const secret = "super-secret-value"
+	const rawURL = "http://alice:" + secret + "@orders.example.com:bad/actuator"
+	content := `server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "./statlite.sqlite"
+polling:
+  interval: "30s"
+targets:
+  - name: "orders"
+    type: "spring"
+    url: "` + rawURL + `"
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"--config", path}, &stdout, &stderr); code != 1 {
+		t.Fatalf("run() exit code = %d, want 1; stderr=%q", code, stderr.String())
+	}
+	output := stderr.String()
+	if !strings.Contains(output, `invalid target "orders": url: invalid URL syntax`) {
+		t.Fatalf("stderr = %q, want useful target URL syntax error", output)
+	}
+	if strings.Contains(output, secret) || strings.Contains(output, rawURL) {
+		t.Fatalf("stderr = %q, must not contain the password or credential-bearing URL", output)
+	}
+}
+
+func TestRunStatliteMetricsCredentialsAreRejectedWithoutAuthAdvice(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "statlite.yaml")
+	content := `server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "./statlite.sqlite"
+polling:
+  interval: "30s"
+targets:
+  - name: "remote"
+    type: "statlite-metrics"
+    url: "http://user:secret@example.com/statlite/metrics"
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"--config", path}, &stdout, &stderr); code != 1 {
+		t.Fatalf("run() exit code = %d, want 1; stderr=%q", code, stderr.String())
+	}
+	output := stderr.String()
+	if !strings.Contains(output, "must not contain embedded credentials") || !strings.Contains(output, configurationDocsURL) {
+		t.Fatalf("stderr = %q, want focused credential error and documentation", output)
+	}
+	if strings.Contains(output, "Use auth") || strings.Contains(output, "auth configuration") {
+		t.Fatalf("stderr = %q, must not suggest unsupported StatLite Metrics auth", output)
+	}
+}
+
+func TestRunKeepsObviousDurationErrorConcise(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "statlite.yaml")
+	content := `server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "./statlite.sqlite"
+polling:
+  interval: "0s"
+targets:
+  - name: "orders"
+    type: "spring"
+    url: "http://orders.example.com/actuator"
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"--config", path}, &stdout, &stderr); code != 1 {
+		t.Fatalf("run() exit code = %d, want 1; stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "polling.interval: must be greater than zero") || strings.Contains(stderr.String(), configurationDocsURL) {
+		t.Fatalf("stderr = %q, want concise duration error without docs boilerplate", stderr.String())
 	}
 }
 

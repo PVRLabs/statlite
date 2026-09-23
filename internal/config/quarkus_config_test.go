@@ -41,18 +41,19 @@ targets:
 
 func TestLoadRejectsInvalidQuarkusFields(t *testing.T) {
 	tests := []struct{ name, fields, want string }{
-		{"missing url", "", "url is required for type quarkus"},
-		{"actuator url", "url: http://example.com/q/metrics\n    actuator_base_url: http://example.com/actuator", "actuator_base_url is supported only for type spring"},
-		{"host metrics", "url: http://example.com/q/metrics\n    collect_host_metrics: true", "collect_host_metrics is supported only for type spring"},
-		{"false host metrics", "url: http://example.com/q/metrics\n    collect_host_metrics: false", "collect_host_metrics is supported only for type spring"},
-		{"spring source", "url: http://example.com/q/metrics\n    metrics_source: prometheus", "metrics_source is supported only for type spring"},
-		{"empty spring source", "url: http://example.com/q/metrics\n    metrics_source: \"\"", "metrics_source is supported only for type spring"},
-		{"empty actuator url", "url: http://example.com/q/metrics\n    actuator_base_url: \"\"", "actuator_base_url is supported only for type spring"},
+		{"missing url", "", "url: is required for type quarkus"},
+		{"actuator url", "url: http://example.com/q/metrics\n    actuator_base_url: http://example.com/actuator", "actuator_base_url: is supported only for type spring"},
+		{"host metrics", "url: http://example.com/q/metrics\n    collect_host_metrics: true", "collect_host_metrics: is supported only for type spring"},
+		{"false host metrics", "url: http://example.com/q/metrics\n    collect_host_metrics: false", "collect_host_metrics: is supported only for type spring"},
+		{"spring source", "url: http://example.com/q/metrics\n    metrics_source: prometheus", "metrics_source: is supported only for type spring"},
+		{"empty spring source", "url: http://example.com/q/metrics\n    metrics_source: \"\"", "metrics_source: is supported only for type spring"},
+		{"empty actuator url", "url: http://example.com/q/metrics\n    actuator_base_url: \"\"", "actuator_base_url: is supported only for type spring"},
 		{"fragment", "url: http://example.com/q/metrics#section", "must not contain a fragment"},
-		{"userinfo", "url: http://user:secret@example.com/q/metrics", "without user info"},
-		{"scheme", "url: ftp://example.com/q/metrics", "must be an http or https URL"},
-		{"health fragment", "url: http://example.com/q/metrics\n    health_url: http://example.com/q/health#section", "health_url for type quarkus: must not contain a fragment"},
-		{"health userinfo", "url: http://example.com/q/metrics\n    health_url: http://user:secret@example.com/q/health", "health_url for type quarkus: must be an http or https URL without user info"},
+		{"userinfo", "url: http://user:secret@example.com/q/metrics", "url: must not contain embedded credentials"},
+		{"scheme", "url: ftp://example.com/q/metrics", `url: unsupported URL scheme "ftp"`},
+		{"health fragment", "url: http://example.com/q/metrics\n    health_url: http://example.com/q/health#section", "health_url: must not contain a fragment"},
+		{"health empty fragment", "url: http://example.com/q/metrics\n    health_url: http://example.com/q/health#", "health_url: must not contain a fragment"},
+		{"health userinfo", "url: http://example.com/q/metrics\n    health_url: http://user:secret@example.com/q/health", "health_url: must not contain embedded credentials"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -122,7 +123,7 @@ targets:
     health_url: "`+tt.healthURL+`"
 `)
 			_, err := Load(path)
-			if err == nil || !strings.Contains(err.Error(), "health_url is supported only for type quarkus") {
+			if err == nil || !strings.Contains(err.Error(), "health_url: is supported only for type quarkus") {
 				t.Fatalf("Load() error = %v, want Quarkus-only health_url error", err)
 			}
 		})

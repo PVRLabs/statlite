@@ -125,7 +125,7 @@ func runMonitor(args []string, stdout, stderr io.Writer) int {
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
-		fmt.Fprintf(stderr, "config: %v\n", err)
+		writeConfigFailure(stderr, err)
 		if implicitConfig && *configPath == "statlite.yaml" && errors.Is(err, os.ErrNotExist) {
 			printMissingConfigSuggestion(stderr)
 		}
@@ -228,6 +228,16 @@ func runMonitor(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+func writeConfigFailure(w io.Writer, err error) {
+	var validation *config.TargetValidationError
+	if !errors.As(err, &validation) {
+		fmt.Fprintf(w, "config: %v\n", err)
+		return
+	}
+	fmt.Fprintln(w, validation.Error())
+	fmt.Fprintf(w, "\nConfiguration documentation:\n  %s\n", configurationDocsURL)
 }
 
 func hasConfigFlag(args []string) bool {
@@ -447,9 +457,9 @@ func isInspectUsageError(err error) bool {
 
 func printMissingConfigSuggestion(w io.Writer) {
 	fmt.Fprintln(w, `
-To identify a supported application endpoint and print a minimal statlite.yaml:
-  statlite inspect <application-url>
-
 To use an existing configuration:
-  statlite --config /path/to/statlite.yaml`)
+  statlite --config /path/to/statlite.yaml
+
+Configuration documentation:
+  `+configurationDocsURL)
 }

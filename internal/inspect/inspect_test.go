@@ -788,6 +788,13 @@ func TestParseApplicationURLRejectsUnsafeForms(t *testing.T) {
 	}
 }
 
+func TestParseApplicationURLKeepsMalformedHostAsSyntaxError(t *testing.T) {
+	_, err := parseApplicationURL("http://[::1")
+	if err == nil || !strings.Contains(err.Error(), "parsing application URL:") || strings.Contains(err.Error(), "application URL must include a host") {
+		t.Fatalf("parseApplicationURL() error = %v, want malformed URL syntax error", err)
+	}
+}
+
 func testInspector(response func(*http.Request) (int, string)) *inspector {
 	return &inspector{
 		client: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {

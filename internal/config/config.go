@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pvrlabs/statlite/internal/urlshape"
 	"gopkg.in/yaml.v3"
 )
 
@@ -60,6 +61,7 @@ type TargetConfig struct {
 	collectHostSet         bool
 	healthURLSet           bool
 	legacyActuatorUserinfo bool
+	legacyStatliteTarget   bool
 }
 
 type TargetDisplayMetadata struct {
@@ -74,6 +76,12 @@ type AuthConfig struct {
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
 }
+
+// TargetValidationError marks a target-scoped structural configuration error.
+type TargetValidationError struct{ Err error }
+
+func (e *TargetValidationError) Error() string { return e.Err.Error() }
+func (e *TargetValidationError) Unwrap() error { return e.Err }
 
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
@@ -132,9 +140,13 @@ func Validate(cfg *Config) error {
 	if cfg == nil {
 		return fmt.Errorf("config is required")
 	}
-	for i, target := range cfg.Targets {
+	for i := range cfg.Targets {
+		target := &cfg.Targets[i]
+		if target.Type == targetTypeStatliteLegacy && strings.Contains(target.URL, "#") {
+			return targetURLValidationError(target, "url", fmt.Errorf("must not contain a fragment"))
+		}
 		if (target.Type == "" || target.Type == TargetTypeSpring) && target.URL != "" && target.ActuatorBaseURL != "" {
-			return fmt.Errorf("targets[%d] configures both url and deprecated actuator_base_url; use only url", i)
+			return targetError(target, "url", "configures both url and deprecated actuator_base_url; use only url")
 		}
 	}
 	cfg.deprecationWarnings = nil
@@ -191,7 +203,7 @@ func (t *TargetConfig) UnmarshalYAML(value *yaml.Node) error {
 }
 
 func (c *Config) validate() error {
-	if c.Server.Listen == "" {
+	if strings.TrimSpace(c.Server.Listen) == "" {
 		return fmt.Errorf("server.listen is required")
 	}
 	if c.Storage.SQLitePath == "" {
@@ -203,14 +215,22 @@ func (c *Config) validate() error {
 	if c.Polling.Interval == "" {
 		return fmt.Errorf("polling.interval is required")
 	}
-	if _, err := time.ParseDuration(c.Polling.Interval); err != nil {
+	interval, err := time.ParseDuration(c.Polling.Interval)
+	if err != nil {
 		return fmt.Errorf("polling.interval: invalid duration: %w", err)
+	}
+	if interval <= 0 {
+		return fmt.Errorf("polling.interval: must be greater than zero")
 	}
 	if c.Polling.Timeout == "" {
 		c.Polling.Timeout = "10s"
 	}
-	if _, err := time.ParseDuration(c.Polling.Timeout); err != nil {
+	timeout, err := time.ParseDuration(c.Polling.Timeout)
+	if err != nil {
 		return fmt.Errorf("polling.timeout: invalid duration: %w", err)
+	}
+	if timeout <= 0 {
+		return fmt.Errorf("polling.timeout: must be greater than zero")
 	}
 	return c.validateTargets()
 }
@@ -239,107 +259,113 @@ func (c *Config) validateTargets() error {
 		}
 		switch targetType {
 		case TargetTypeSpring:
-			if err := validateSpringTarget(i, target); err != nil {
+			if err := validateSpringTarget(target); err != nil {
 				return err
 			}
 		case TargetTypeQuarkus:
-			if err := validateQuarkusTarget(i, target); err != nil {
+			if err := validateQuarkusTarget(target); err != nil {
 				return err
 			}
 		case TargetTypeStatliteMetrics:
-			if err := validateStatliteMetricsTarget(i, target); err != nil {
+			if err := validateStatliteMetricsTarget(target); err != nil {
 				return err
 			}
 		default:
-			return fmt.Errorf("targets[%d].type: unsupported type %q (supported: spring, quarkus, statlite-metrics)", i, targetType)
+			return targetError(target, "type", fmt.Sprintf("unsupported value %q (supported: spring, quarkus, statlite-metrics)", targetType))
 		}
 		if target.Auth != nil {
 			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus {
-				return fmt.Errorf("targets[%d].auth is currently supported only for type spring and quarkus", i)
+				return targetError(target, "auth", "is supported only for type spring and quarkus")
 			}
 			if target.Auth.Type != "basic" {
-				return fmt.Errorf("targets[%d].auth.type: unsupported type %q (only 'basic' is supported)", i, target.Auth.Type)
+				return targetError(target, "auth.type", fmt.Sprintf("unsupported value %q (only basic is supported)", target.Auth.Type))
 			}
 			if target.Auth.Username == "" {
-				return fmt.Errorf("targets[%d].auth.username is required when auth is configured", i)
+				return targetError(target, "auth.username", "is required when auth is configured")
+			}
+			if strings.Contains(target.Auth.Username, ":") {
+				return targetError(target, "auth.username", "must not contain ':'")
 			}
 			if target.Auth.Password == "" {
-				return fmt.Errorf("targets[%d].auth.password is required when auth is configured", i)
+				return targetError(target, "auth.password", "is required when auth is configured")
 			}
 		}
 		if (target.CollectHostMetrics || target.collectHostSet) && targetType != TargetTypeSpring {
-			return fmt.Errorf("targets[%d].collect_host_metrics is supported only for type spring", i)
+			return targetError(target, "collect_host_metrics", "is supported only for type spring")
 		}
 		if (target.HealthURL != "" || target.healthURLSet) && targetType != TargetTypeQuarkus {
-			return fmt.Errorf("targets[%d].health_url is supported only for type quarkus", i)
+			return targetError(target, "health_url", "is supported only for type quarkus")
 		}
 	}
 	return nil
 }
 
-func validateSpringTarget(index int, target *TargetConfig) error {
+func validateSpringTarget(target *TargetConfig) error {
 	if target.URL == "" {
-		return fmt.Errorf("targets[%d].url is required for type spring", index)
+		return targetError(target, "url", "is required for type spring")
 	}
-	if !target.legacyActuatorUserinfo && urlHasUserinfo(target.URL) {
-		return fmt.Errorf("targets[%d].url must not contain embedded credentials; use the explicit auth configuration instead", index)
+	if err := validateTargetURL(target.URL, !target.legacyActuatorUserinfo, !target.legacyActuatorUserinfo); err != nil {
+		return targetURLValidationError(target, "url", err)
 	}
 	if target.MetricsSource == "" {
 		target.MetricsSource = SpringMetricsSourceAuto
 	} else if target.MetricsSource != SpringMetricsSourceAuto && target.MetricsSource != SpringMetricsSourcePrometheus && target.MetricsSource != SpringMetricsSourceActuator {
-		return fmt.Errorf("targets[%d].metrics_source: unsupported value %q (supported: auto, prometheus, actuator)", index, target.MetricsSource)
+		return targetError(target, "metrics_source", fmt.Sprintf("unsupported value %q (supported: auto, prometheus, actuator)", target.MetricsSource))
 	}
 	if target.legacyActuatorUserinfo {
 		if target.Auth != nil {
-			return fmt.Errorf("targets[%d].auth cannot be combined with embedded credentials from deprecated actuator_base_url; use either the legacy URL credentials or url with explicit auth configuration", index)
+			return targetError(target, "auth", "cannot be combined with embedded credentials from deprecated actuator_base_url; use either the legacy URL credentials or url with explicit auth configuration")
 		}
 		if target.MetricsSource == SpringMetricsSourcePrometheus {
-			return fmt.Errorf("targets[%d].metrics_source: prometheus cannot be used with embedded credentials from deprecated actuator_base_url; use metrics_source: actuator or url with explicit auth configuration", index)
+			return targetError(target, "metrics_source", "prometheus cannot be used with embedded credentials from deprecated actuator_base_url; use metrics_source: actuator or url with explicit auth configuration")
 		}
 		target.MetricsSource = SpringMetricsSourceActuator
 	}
 	return nil
 }
 
-func validateQuarkusTarget(index int, target *TargetConfig) error {
+func validateQuarkusTarget(target *TargetConfig) error {
 	if target.URL == "" {
-		return fmt.Errorf("targets[%d].url is required for type quarkus", index)
+		return targetError(target, "url", "is required for type quarkus")
 	}
 	if target.ActuatorBaseURL != "" || target.actuatorURLSet {
-		return fmt.Errorf("targets[%d].actuator_base_url is supported only for type spring", index)
+		return targetError(target, "actuator_base_url", "is supported only for type spring")
 	}
 	if target.metricsSourceSet {
-		return fmt.Errorf("targets[%d].metrics_source is supported only for type spring", index)
+		return targetError(target, "metrics_source", "is supported only for type spring")
 	}
 	if target.collectHostSet {
-		return fmt.Errorf("targets[%d].collect_host_metrics is supported only for type spring", index)
+		return targetError(target, "collect_host_metrics", "is supported only for type spring")
 	}
-	if err := validateQuarkusURL(target.URL); err != nil {
-		return fmt.Errorf("targets[%d].url for type quarkus: %w", index, err)
+	if err := validateTargetURL(target.URL, true, false); err != nil {
+		return targetURLValidationError(target, "url", err)
 	}
 	if target.HealthURL != "" {
-		if err := validateQuarkusURL(target.HealthURL); err != nil {
-			return fmt.Errorf("targets[%d].health_url for type quarkus: %w", index, err)
+		if err := validateTargetURL(target.HealthURL, true, false); err != nil {
+			return targetURLValidationError(target, "health_url", err)
 		}
 	}
 	if target.MetricsSource != "" {
-		return fmt.Errorf("targets[%d].metrics_source is supported only for type spring", index)
+		return targetError(target, "metrics_source", "is supported only for type spring")
 	}
 	return nil
 }
 
-func validateStatliteMetricsTarget(index int, target *TargetConfig) error {
+func validateStatliteMetricsTarget(target *TargetConfig) error {
 	if target.URL == "" {
-		return fmt.Errorf("targets[%d].url is required for type %s", index, target.Type)
+		return targetError(target, "url", fmt.Sprintf("is required for type %s", target.Type))
+	}
+	if err := validateTargetURL(target.URL, !target.legacyStatliteTarget, false); err != nil {
+		return targetURLValidationError(target, "url", err)
 	}
 	if target.MetricsSource != "" {
-		return fmt.Errorf("targets[%d].metrics_source is supported only for type spring", index)
+		return targetError(target, "metrics_source", "is supported only for type spring")
 	}
 	if target.ActuatorBaseURL != "" || target.actuatorURLSet {
-		return fmt.Errorf("targets[%d].actuator_base_url is supported only for type spring", index)
+		return targetError(target, "actuator_base_url", "is supported only for type spring")
 	}
 	if target.metricsSourceSet {
-		return fmt.Errorf("targets[%d].metrics_source is supported only for type spring", index)
+		return targetError(target, "metrics_source", "is supported only for type spring")
 	}
 	return nil
 }
@@ -356,13 +382,32 @@ func (t TargetConfig) UsesLegacyActuatorURLUserinfo() bool {
 	return t.legacyActuatorUserinfo
 }
 
-func validateQuarkusURL(raw string) error {
-	u, err := url.Parse(raw)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil {
-		return fmt.Errorf("must be an http or https URL without user info")
+func targetError(target *TargetConfig, field, reason string) error {
+	return &TargetValidationError{
+		Err: fmt.Errorf("invalid target %q: %s: %s", target.Name, field, reason),
 	}
-	if u.Fragment != "" {
-		return fmt.Errorf("must not contain a fragment")
+}
+
+func targetURLValidationError(target *TargetConfig, field string, cause error) error {
+	validation := &TargetValidationError{
+		Err: fmt.Errorf("invalid target %q: %s: %w", target.Name, field, cause),
+	}
+	return validation
+}
+
+func validateTargetURL(raw string, rejectUserinfo, rejectQuery bool) error {
+	if strings.TrimSpace(raw) != raw || raw == "" {
+		return fmt.Errorf("must be an absolute URL without surrounding whitespace")
+	}
+	u, err := urlshape.ParseHTTP(raw)
+	if err != nil {
+		return err
+	}
+	if rejectUserinfo && u.User != nil {
+		return fmt.Errorf("must not contain embedded credentials")
+	}
+	if rejectQuery && (u.RawQuery != "" || u.ForceQuery) {
+		return fmt.Errorf("must not contain a query string")
 	}
 	return nil
 }

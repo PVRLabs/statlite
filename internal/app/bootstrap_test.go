@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,7 +15,92 @@ import (
 
 	"github.com/pvrlabs/statlite/internal/collector"
 	"github.com/pvrlabs/statlite/internal/config"
+	"github.com/pvrlabs/statlite/internal/storage"
 )
+
+func TestMonitorStartsWithUnreachableTargetAndRecovers(t *testing.T) {
+	reserved, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("reserve target port: %v", err)
+	}
+	address := reserved.Addr().String()
+	if err := reserved.Close(); err != nil {
+		t.Fatalf("release target port: %v", err)
+	}
+
+	cfg := &config.Config{
+		Server:  config.ServerConfig{Listen: "127.0.0.1:9090"},
+		Storage: config.StorageConfig{SQLitePath: filepath.Join(t.TempDir(), "statlite.sqlite")},
+		Polling: config.PollingConfig{Interval: "20ms", Timeout: "250ms"},
+		Targets: []config.TargetConfig{{
+			Name: "remote",
+			Type: config.TargetTypeStatliteMetrics,
+			URL:  "http://" + address + "/statlite/metrics",
+		}},
+	}
+	if err := config.Validate(cfg); err != nil {
+		t.Fatalf("Validate() error = %v, want unreachable endpoint to remain valid configuration", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	store, err := storage.Open(ctx, cfg.Storage.SQLitePath)
+	if err != nil {
+		t.Fatalf("storage.Open() error = %v", err)
+	}
+	defer func() {
+		cancel()
+		_ = store.Close()
+	}()
+	manager, err := NewMonitorManager(cfg.Targets, store, 250*time.Millisecond, 20*time.Millisecond)
+	if err != nil {
+		t.Fatalf("NewMonitorManager() error = %v, want startup setup to succeed without endpoint probing", err)
+	}
+	manager.Start(ctx)
+
+	failedBy := time.Now().Add(3 * time.Second)
+	for manager.Status("remote").ConsecutivePollFailures == 0 && time.Now().Before(failedBy) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	failed := manager.LatestSnapshot("remote")
+	if failed == nil || failed.Status != "error" {
+		t.Fatalf("first stored snapshot = %#v, want normal failed poll", failed)
+	}
+	failedPollID := failed.PollID
+	if status := manager.Status("remote"); status.ConsecutivePollFailures == 0 || status.LastStoredPollID != failedPollID {
+		t.Fatalf("status after unavailable poll = %#v, want recorded polling failure %d", status, failedPollID)
+	}
+
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		t.Fatalf("listen on target port for recovery: %v", err)
+	}
+	endpoint := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/statlite/metrics" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"schema":"statlite-metrics/v1","status":"UP"}`))
+	})}
+	go func() { _ = endpoint.Serve(listener) }()
+	defer func() {
+		cancel()
+		_ = endpoint.Close()
+	}()
+
+	recoveredBy := time.Now().Add(3 * time.Second)
+	for manager.Status("remote").LastSuccessfulStoredPollID <= failedPollID && time.Now().Before(recoveredBy) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	recovered := manager.LatestSnapshot("remote")
+	status := manager.Status("remote")
+	if recovered == nil || recovered.Status != "ok" || recovered.PollID <= failedPollID {
+		t.Fatalf("recovered snapshot = %#v, want successful poll after failed poll %d", recovered, failedPollID)
+	}
+	if status.ConsecutivePollFailures != 0 || status.LastSuccessfulStoredPollID != recovered.PollID {
+		t.Fatalf("status after recovery = %#v, want failure count cleared and successful poll %d", status, recovered.PollID)
+	}
+}
 
 func TestNewCollectorBuildsConfiguredTargetTypes(t *testing.T) {
 	tests := []struct {

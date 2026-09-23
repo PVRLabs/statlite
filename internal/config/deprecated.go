@@ -30,6 +30,7 @@ func (c *Config) upgradeDeprecatedTargets() {
 		}
 
 		target.Type = TargetTypeStatliteMetrics
+		target.legacyStatliteTarget = true
 		target.URL = statliteMetricsURL(target.URL)
 		// Do not include the endpoint: it may contain credentials.
 		c.deprecationWarnings = append(c.deprecationWarnings, fmt.Sprintf("targets[%d].type %q is deprecated; using type %q with /statlite/metrics", i, targetTypeStatliteLegacy, TargetTypeStatliteMetrics))

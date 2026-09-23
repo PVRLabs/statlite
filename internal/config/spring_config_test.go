@@ -127,7 +127,7 @@ targets:
     url: "https://user:secret@example.com/actuator"
 `)
 	_, err := Load(path)
-	if err == nil || !strings.Contains(err.Error(), "url must not contain embedded credentials; use the explicit auth configuration instead") {
+	if err == nil || !strings.Contains(err.Error(), "url: must not contain embedded credentials") {
 		t.Fatalf("Load() error = %v, want actionable canonical URL credential error", err)
 	}
 }
@@ -149,7 +149,7 @@ targets:
       password: password
 `)
 	_, err := Load(path)
-	if err == nil || !strings.Contains(err.Error(), "auth cannot be combined with embedded credentials from deprecated actuator_base_url") {
+	if err == nil || !strings.Contains(err.Error(), "auth: cannot be combined with embedded credentials from deprecated actuator_base_url") {
 		t.Fatalf("Load() error = %v, want ambiguous credential configuration error", err)
 	}
 }

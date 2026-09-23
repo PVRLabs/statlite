@@ -38,3 +38,22 @@ targets:
 		t.Fatalf("DeprecationWarnings() = %#v, must not expose endpoint credentials", warnings)
 	}
 }
+
+func TestLoadRejectsFragmentFromLegacyStatliteURL(t *testing.T) {
+	path := writeConfig(t, `
+server:
+  listen: "127.0.0.1:9091"
+storage:
+  sqlite_path: "./statlite-self.sqlite"
+polling:
+  interval: "30s"
+targets:
+  - name: "statlite-local"
+    type: "statlite"
+    url: "http://127.0.0.1:9090/healthz#"
+`)
+	_, err := Load(path)
+	if err == nil || !strings.Contains(err.Error(), "url: must not contain a fragment") {
+		t.Fatalf("Load() error = %v, want legacy target fragment validation error", err)
+	}
+}
