@@ -16,7 +16,7 @@ import (
 //go:embed schema.sql
 var schemaFS embed.FS
 
-const currentSchemaVersion = 1
+const currentSchemaVersion = 2
 
 type Store struct {
 	db     *sql.DB
@@ -71,29 +71,59 @@ func (s *Store) init(ctx context.Context) error {
 		return fmt.Errorf("enable sqlite foreign keys: %w", err)
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
+	// Run migrations sequentially, with one committed transaction per version.
+	// A failed later migration leaves the last successfully committed version.
+	// Keep each transition in its own migration file.
+	for {
+		var schemaVersion int
+		if err := s.db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schemaVersion); err != nil {
+			return fmt.Errorf("read sqlite schema version: %w", err)
+		}
+		if schemaVersion > currentSchemaVersion {
+			return fmt.Errorf("sqlite schema version %d is newer than supported version %d", schemaVersion, currentSchemaVersion)
+		}
+		switch schemaVersion {
+		case 0:
+			var objectCount int
+			if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'`).Scan(&objectCount); err != nil {
+				return fmt.Errorf("inspect unversioned sqlite database: %w", err)
+			}
+			if objectCount == 0 {
+				if err := initializeFreshSchema(ctx, s.db); err != nil {
+					return err
+				}
+			} else if err := migrateV1ToV2(ctx, s.db); err != nil {
+				return err
+			}
+		case 1:
+			if err := migrateV1ToV2(ctx, s.db); err != nil {
+				return err
+			}
+		case 2:
+			return checkV2Columns(ctx, s.db)
+		default:
+			return fmt.Errorf("unsupported sqlite schema version %d", schemaVersion)
+		}
+	}
+}
+
+func initializeFreshSchema(ctx context.Context, db *sql.DB) error {
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin sqlite schema initialization: %w", err)
 	}
 	defer tx.Rollback()
 
-	var schemaVersion int
+	var schemaVersion, objectCount int
 	if err := tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schemaVersion); err != nil {
 		return fmt.Errorf("read sqlite schema version: %w", err)
 	}
-	if schemaVersion > currentSchemaVersion {
-		return fmt.Errorf("sqlite schema version %d is newer than supported version %d", schemaVersion, currentSchemaVersion)
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'`).Scan(&objectCount); err != nil {
+		return fmt.Errorf("inspect unversioned sqlite database: %w", err)
 	}
-	if schemaVersion != 0 && schemaVersion < currentSchemaVersion {
-		return fmt.Errorf("sqlite schema version %d requires a migration to version %d", schemaVersion, currentSchemaVersion)
+	if schemaVersion != 0 || objectCount != 0 {
+		return fmt.Errorf("sqlite database changed during fresh schema initialization")
 	}
-	if schemaVersion == currentSchemaVersion {
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("finish sqlite schema initialization: %w", err)
-		}
-		return nil
-	}
-
 	schema, err := schemaFS.ReadFile("schema.sql")
 	if err != nil {
 		return fmt.Errorf("read embedded schema: %w", err)

@@ -4,8 +4,7 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS targets (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL UNIQUE CHECK (name <> ''),
-  created_at TEXT NOT NULL,
-  target_type TEXT
+  created_at TEXT NOT NULL
 );
 
 -- Detected runtime instances for a target process.
@@ -15,7 +14,6 @@ CREATE TABLE IF NOT EXISTS app_runs (
   process_start_time TEXT,
   first_seen_at TEXT NOT NULL,
   last_seen_at TEXT NOT NULL,
-  target_type TEXT,
   FOREIGN KEY (target_id) REFERENCES targets(id),
   UNIQUE (target_id, process_start_time)
 );
@@ -31,7 +29,6 @@ CREATE TABLE IF NOT EXISTS polls (
   health_status TEXT,
   db_health_status TEXT,
   error_summary TEXT,
-  metrics_source TEXT,
   FOREIGN KEY (target_id) REFERENCES targets(id),
   FOREIGN KEY (app_run_id) REFERENCES app_runs(id)
 );

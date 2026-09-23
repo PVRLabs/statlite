@@ -7,16 +7,20 @@ general-purpose abstraction or migration system.
 ## Schema versioning
 
 StatLite uses SQLite `PRAGMA user_version` to record the schema version. The
-current schema version is **1**, and `currentSchemaVersion` in Go is the source
+current schema version is **2**, and `currentSchemaVersion` in Go is the source
 of truth for the version understood by the application.
 
 Version 0 identifies databases created before explicit schema versioning.
-StatLite can adopt those existing databases as version 1 without rewriting
-their data because version 1 represents the pre-versioning schema.
+StatLite recognizes the known version 1 schema in those databases and migrates
+it directly to version 2. Version 1 databases follow the same migration.
+The migration adds nullable target and app-run type and poll source columns;
+existing rows keep unknown provenance as `NULL`.
 
-There is intentionally no general migration framework yet. When the first
-actual schema change is required, StatLite will increment
-`currentSchemaVersion` and introduce an explicit version-to-version migration.
+There is intentionally no general migration framework. The explicit version 1
+to version 2 transition validates the known legacy schema and relationships
+before changing it. Each migration commits its own transaction, so a failed
+later transition leaves the database at the last completed version.
+Unsupported or inconsistent databases fail to open.
 
 ## Timestamp storage
 

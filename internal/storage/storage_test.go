@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -34,6 +35,17 @@ func TestOpenCreatesSchema(t *testing.T) {
 	if schemaVersion != currentSchemaVersion {
 		t.Fatalf("schema version = %d, want %d", schemaVersion, currentSchemaVersion)
 	}
+	for _, query := range []string{
+		`SELECT target_type FROM targets LIMIT 0`,
+		`SELECT target_type FROM app_runs LIMIT 0`,
+		`SELECT metrics_source FROM polls LIMIT 0`,
+	} {
+		rows, err := store.db.Query(query)
+		if err != nil {
+			t.Fatalf("fresh v2 column missing for %q: %v", query, err)
+		}
+		rows.Close()
+	}
 }
 
 func TestOpenAdoptsExistingUnversionedSchema(t *testing.T) {
@@ -43,10 +55,10 @@ func TestOpenAdoptsExistingUnversionedSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open unversioned database: %v", err)
 	}
-	schema, err := schemaFS.ReadFile("schema.sql")
+	schema, err := os.ReadFile("testdata/schema_v1.sql")
 	if err != nil {
 		db.Close()
-		t.Fatalf("read embedded schema: %v", err)
+		t.Fatalf("read fixed v1 schema: %v", err)
 	}
 	if _, err := db.ExecContext(ctx, string(schema)); err != nil {
 		db.Close()
