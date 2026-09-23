@@ -231,21 +231,21 @@ test("renderPollStatus shows the latest poll state and a failed-poll summary", (
   }
 });
 
-test("renderError replaces stale App health explanation and accessibility metadata", () => {
+test("renderError replaces stale App status explanation and accessibility metadata", () => {
   const originalDocument = global.document;
   const document = dashboardDocument();
   global.document = document;
 
   try {
-    dashboard.renderApplicationHealth(dashboard.targetPresentation(targetSummary("UP", "ok")));
+    dashboard.renderApplicationStatus(dashboard.targetPresentation(targetSummary("UP", "ok")));
     dashboard.renderError(new Error("summary unavailable"));
 
-    const health = document.getElementById("health");
-    const tooltip = document.getElementById("application-health-tooltip");
-    assert.equal(health.textContent, "API error");
-    assert.equal(health.title, "App health unavailable because the dashboard API request failed.");
-    assert.equal(health.attributes["aria-label"], health.title);
-    assert.equal(tooltip.textContent, health.title);
+    const status = document.getElementById("app-status");
+    const tooltip = document.getElementById("app-status-tooltip");
+    assert.equal(status.textContent, "API error");
+    assert.equal(status.title, "App status unavailable because the dashboard API request failed.");
+    assert.equal(status.attributes["aria-label"], status.title);
+    assert.equal(tooltip.textContent, status.title);
     assert.doesNotMatch(tooltip.textContent, /positive health/);
   } finally {
     global.document = originalDocument;
@@ -345,33 +345,33 @@ test("targetPresentation trims health and normalizes health and poll status case
   assert.equal(whitespaceOnly.authoritativeHealth, false);
 });
 
-test("application health card keeps one value line and explains details in its help tooltip", () => {
+test("app status card keeps one value line and explains its source in the help tooltip", () => {
   const originalDocument = global.document;
   const document = dashboardDocument();
   global.document = document;
 
   try {
-    dashboard.renderApplicationHealth(dashboard.targetPresentation(targetSummary("", "ok")));
-    assert.match(document.getElementById("health").innerHTML, />UP</);
-    assert.equal(document.getElementById("application-health-tooltip").textContent, "No explicit application health signal is available. UP is based on successful metrics collection.");
+    dashboard.renderApplicationStatus(dashboard.targetPresentation(targetSummary("", "ok")));
+    assert.match(document.getElementById("app-status").innerHTML, />UP</);
+    assert.equal(document.getElementById("app-status-tooltip").textContent, "No explicit application health signal is available. UP is based on successful metrics collection.");
 
-    dashboard.renderApplicationHealth(dashboard.targetPresentation(targetSummary("OK", "ok")));
-    assert.match(document.getElementById("health").innerHTML, />UP</);
-    assert.equal(document.getElementById("application-health-tooltip").textContent, "UP means the application reported positive health. Collection status: Reporting.");
-    assert.doesNotMatch(document.getElementById("health").attributes["aria-label"], /OK/);
+    dashboard.renderApplicationStatus(dashboard.targetPresentation(targetSummary("OK", "ok")));
+    assert.match(document.getElementById("app-status").innerHTML, />UP</);
+    assert.equal(document.getElementById("app-status-tooltip").textContent, "UP means the application reported positive health. Collection status: Reporting.");
+    assert.doesNotMatch(document.getElementById("app-status").attributes["aria-label"], /OK/);
 
-    dashboard.renderApplicationHealth(dashboard.targetPresentation(targetSummary("DOWN", "ok")));
-    assert.match(document.getElementById("health").innerHTML, />Unhealthy</);
-    assert.equal(document.getElementById("application-health-tooltip").textContent, "Application reported DOWN, shown as Unhealthy. Collection status: Reporting.");
-    assert.match(document.getElementById("health").attributes["aria-label"], /Unhealthy \(DOWN\).*Reporting/);
+    dashboard.renderApplicationStatus(dashboard.targetPresentation(targetSummary("DOWN", "ok")));
+    assert.match(document.getElementById("app-status").innerHTML, />Unhealthy</);
+    assert.equal(document.getElementById("app-status-tooltip").textContent, "Application reported DOWN, shown as Unhealthy. Collection status: Reporting.");
+    assert.match(document.getElementById("app-status").attributes["aria-label"], /App status: Unhealthy.*DOWN.*Reporting/);
 
-    dashboard.renderApplicationHealth(dashboard.targetPresentation(targetSummary("DEGRADED", "ok")));
-    assert.match(document.getElementById("health").innerHTML, />DEGRADED</);
-    assert.equal(document.getElementById("application-health-tooltip").textContent, "Application reported DEGRADED. Collection status: Reporting.");
+    dashboard.renderApplicationStatus(dashboard.targetPresentation(targetSummary("DEGRADED", "ok")));
+    assert.match(document.getElementById("app-status").innerHTML, />DEGRADED</);
+    assert.equal(document.getElementById("app-status-tooltip").textContent, "Application reported DEGRADED. Collection status: Reporting.");
 
-    dashboard.renderApplicationHealth(dashboard.targetPresentation(targetSummary("UP", "error")));
-    assert.match(document.getElementById("health").innerHTML, />DOWN</);
-    assert.equal(document.getElementById("application-health-tooltip").textContent, "StatLite cannot currently collect from the application. Last reported application health: UP.");
+    dashboard.renderApplicationStatus(dashboard.targetPresentation(targetSummary("UP", "error")));
+    assert.match(document.getElementById("app-status").innerHTML, />DOWN</);
+    assert.equal(document.getElementById("app-status-tooltip").textContent, "StatLite cannot currently collect from the application. Last reported application health: UP.");
   } finally {
     global.document = originalDocument;
   }
@@ -435,7 +435,7 @@ test("target context uses the shared presentation for one selected target", () =
     dashboard.renderTargetContext(targets, targets[0].metadata);
     assert.equal(document.getElementById("target-name").textContent, "api");
     assert.match(document.getElementById("target-status").className, /ok/);
-    assert.match(document.getElementById("target-status").attributes["aria-label"], /target is reporting/i);
+    assert.match(document.getElementById("target-status").attributes["aria-label"], /App status: UP based on successful metrics collection/i);
     assert.equal(document.getElementById("target-select").classList.toggles.hidden, true);
   } finally {
     global.document = originalDocument;
@@ -461,7 +461,7 @@ test("target selector distinguishes reporting, unavailable, and unhealthy target
       "unhealthy  🔴 Unhealthy (DOWN)",
       "new  ⚪ Not reporting"
     ]);
-    assert.match(document.getElementById("target-status").attributes["aria-label"], /Unhealthy \(DOWN\).*Reporting/);
+    assert.match(document.getElementById("target-status").attributes["aria-label"], /App status: Unhealthy based on application-reported health \(DOWN\).*Reporting/);
   } finally {
     global.document = originalDocument;
   }

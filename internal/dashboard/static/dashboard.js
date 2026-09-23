@@ -298,7 +298,7 @@ function renderSummary(summary) {
   const targets = summary.targets || [];
   renderTargetContext(targets, selected);
   renderFooterSummary(targets);
-  renderApplicationHealth(targetPresentation({ latest, status: monitor }));
+  renderApplicationStatus(targetPresentation({ latest, status: monitor }));
   renderDatabaseHealth(result.db_health_status);
   setText("process-start", formatDateTime(result.process_start_time));
   renderRestart(summary);
@@ -348,17 +348,17 @@ function targetPresentation(target) {
     tone = "warn";
   }
 
-  const healthDescription = currentFailure
-    ? "Application availability: DOWN because collection is failing" + (rawHealth ? "; last reported application health: " + rawHealth : "")
+  const statusDescription = currentFailure
+    ? "App status: DOWN because StatLite cannot currently collect from the application" + (rawHealth ? "; last reported application health: " + rawHealth : "")
     : rawHealth
-      ? "Application health: " + label + (healthDetail ? " (" + healthDetail + ")" : "")
+      ? "App status: " + label + " based on application-reported health" + (healthDetail ? " (" + healthDetail + ")" : "")
       : reportingState === "Reporting"
-        ? "Authoritative application health unavailable; target is reporting and shown as UP"
-        : "Authoritative application health unavailable; target is " + reportingState.toLowerCase();
+        ? "App status: UP based on successful metrics collection; no explicit application health signal is available"
+        : "App status: " + reportingState + "; no explicit application health signal is available";
   return {
     label,
     tone,
-    accessibleLabel: healthDescription + "; reporting status: " + reportingState,
+    accessibleLabel: statusDescription + "; reporting status: " + reportingState,
     selectorSuffix: presentationSymbol(tone) + " " + label + (healthDetail && label === "Unhealthy" ? " (" + healthDetail + ")" : ""),
     reportingState,
     reporting: reportingState === "Reporting",
@@ -373,13 +373,13 @@ function presentationSymbol(tone) {
   return "\u{26AA}";
 }
 
-function renderApplicationHealth(presentation) {
-  const health = document.getElementById("health");
-  health.innerHTML = '<span class="pill ' + presentation.tone + '">' + escapeHTML(presentation.label) + '</span>';
-  health.title = presentation.accessibleLabel;
-  health.setAttribute("aria-label", presentation.accessibleLabel);
+function renderApplicationStatus(presentation) {
+  const status = document.getElementById("app-status");
+  status.innerHTML = '<span class="pill ' + presentation.tone + '">' + escapeHTML(presentation.label) + '</span>';
+  status.title = presentation.accessibleLabel;
+  status.setAttribute("aria-label", presentation.accessibleLabel);
 
-  const tooltip = document.getElementById("application-health-tooltip");
+  const tooltip = document.getElementById("app-status-tooltip");
   if (presentation.reportingState === "Unavailable") {
     tooltip.textContent = "StatLite cannot currently collect from the application." +
       (presentation.authoritativeHealth ? " Last reported application health: " + presentation.rawHealth + "." : "");
@@ -659,12 +659,12 @@ function createEventRow(event, elementName = "div") {
 }
 
 function renderError(error) {
-  const health = document.getElementById("health");
-  const explanation = "App health unavailable because the dashboard API request failed.";
-  health.textContent = "API error";
-  health.title = explanation;
-  health.setAttribute("aria-label", explanation);
-  document.getElementById("application-health-tooltip").textContent = explanation;
+  const status = document.getElementById("app-status");
+  const explanation = "App status unavailable because the dashboard API request failed.";
+  status.textContent = "API error";
+  status.title = explanation;
+  status.setAttribute("aria-label", explanation);
+  document.getElementById("app-status-tooltip").textContent = explanation;
   document.getElementById("latest-json").textContent = String(error);
 }
 
@@ -775,6 +775,6 @@ function initDashboard() {
   refreshWhenVisible();
 }
 
-const dashboardTestHooks = { detectCapabilities, foldRepeatedEvents, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, openEventGroupKeys, refresh, refreshWhenVisible, renderApplicationHealth, renderDatabaseHealth, renderError, renderFooterSummary, renderPollStatus, renderRangeSelection, renderSeries, renderTargetContext, runtimeHelp, shouldRenderSeries, state, targetPresentation, targetTypeHelp, validDiskPoint };
+const dashboardTestHooks = { detectCapabilities, foldRepeatedEvents, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, openEventGroupKeys, refresh, refreshWhenVisible, renderApplicationStatus, renderDatabaseHealth, renderError, renderFooterSummary, renderPollStatus, renderRangeSelection, renderSeries, renderTargetContext, runtimeHelp, shouldRenderSeries, state, targetPresentation, targetTypeHelp, validDiskPoint };
 if (typeof module !== "undefined" && module.exports) module.exports = dashboardTestHooks;
 if (typeof document !== "undefined") initDashboard();

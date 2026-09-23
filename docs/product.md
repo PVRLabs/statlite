@@ -158,14 +158,15 @@ health.
 
 ### Dashboard status language
 
-The dashboard's **App health** card answers the practical question "is my app
-up?" using a compact operational vocabulary. In the StatLite UI, `UP` is the
-positive app status: it means either that the application reported positive
-health or that StatLite is successfully receiving metrics when no explicit
-health signal is available. The card's hint identifies which signal produced
-the status.
+The dashboard's **App status** card gives a compact operational view of the
+latest application signal. `UP` means either that the application reported
+positive health or that StatLite is successfully receiving metrics when no
+explicit health signal is available. `DOWN` means StatLite cannot currently
+collect from the application. The card's hint identifies which signal
+produced the status and shows the last reported health when collection is
+failing.
 
-| Current state | App health display |
+| Current state | App status display |
 | --- | --- |
 | Successful collection with explicit positive health | `UP` |
 | Successful collection without explicit health | `UP` |
@@ -174,8 +175,10 @@ the status.
 | No completed poll | `Not reporting` |
 
 These are presentation labels only. Health fields remain optional and preserve
-only explicit source values; reporting, unavailable, and not-yet-reporting
-remain the underlying collection concepts.
+only explicit source values; successful reporting, unavailable collection, and
+not-yet-reporting remain the underlying collection concepts. A displayed `UP`
+or `DOWN` derived from collection does not synthesize or persist application
+health.
 
 The **DB health** card shows `Not reported` in neutral gray when the integration
 provides no database health signal. Reported healthy states are green; reported
@@ -228,10 +231,10 @@ remain distinct. Health fields preserve optional source values, poll status
 records whether collection succeeded, and the dashboard derives reporting
 availability from the latest poll and monitor state. For quick scanning, the
 dashboard presents successful reporting as `UP` when explicit application
-health is absent and presents a current collection failure as `DOWN`. Its hint
-identifies the signal source. These labels do not synthesize application health:
-the underlying collection states remain reporting, unavailable, or not yet
-reporting.
+health is absent and presents a current collection failure as `DOWN`. The App
+status hint identifies the signal source. These labels do not synthesize
+application health: the underlying collection states remain reporting,
+unavailable, or not yet reporting.
 
 Source-specific metric names should not leak into storage or primary dashboard
 paths. For example, Actuator and StatLite Metrics fields are mapped to shared
