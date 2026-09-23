@@ -1026,6 +1026,12 @@ func openTestStore(t *testing.T) *storage.Store {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	if err := store.RegisterTargets(t.Context(), []storage.TargetIdentity{
+		{Name: "app", Type: "spring"}, {Name: "alpha", Type: "spring"},
+		{Name: "beta", Type: "statlite-metrics"},
+	}); err != nil {
+		t.Fatalf("RegisterTargets() error = %v", err)
+	}
 	return store
 }
 

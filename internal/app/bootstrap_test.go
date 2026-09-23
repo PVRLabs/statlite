@@ -47,6 +47,9 @@ func TestMonitorStartsWithUnreachableTargetAndRecovers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	if err := store.RegisterTargets(ctx, []storage.TargetIdentity{{Name: cfg.Targets[0].Name, Type: cfg.Targets[0].Type}}); err != nil {
+		t.Fatalf("RegisterTargets() error = %v", err)
+	}
 	defer func() {
 		cancel()
 		_ = store.Close()

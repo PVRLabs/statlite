@@ -173,6 +173,9 @@ func TestHealthStatusRoundTripsIndependentlyFromPollStatus(t *testing.T) {
 
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if err := store.RegisterTargets(t.Context(), []TargetIdentity{{Name: tt.name, Type: "spring"}}); err != nil {
+				t.Fatal(err)
+			}
 			at := time.Date(2026, 9, 8, 12, i, 0, 0, time.UTC)
 			result := &collector.CollectionResult{
 				TargetName:     tt.name,
@@ -213,7 +216,10 @@ func TestHealthStatusRoundTripsIndependentlyFromPollStatus(t *testing.T) {
 }
 
 func TestEnsureAppRunPreservesLegacyProcessStartTimeIdentity(t *testing.T) {
-	store := openTestStore(t)
+	store, err := Open(t.Context(), filepath.Join(t.TempDir(), "statlite.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer store.Close()
 
 	ctx := context.Background()
@@ -239,6 +245,9 @@ VALUES (?, ?, ?, ?)
 	wantID, err := result.LastInsertId()
 	if err != nil {
 		t.Fatalf("read legacy app run id: %v", err)
+	}
+	if err := store.RegisterTargets(ctx, []TargetIdentity{{Name: "app", Type: "spring"}}); err != nil {
+		t.Fatal(err)
 	}
 
 	gotID, err := store.EnsureAppRun(ctx, "app", &processStart, seenAt)
@@ -315,6 +324,9 @@ func TestSaveSpringContractResultRowDeltas(t *testing.T) {
 	if result.ProcessStartTime == nil {
 		t.Fatal("Spring contract ProcessStartTime = nil, want populated")
 	}
+	if err := store.RegisterTargets(ctx, []TargetIdentity{{Name: result.TargetName, Type: "spring"}}); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := store.EnsureAppRun(ctx, result.TargetName, result.ProcessStartTime, result.PollStartedAt.Add(-time.Second)); err != nil {
 		t.Fatalf("EnsureAppRun() error = %v", err)
 	}
@@ -389,7 +401,7 @@ func TestSaveCollectionResultRollsBackOnSampleInsertFailure(t *testing.T) {
 		t.Fatal("SaveCollectionResult() error = nil, want sample insert error")
 	}
 
-	assertTableCount(t, store, "targets", 0)
+	assertTableCount(t, store, "targets", 1)
 	assertTableCount(t, store, "polls", 0)
 	assertTableCount(t, store, "metric_samples", 0)
 }
@@ -1228,6 +1240,9 @@ func openTestStore(t *testing.T) *Store {
 	store, err := Open(context.Background(), filepath.Join(t.TempDir(), "statlite.sqlite"))
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
+	}
+	if err := store.RegisterTargets(t.Context(), []TargetIdentity{{Name: "app", Type: "spring"}}); err != nil {
+		t.Fatalf("RegisterTargets() error = %v", err)
 	}
 	return store
 }

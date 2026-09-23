@@ -34,7 +34,7 @@ func (s *Store) SaveCollectionResultWithAppRun(ctx context.Context, result *coll
 	}
 	defer tx.Rollback()
 
-	targetID, err := upsertTarget(ctx, tx, result.TargetName, result.PollStartedAt)
+	targetID, _, err := registeredTarget(ctx, tx, result.TargetName)
 	if err != nil {
 		return 0, err
 	}
@@ -80,20 +80,20 @@ func (s *Store) EnsureAppRun(ctx context.Context, targetName string, processStar
 	}
 	defer tx.Rollback()
 
-	targetID, err := upsertTarget(ctx, tx, targetName, seenAt)
+	targetID, targetType, err := registeredTarget(ctx, tx, targetName)
 	if err != nil {
 		return 0, err
 	}
 
 	var appRunID int64
 	if processStartTime != nil {
-		id, err := upsertAppRun(ctx, tx, targetID, processStartTime, seenAt)
+		id, err := upsertAppRun(ctx, tx, targetID, targetType, processStartTime, seenAt)
 		if err != nil {
 			return 0, err
 		}
 		appRunID = *id
 	} else {
-		id, err := insertAnonymousAppRun(ctx, tx, targetID, seenAt)
+		id, err := insertAnonymousAppRun(ctx, tx, targetID, targetType, seenAt)
 		if err != nil {
 			return 0, err
 		}
@@ -136,33 +136,17 @@ func (s *Store) appRunIDForResult(ctx context.Context, result *collector.Collect
 	return &id, nil
 }
 
-func upsertTarget(ctx context.Context, tx *sql.Tx, name string, now time.Time) (int64, error) {
-	if _, err := tx.ExecContext(ctx, `
-INSERT INTO targets (name, created_at)
-VALUES (?, ?)
-ON CONFLICT(name) DO NOTHING
-`, name, formatSortableTime(now)); err != nil {
-		return 0, fmt.Errorf("upsert target %q: %w", name, err)
-	}
-
-	var id int64
-	if err := tx.QueryRowContext(ctx, `SELECT id FROM targets WHERE name = ?`, name).Scan(&id); err != nil {
-		return 0, fmt.Errorf("query target %q: %w", name, err)
-	}
-	return id, nil
-}
-
-func upsertAppRun(ctx context.Context, tx *sql.Tx, targetID int64, processStartTime *time.Time, seenAt time.Time) (*int64, error) {
+func upsertAppRun(ctx context.Context, tx *sql.Tx, targetID int64, targetType string, processStartTime *time.Time, seenAt time.Time) (*int64, error) {
 	if processStartTime == nil {
 		return nil, nil
 	}
 
 	if _, err := tx.ExecContext(ctx, `
-INSERT INTO app_runs (target_id, process_start_time, first_seen_at, last_seen_at)
-VALUES (?, ?, ?, ?)
+INSERT INTO app_runs (target_id, process_start_time, first_seen_at, last_seen_at, target_type)
+VALUES (?, ?, ?, ?, ?)
 ON CONFLICT(target_id, process_start_time) DO UPDATE SET
   last_seen_at = excluded.last_seen_at
-`, targetID, formatIdentityTime(*processStartTime), formatSortableTime(seenAt), formatSortableTime(seenAt)); err != nil {
+`, targetID, formatIdentityTime(*processStartTime), formatSortableTime(seenAt), formatSortableTime(seenAt), targetType); err != nil {
 		return nil, fmt.Errorf("upsert app run: %w", err)
 	}
 
@@ -176,11 +160,11 @@ WHERE target_id = ? AND process_start_time = ?
 	return &id, nil
 }
 
-func insertAnonymousAppRun(ctx context.Context, tx *sql.Tx, targetID int64, seenAt time.Time) (int64, error) {
+func insertAnonymousAppRun(ctx context.Context, tx *sql.Tx, targetID int64, targetType string, seenAt time.Time) (int64, error) {
 	result, err := tx.ExecContext(ctx, `
-INSERT INTO app_runs (target_id, process_start_time, first_seen_at, last_seen_at)
-VALUES (?, NULL, ?, ?)
-`, targetID, formatSortableTime(seenAt), formatSortableTime(seenAt))
+INSERT INTO app_runs (target_id, process_start_time, first_seen_at, last_seen_at, target_type)
+VALUES (?, NULL, ?, ?, ?)
+`, targetID, formatSortableTime(seenAt), formatSortableTime(seenAt), targetType)
 	if err != nil {
 		return 0, fmt.Errorf("insert app run: %w", err)
 	}

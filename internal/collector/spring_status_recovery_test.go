@@ -75,6 +75,9 @@ func TestSpringIncompleteStatusAggregateDoesNotFabricateRecoveryDelta(t *testing
 				t.Fatalf("storage.Open() error = %v", err)
 			}
 			defer store.Close()
+			if err := store.RegisterTargets(t.Context(), []storage.TargetIdentity{{Name: "app", Type: "spring"}}); err != nil {
+				t.Fatalf("RegisterTargets() error = %v", err)
+			}
 
 			base := time.Date(2026, 9, 8, 10, 0, 0, 0, time.UTC)
 			appRunID, err := store.EnsureAppRun(context.Background(), "app", &base, base)

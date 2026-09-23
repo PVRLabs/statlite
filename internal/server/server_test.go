@@ -202,6 +202,7 @@ func TestDebugPollNowCannotBypassNoPoll(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 	targetCollector := &countingCollector{}
 	mon := newServerTestMonitor(t, "app", store, targetCollector)
@@ -230,6 +231,7 @@ func TestFrozenDashboardTimeControlsSummaryRangesAndRestartLookup(t *testing.T) 
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 	frozen := time.Date(2024, 3, 4, 12, 0, 0, 0, time.UTC)
 	pollAt := frozen.Add(-30 * time.Minute)
@@ -702,6 +704,7 @@ func TestStatliteMetricsReportsSQLiteDatabaseStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 
 	mon := newServerTestMonitor(t, "statlite-self", store, &noopCollector{})
@@ -736,6 +739,7 @@ func TestStorageHealthCheckCachesAndRefreshesWithoutBlockingEndpoints(t *testing
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 
 	mon := newServerTestMonitor(t, "statlite-self", store, &noopCollector{})
@@ -830,6 +834,7 @@ func TestHealthzStaysOKWhenTargetPollingFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 	mon, err := monitor.New("app", collector.NewSpringActuatorCollector("app", client, false), store, time.Minute)
 	if err != nil {
@@ -879,6 +884,7 @@ func TestHealthzReportsErrorWhenStorageUnhealthy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	mon, err := monitor.New("app", collector.NewSpringActuatorCollector("app", client, false), store, time.Minute)
 	if err != nil {
 		store.Close()
@@ -954,6 +960,7 @@ func TestDebugEndpointsAllowConcurrentPollAndLatestAccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 	mon, err := monitor.New("app", collector.NewSpringActuatorCollector("app", client, false), store, time.Minute)
 	if err != nil {
@@ -1053,6 +1060,7 @@ func TestHandleSeriesReturnsDataAfterPoll(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 	mon, err := monitor.New("app", collector.NewSpringActuatorCollector("app", client, false), store, time.Minute)
 	if err != nil {
@@ -1096,6 +1104,7 @@ func TestHandleSeriesSerializesHostResourceFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 
 	now := time.Now().UTC()
@@ -1162,6 +1171,7 @@ func TestHandleSeriesReturnsDeltasAfterTwoPolls(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 
 	now := time.Now()
@@ -1268,6 +1278,7 @@ func TestSummaryReturnsAllTargetsAndSelectedTarget(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 
 	start := time.Date(2026, 7, 7, 10, 0, 0, 0, time.UTC)
@@ -1398,6 +1409,7 @@ func TestTargetAwareAPIsRouteToSelectedTarget(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 
 	start := time.Now().UTC().Add(-10 * time.Minute)
@@ -1477,6 +1489,7 @@ func TestSeriesClampsCustomRangeToRetentionCutoff(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 
 	now := time.Now().UTC()
@@ -1527,6 +1540,7 @@ func TestEventsClampsCustomRangeToRetentionCutoff(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 
 	now := time.Now().UTC()
@@ -1574,6 +1588,7 @@ func TestHandleSeriesReturns400ForInvalidRange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 	mon, err := monitor.New("app", &noopCollector{}, store, time.Minute)
 	if err != nil {
@@ -1613,6 +1628,7 @@ func TestHandleEventsReturnsEmptyWithoutData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 	mon, err := monitor.New("app", &noopCollector{}, store, time.Minute)
 	if err != nil {
@@ -1647,6 +1663,7 @@ func TestHandleEventsReturns400ForInvalidRange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 	mon, err := monitor.New("app", &noopCollector{}, store, time.Minute)
 	if err != nil {
@@ -1686,6 +1703,7 @@ func TestHandleSummaryIgnoresInvalidRange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 	mon := newServerTestMonitor(t, "app", store, &noopCollector{})
 	statlite := New("127.0.0.1:0", mon)
@@ -1714,6 +1732,7 @@ func TestHandleSummarySurvivesRestartLookupFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	mon := newServerTestMonitor(t, "app", store, &noopCollector{})
 	statlite := New("127.0.0.1:0", mon)
 	server := httptest.NewServer(statlite.httpServer.Handler)
@@ -1766,6 +1785,7 @@ func TestHandleSeriesAggregatesDense7dWithScale(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 
 	// Align poll times to "now" so range=7d includes them.
@@ -1824,6 +1844,7 @@ func TestHandleSeriesKeepsSparse1hResolution(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 
 	// Keep both ends safely inside the live 1h window. Ending exactly at the
@@ -1865,6 +1886,7 @@ func TestHandleSeriesKeepsDense1hResolution(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 
 	end := time.Now().UTC().Truncate(time.Minute)
@@ -1920,6 +1942,7 @@ func TestHandleEventsHonorsCallerLimitAndDefaultsToAll(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 	const eventLimit = 20
 
@@ -1990,6 +2013,7 @@ func TestHandleEventsRejectsInvalidLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 	mon := newServerTestMonitor(t, "app", store, &noopCollector{})
 	statlite := New("127.0.0.1:0", mon)
@@ -2013,6 +2037,7 @@ func TestSummaryLatestRestartIndependentOfEventsLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 
 	base := time.Date(2026, 7, 7, 10, 0, 0, 0, time.UTC)
@@ -2089,6 +2114,7 @@ func TestHandleLatestReturns404WhenNoData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 	mon, err := monitor.New("app", &noopCollector{}, store, time.Minute)
 	if err != nil {
@@ -2113,6 +2139,7 @@ func TestHandleMonitorStatusReturnsJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 	mon, err := monitor.New("app", &noopCollector{}, store, time.Minute)
 	if err != nil {
@@ -2144,6 +2171,7 @@ func TestMultiTargetDebugEndpointsRouteToSelectedTarget(t *testing.T) {
 	if err != nil {
 		t.Fatalf("storage.Open() error = %v", err)
 	}
+	registerServerTestTargets(t, store)
 	defer store.Close()
 
 	start := time.Now().UTC().Add(-10 * time.Minute)
@@ -2593,6 +2621,20 @@ func mustSingleServerTestManager(t *testing.T, mon *monitor.Monitor) *monitor.Ma
 		t.Fatalf("monitor.NewManager() error = %v", err)
 	}
 	return manager
+}
+
+func registerServerTestTargets(t *testing.T, store *storage.Store) {
+	t.Helper()
+	identities := []storage.TargetIdentity{
+		{Name: "app", Type: "spring"},
+		{Name: "host", Type: "spring"},
+		{Name: "alpha", Type: "spring"},
+		{Name: "beta", Type: "spring"},
+		{Name: "gamma", Type: "spring"},
+	}
+	if err := store.RegisterTargets(t.Context(), identities); err != nil {
+		t.Fatalf("RegisterTargets() error = %v", err)
+	}
 }
 
 func newServerTestMonitor(t *testing.T, name string, store *storage.Store, collector monitor.Collector) *monitor.Monitor {

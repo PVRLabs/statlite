@@ -3,15 +3,19 @@ package main
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"errors"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pvrlabs/statlite/internal/config"
 	"github.com/pvrlabs/statlite/internal/inspect"
+	"github.com/pvrlabs/statlite/internal/storage"
 	"github.com/pvrlabs/statlite/internal/version"
 )
 
@@ -72,7 +76,82 @@ func TestStatliteEntrypointHelper(t *testing.T) {
 		return
 	}
 	os.Args = []string{"statlite", "--config", os.Getenv("STATLITE_ENTRYPOINT_CONFIG")}
+	if os.Getenv("STATLITE_ENTRYPOINT_NO_POLL") == "1" {
+		os.Args = append(os.Args, "--no-poll")
+	}
 	main()
+}
+
+func TestConflictingTargetFailsBeforeNoPollServiceStarts(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "statlite.sqlite")
+	store, err := storage.Open(t.Context(), dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RegisterTargets(t.Context(), []storage.TargetIdentity{{Name: "existing", Type: "spring"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	address := listener.Addr().String()
+	listener.Close()
+	configPath := filepath.Join(dir, "statlite.yaml")
+	config := `server:
+  listen: "` + address + `"
+storage:
+  sqlite_path: "` + dbPath + `"
+polling:
+  interval: "30s"
+targets:
+  - name: "new"
+    type: "spring"
+    url: "http://127.0.0.1:1/actuator"
+  - name: "existing"
+    type: "quarkus"
+    url: "http://127.0.0.1:1/q/metrics"
+`
+	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestStatliteEntrypointHelper$")
+	cmd.Env = append(os.Environ(), "STATLITE_ENTRYPOINT_HELPER=1", "STATLITE_ENTRYPOINT_CONFIG="+configPath, "STATLITE_ENTRYPOINT_NO_POLL=1")
+	output, err := cmd.CombinedOutput()
+	if ctx.Err() != nil {
+		t.Fatalf("startup did not reject conflicting identity: %v", ctx.Err())
+	}
+	if exitErr, ok := err.(*exec.ExitError); !ok || exitErr.ExitCode() != 1 {
+		t.Fatalf("startup error = %v, output=%q", err, output)
+	}
+	for _, want := range []string{`"existing"`, `"spring"`, `"quarkus"`, "use a new target name"} {
+		if !strings.Contains(string(output), want) {
+			t.Fatalf("startup output %q missing %q", output, want)
+		}
+	}
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var count int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM targets WHERE name = 'new'`).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("partial target registration: count=%d err=%v", count, err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM polls`).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("polls after failed startup: count=%d err=%v", count, err)
+	}
+	probe, err := net.Listen("tcp", address)
+	if err != nil {
+		t.Fatalf("startup bound listener %q: %v", address, err)
+	}
+	probe.Close()
 }
 
 func TestPrintVersion(t *testing.T) {

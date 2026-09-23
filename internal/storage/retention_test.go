@@ -104,6 +104,9 @@ func TestCleanupRetentionDoesNotLogWhenNothingDeleted(t *testing.T) {
 
 func saveRetentionTestPoll(t *testing.T, store *Store, startedAt time.Time) {
 	t.Helper()
+	if err := store.RegisterTargets(t.Context(), []TargetIdentity{{Name: "app", Type: "spring"}}); err != nil {
+		t.Fatalf("RegisterTargets() error = %v", err)
+	}
 	result := &collector.CollectionResult{
 		TargetName:     "app",
 		PollStartedAt:  startedAt,

@@ -160,6 +160,14 @@ func runMonitor(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	defer store.Close()
+	identities := make([]storage.TargetIdentity, 0, len(cfg.Targets))
+	for _, target := range cfg.Targets {
+		identities = append(identities, storage.TargetIdentity{Name: target.Name, Type: target.Type})
+	}
+	if err := store.RegisterTargets(ctx, identities); err != nil {
+		logger.Printf("storage: %v", err)
+		return 1
+	}
 	retentionCutoff := storage.NewRetentionCutoffTracker(cfg.Storage.RetentionDays)
 
 	manager, err := app.NewMonitorManager(cfg.Targets, store, timeout, interval)

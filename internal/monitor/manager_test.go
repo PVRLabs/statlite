@@ -150,6 +150,9 @@ func TestManagerResolveTargetPrefersRequestedThenProblemsThenFirst(t *testing.T)
 func TestManagerSummariesAndResolutionKeepHealthSeparateFromReporting(t *testing.T) {
 	store := openTestStore(t)
 	defer store.Close()
+	if err := store.RegisterTargets(t.Context(), []storage.TargetIdentity{{Name: "reporting", Type: "spring"}, {Name: "unhealthy", Type: "spring"}}); err != nil {
+		t.Fatal(err)
+	}
 
 	start := time.Date(2026, 9, 8, 10, 0, 0, 0, time.UTC)
 	reportingResult := namedSuccessfulResult("reporting", start, 1, 0.1)
