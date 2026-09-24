@@ -120,6 +120,7 @@ func NewWithManagerRetentionCutoffAndFilesystem(listen string, manager *monitor.
 	mux.HandleFunc("/api/latest", s.handleLatest)
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/monitor/status", s.handleMonitorStatus)
+	mux.HandleFunc("/api/v1/status", s.handlePublicStatus)
 	mux.HandleFunc("/debug/poll-now", s.handleDebugPollNow)
 	mux.HandleFunc("/debug/latest", s.handleLatest)
 
@@ -144,7 +145,7 @@ func (s *Server) FreezeDashboardTime(now time.Time) {
 func monitorManagerForSingleTarget(mon *monitor.Monitor) (*monitor.Manager, error) {
 	name := mon.TargetName()
 	return monitor.NewManager([]monitor.ManagedTarget{{
-		Metadata: monitor.TargetMetadata{Name: name},
+		Metadata: monitor.TargetMetadata{Name: name, Type: mon.IntegrationType()},
 		Monitor:  mon,
 	}})
 }

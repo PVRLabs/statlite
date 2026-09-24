@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/pvrlabs/statlite/internal/collector"
+	"github.com/pvrlabs/statlite/internal/config"
 	"github.com/pvrlabs/statlite/internal/storage"
 )
 
@@ -34,6 +35,7 @@ type Monitor struct {
 	status   Status
 	latest   *storage.Snapshot
 	previous *storage.Snapshot
+	health   HealthObservation
 }
 
 const defaultStartupFollowUpDelay = 3 * time.Second
@@ -52,6 +54,27 @@ type Status struct {
 	LastPollErrorSummary       string     `json:"last_poll_error_summary,omitempty"`
 	LastStoredPollID           int64      `json:"last_stored_poll_id,omitempty"`
 	LastSuccessfulStoredPollID int64      `json:"last_successful_stored_poll_id,omitempty"`
+}
+
+// HealthObservation is the health reported by the newest collection attempt.
+// Reported is false when that attempt did not provide either health value.
+type HealthObservation struct {
+	Application string
+	Dependency  string
+	ObservedAt  time.Time
+	Reported    bool
+}
+
+func healthObservation(result *collector.CollectionResult) HealthObservation {
+	if result == nil || (result.HealthStatus == "" && result.DBHealthStatus == "") {
+		return HealthObservation{}
+	}
+	return HealthObservation{
+		Application: result.HealthStatus,
+		Dependency:  result.DBHealthStatus,
+		ObservedAt:  result.PollFinishedAt.UTC(),
+		Reported:    true,
+	}
 }
 
 func New(targetName string, collector Collector, store *storage.Store, interval time.Duration) (*Monitor, error) {
@@ -109,6 +132,7 @@ func (m *Monitor) EnableNoPoll(ctx context.Context) error {
 	m.statusMu.Lock()
 	defer m.statusMu.Unlock()
 	m.latest = snapshot
+	m.health = healthObservation(&snapshot.Result)
 	m.status.LastPollAt = &at
 	m.status.LastStoredPollID = snapshot.PollID
 	if successfulErr == nil {
@@ -131,6 +155,21 @@ func (m *Monitor) TargetName() string {
 	return m.targetName
 }
 
+// IntegrationType identifies a built-in collector used by the legacy
+// single-monitor server constructor. Configured managers supply their type.
+func (m *Monitor) IntegrationType() string {
+	switch m.collector.(type) {
+	case *collector.SpringActuatorCollector:
+		return config.TargetTypeSpring
+	case *collector.QuarkusCollector:
+		return config.TargetTypeQuarkus
+	case *collector.StatliteMetricsCollector:
+		return config.TargetTypeStatliteMetrics
+	default:
+		return ""
+	}
+}
+
 func (m *Monitor) PollNow(ctx context.Context) (*storage.Snapshot, error) {
 	if m.noPoll.Load() {
 		return nil, ErrPollingDisabled
@@ -141,10 +180,13 @@ func (m *Monitor) PollNow(ctx context.Context) (*storage.Snapshot, error) {
 	if m.previous == nil {
 		previous, err := m.store.LatestSuccessfulSnapshot(ctx, m.targetName)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			m.recordFailure(time.Now().UTC(), 0, fmt.Sprintf("load previous successful poll: %v", err), nil, nil)
 			return nil, err
 		}
 		if err == nil {
+			m.statusMu.Lock()
 			m.previous = previous
+			m.statusMu.Unlock()
 		}
 	}
 
@@ -166,7 +208,7 @@ func (m *Monitor) PollNow(ctx context.Context) (*storage.Snapshot, error) {
 	if collectErr == nil && !hasErrorEvent(result.Events) {
 		id, restartDetected, reason, err := m.detectAppRun(ctx, result)
 		if err != nil {
-			m.recordFailure(result.PollFinishedAt, 0, fmt.Sprintf("detect app run: %v", err), nil)
+			m.recordFailure(result.PollFinishedAt, 0, fmt.Sprintf("detect app run: %v", err), nil, result)
 			return nil, err
 		}
 		appRunID = &id
@@ -181,13 +223,13 @@ func (m *Monitor) PollNow(ctx context.Context) (*storage.Snapshot, error) {
 
 	pollID, saveErr := m.store.SaveCollectionResultWithAppRun(ctx, result, appRunID)
 	if saveErr != nil {
-		m.recordFailure(result.PollFinishedAt, 0, fmt.Sprintf("store poll: %v", saveErr), nil)
+		m.recordFailure(result.PollFinishedAt, 0, fmt.Sprintf("store poll: %v", saveErr), nil, result)
 		return nil, saveErr
 	}
 
 	snapshot, err := m.store.LatestSnapshot(ctx, m.targetName)
 	if err != nil {
-		m.recordFailure(result.PollFinishedAt, pollID, fmt.Sprintf("load stored poll: %v", err), nil)
+		m.recordFailure(result.PollFinishedAt, pollID, fmt.Sprintf("load stored poll: %v", err), nil, result)
 		return nil, err
 	}
 
@@ -196,7 +238,7 @@ func (m *Monitor) PollNow(ctx context.Context) (*storage.Snapshot, error) {
 		if collectErr != nil && summary == "" {
 			summary = collectErr.Error()
 		}
-		m.recordFailure(result.PollFinishedAt, pollID, summary, snapshot)
+		m.recordFailure(result.PollFinishedAt, pollID, summary, snapshot, result)
 		return snapshot, collectErr
 	}
 
@@ -214,6 +256,15 @@ func (m *Monitor) Status() Status {
 	m.statusMu.RLock()
 	defer m.statusMu.RUnlock()
 	return m.status
+}
+
+// CurrentState reads status, the last successful snapshot, and the newest
+// attempt's health from one completed monitor update. Snapshots are immutable
+// after publication.
+func (m *Monitor) CurrentState() (Status, *storage.Snapshot, HealthObservation) {
+	m.statusMu.RLock()
+	defer m.statusMu.RUnlock()
+	return m.status, m.previous, m.health
 }
 
 func (m *Monitor) StorageHealthy(ctx context.Context) bool {
@@ -322,7 +373,9 @@ func (m *Monitor) loadSuccessfulHistory(ctx context.Context) (*storage.Snapshot,
 	}
 	previous, err := m.store.LatestSuccessfulSnapshot(ctx, m.targetName)
 	if err == nil {
+		m.statusMu.Lock()
 		m.previous = previous
+		m.statusMu.Unlock()
 		return previous, true
 	}
 	if errors.Is(err, sql.ErrNoRows) {
@@ -383,6 +436,7 @@ func (m *Monitor) recordSuccess(at time.Time, pollID int64, snapshot *storage.Sn
 
 	m.latest = snapshot
 	m.previous = snapshot
+	m.health = healthObservation(&snapshot.Result)
 	m.status.LastPollAt = &at
 	m.status.LastSuccessfulPollAt = &at
 	m.status.ConsecutivePollFailures = 0
@@ -391,13 +445,14 @@ func (m *Monitor) recordSuccess(at time.Time, pollID int64, snapshot *storage.Sn
 	m.status.LastSuccessfulStoredPollID = pollID
 }
 
-func (m *Monitor) recordFailure(at time.Time, pollID int64, summary string, snapshot *storage.Snapshot) {
+func (m *Monitor) recordFailure(at time.Time, pollID int64, summary string, snapshot *storage.Snapshot, result *collector.CollectionResult) {
 	m.statusMu.Lock()
 	defer m.statusMu.Unlock()
 
 	if snapshot != nil {
 		m.latest = snapshot
 	}
+	m.health = healthObservation(result)
 	m.status.LastPollAt = &at
 	m.status.LastFailedPollAt = &at
 	m.status.ConsecutivePollFailures++

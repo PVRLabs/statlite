@@ -5,6 +5,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +16,74 @@ import (
 
 func (s *Server) selectedTarget(r *http.Request) monitor.ManagedTarget {
 	return s.manager.ResolveTarget(r.URL.Query().Get("target"))
+}
+
+func parsePublicQuery(r *http.Request, allowed ...string) (url.Values, error) {
+	query, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		return nil, fmt.Errorf("invalid query: %w", err)
+	}
+	allow := make(map[string]bool, len(allowed))
+	for _, name := range allowed {
+		allow[name] = true
+	}
+	for name, values := range query {
+		if !allow[name] {
+			return nil, fmt.Errorf("unsupported query parameter %q", name)
+		}
+		if len(values) != 1 {
+			return nil, fmt.Errorf("query parameter %q must occur once", name)
+		}
+		if strings.TrimSpace(values[0]) == "" {
+			return nil, fmt.Errorf("query parameter %q must not be empty", name)
+		}
+	}
+	return query, nil
+}
+
+func selectPublicTarget(manager *monitor.Manager, query url.Values) (monitor.ManagedTarget, error) {
+	name := query.Get("target")
+	if name == "" {
+		names := manager.Names()
+		if len(names) != 1 {
+			return monitor.ManagedTarget{}, fmt.Errorf("target is required when multiple targets are configured")
+		}
+		name = names[0]
+	}
+	target, ok := manager.ExactTarget(name)
+	if !ok {
+		return monitor.ManagedTarget{}, fmt.Errorf("unknown target %q", name)
+	}
+	return target, nil
+}
+
+func parsePublicEventsOptions(query url.Values) (time.Duration, int, error) {
+	rangeValue := query.Get("range")
+	var window time.Duration
+	switch rangeValue {
+	case "", "1h":
+		window = time.Hour
+	case "5m":
+		window = 5 * time.Minute
+	case "24h":
+		window = 24 * time.Hour
+	default:
+		return 0, 0, fmt.Errorf("unsupported range %q; use 5m, 1h, or 24h", rangeValue)
+	}
+	limit := 100
+	if value := query.Get("limit"); value != "" {
+		for _, digit := range value {
+			if digit < '0' || digit > '9' {
+				return 0, 0, fmt.Errorf("limit must be a positive integer at most 500")
+			}
+		}
+		parsed, err := strconv.Atoi(value)
+		if err != nil || parsed < 1 || parsed > 500 {
+			return 0, 0, fmt.Errorf("limit must be a positive integer at most 500")
+		}
+		limit = parsed
+	}
+	return window, limit, nil
 }
 
 func (s *Server) clampToRetention(start time.Time) (time.Time, time.Time, bool) {

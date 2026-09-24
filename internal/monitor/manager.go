@@ -121,6 +121,12 @@ func (m *Manager) ResolveTarget(name string) ManagedTarget {
 	return m.targets[m.order[0]]
 }
 
+// ExactTarget looks up a configured name without the dashboard's fallback.
+func (m *Manager) ExactTarget(name string) (ManagedTarget, bool) {
+	target, ok := m.targets[name]
+	return target, ok
+}
+
 func (m *Manager) Monitor(name string) *Monitor {
 	return m.ResolveTarget(name).Monitor
 }
