@@ -279,6 +279,10 @@ func (m *Monitor) Series(ctx context.Context, start, end time.Time) (*storage.Se
 	return m.store.Series(ctx, m.targetName, start, end)
 }
 
+func (m *Monitor) BoundedSeries(ctx context.Context, start, end, retentionCutoff time.Time) (*storage.Series, error) {
+	return m.store.BoundedSeries(ctx, m.targetName, start, end, retentionCutoff)
+}
+
 func (m *Monitor) Events(ctx context.Context, start, end time.Time, limit int) ([]storage.Event, error) {
 	return m.store.Events(ctx, m.targetName, start, end, limit)
 }

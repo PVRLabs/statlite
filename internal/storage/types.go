@@ -37,6 +37,8 @@ type HostDiskCurrent struct {
 }
 
 type SeriesPoint struct {
+	// publicCoverage supports public grouping and is never serialized.
+	publicCoverage        publicCounterCoverage
 	PollID                int64     `json:"poll_id,omitempty"`
 	Timestamp             time.Time `json:"timestamp"`
 	AppRunID              *int64    `json:"app_run_id,omitempty"`
@@ -54,6 +56,11 @@ type SeriesPoint struct {
 	HostDiskUsedBytes     *float64  `json:"host_disk_used_bytes"`
 	HostDiskTotalBytes    *float64  `json:"host_disk_total_bytes"`
 	HostDiskUsage         *float64  `json:"host_disk_usage"`
+}
+
+type publicCounterCoverage struct {
+	paired4xx bool
+	paired5xx bool
 }
 
 type Event struct {

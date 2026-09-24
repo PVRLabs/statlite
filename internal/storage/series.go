@@ -13,6 +13,63 @@ import (
 )
 
 func (s *Store) Series(ctx context.Context, targetName string, start, end time.Time) (*Series, error) {
+	return s.series(ctx, s.db, targetName, start, end, false, time.Time{})
+}
+
+type seriesQuerier interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+const PublicMetricsPollLimit = 4096
+
+// BoundedSeries reads at most PublicMetricsPollLimit polls before loading samples.
+// Counter baselines before retentionCutoff are ineligible. A read transaction
+// keeps the poll selection and counter baselines consistent.
+func (s *Store) BoundedSeries(ctx context.Context, targetName string, start, end, retentionCutoff time.Time) (*Series, error) {
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, fmt.Errorf("begin bounded series read: %w", err)
+	}
+	defer tx.Rollback()
+	series, err := s.series(ctx, tx, targetName, start, end, true, retentionCutoff)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit bounded series read: %w", err)
+	}
+	return series, nil
+}
+
+func publicPollIDs(ctx context.Context, db seriesQuerier, targetName string, start, end time.Time) ([]int64, error) {
+	rows, err := db.QueryContext(ctx, `
+SELECT p.id FROM targets t JOIN polls p ON p.target_id = t.id
+WHERE t.name = ? AND p.started_at >= ? AND p.started_at <= ?
+ORDER BY p.started_at ASC, p.id ASC LIMIT ?
+`, targetName, formatSortableTime(start), formatSortableTime(end), PublicMetricsPollLimit+1)
+	if err != nil {
+		return nil, fmt.Errorf("query public metric polls: %w", err)
+	}
+	defer rows.Close()
+	ids := make([]int64, 0)
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan public metric poll: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate public metric polls: %w", err)
+	}
+	if len(ids) > PublicMetricsPollLimit {
+		return nil, fmt.Errorf("public metrics poll limit exceeded: more than %d polls in window", PublicMetricsPollLimit)
+	}
+	return ids, nil
+}
+
+func (s *Store) series(ctx context.Context, db seriesQuerier, targetName string, start, end time.Time, bounded bool, retentionCutoff time.Time) (*Series, error) {
 	if strings.TrimSpace(targetName) == "" {
 		return nil, fmt.Errorf("target name is required")
 	}
@@ -37,11 +94,11 @@ func (s *Store) Series(ctx context.Context, targetName string, start, end time.T
 		"host_disk_used_bytes",
 		"host_disk_total_bytes",
 	}...)
-	previous, err := s.previousCounterValues(ctx, targetName, start, counterKeys)
+	previous, err := s.previousCounterValuesFrom(ctx, db, targetName, start, counterKeys, retentionCutoff)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.db.QueryContext(ctx, `
+	query := `
 SELECT
   p.id,
   p.started_at,
@@ -57,7 +114,25 @@ WHERE t.name = ?
   AND p.started_at <= ?
   AND ms.metric_key IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ORDER BY p.started_at ASC, p.id ASC, ms.metric_key ASC
-`, targetName, formatSortableTime(start), formatSortableTime(end), keys[0], keys[1], keys[2], keys[3], keys[4], keys[5], keys[6], keys[7], keys[8], keys[9], keys[10], keys[11], keys[12])
+`
+	args := []any{targetName, formatSortableTime(start), formatSortableTime(end)}
+	if bounded {
+		ids, err := publicPollIDs(ctx, db, targetName, start, end)
+		if err != nil {
+			return nil, err
+		}
+		if len(ids) == 0 {
+			return &Series{Start: start.UTC(), End: end.UTC(), Points: []SeriesPoint{}}, nil
+		}
+		query = strings.Replace(query, "  AND ms.metric_key IN", "  AND p.id IN ("+strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")+")\n  AND ms.metric_key IN", 1)
+		for _, id := range ids {
+			args = append(args, id)
+		}
+	}
+	for _, key := range keys {
+		args = append(args, key)
+	}
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query series samples: %w", err)
 	}
@@ -113,13 +188,13 @@ ORDER BY p.started_at ASC, p.id ASC, ms.metric_key ASC
 	return series, nil
 }
 
-func (s *Store) previousCounterValues(ctx context.Context, targetName string, start time.Time, keys []string) (map[string]counterValue, error) {
+func (s *Store) previousCounterValuesFrom(ctx context.Context, db seriesQuerier, targetName string, start time.Time, keys []string, retentionCutoff time.Time) (map[string]counterValue, error) {
 	previous := make(map[string]counterValue, len(keys))
 	for _, key := range keys {
 		var pollID int64
 		var appRunID sql.NullInt64
 		var value float64
-		err := s.db.QueryRowContext(ctx, `
+		query := `
 SELECT p.id, p.app_run_id, ms.value
 FROM polls p
 JOIN targets t ON t.id = p.target_id
@@ -128,9 +203,17 @@ WHERE t.name = ?
   AND p.started_at < ?
   AND ms.metric_key = ?
   AND ms.metric_kind = ?
+`
+		args := []any{targetName, formatSortableTime(start), key, collector.MetricKindCounter}
+		if !retentionCutoff.IsZero() {
+			query += "  AND p.started_at >= ?\n"
+			args = append(args, formatSortableTime(retentionCutoff))
+		}
+		query += `
 ORDER BY p.started_at DESC, p.id DESC
 LIMIT 1
-`, targetName, formatSortableTime(start), key, collector.MetricKindCounter).Scan(&pollID, &appRunID, &value)
+`
+		err := db.QueryRowContext(ctx, query, args...).Scan(&pollID, &appRunID, &value)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				continue
@@ -197,6 +280,10 @@ func buildSeriesPoint(poll *pollSamples, previous map[string]counterValue, start
 	point.HTTP404 = counterDelta(poll, previous, "http_404_total")
 	point.HTTP4xx = counterDelta(poll, previous, "http_4xx_total")
 	point.HTTP5xx = counterDelta(poll, previous, "http_5xx_total")
+	point.publicCoverage = publicCounterCoverage{
+		paired4xx: requestDelta != nil && point.HTTP4xx != nil && matchingCounterBaseline(previous, "http_requests_total", "http_4xx_total"),
+		paired5xx: requestDelta != nil && point.HTTP5xx != nil && matchingCounterBaseline(previous, "http_requests_total", "http_5xx_total"),
+	}
 	if requestDelta != nil && requestTimeDelta != nil && *requestDelta > 0 &&
 		matchingCounterBaseline(previous, "http_requests_total", "http_request_time_total_seconds") {
 		value := *requestTimeDelta / *requestDelta
