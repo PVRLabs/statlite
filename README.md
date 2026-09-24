@@ -149,6 +149,7 @@ application's environment.
 - [Installation](docs/install.md)
 - [Docker](docs/docker.md)
 - [Configuration](docs/configuration.md)
+- [External API v1](docs/api.md)
 - [Deprecations and compatibility](docs/deprecations.md)
 - [Supported integrations](docs/integrations.md)
 - [Public integration testing](docs/integration-testing.md)

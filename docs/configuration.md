@@ -368,8 +368,15 @@ Selected target and time range are stored in the query string, so you can bookma
 
 ## API notes
 
-* `/api/*` is early/internal and not yet a stable public API.
-* `/healthz` exposes process version and readiness. Monitored-target poll failures do not mark the process unhealthy; SQLite failure does (`status: "error"`, HTTP 503).
+* The read-only `/api/v1/status`, `/api/v1/events`, and `/api/v1/metrics`
+  endpoints are the supported external automation API. See the [External API
+  reference](api.md) for fields, bounds, examples, and access assumptions.
+  Other dashboard `/api/*` routes are internal and are not a compatibility
+  contract.
+* `/healthz` exposes process version and storage readiness. Monitored-target
+  poll failures do not mark the process unhealthy; SQLite failure does
+  (`status: "error"`, HTTP 503). Use `/api/v1/status` for target collection and
+  reported application/dependency health.
 
 ## Example files
 
