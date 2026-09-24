@@ -72,7 +72,7 @@ func publicStatus(name, targetType string, status monitor.Status, successful *st
 		}
 	}
 	if status.LastPollErrorSummary != "" {
-		errorText := publicCollectionError(status.LastPollErrorSummary)
+		errorText := publicDiagnosticMessage(status.LastPollErrorSummary)
 		response.LastCollectionError = &errorText
 	}
 
@@ -101,11 +101,11 @@ func publicStatus(name, targetType string, status monitor.Status, successful *st
 	return response
 }
 
-func publicCollectionError(summary string) string {
+func publicDiagnosticMessage(message string) string {
 	// Transport errors often repeat the endpoint address after the URL (for
 	// example, in a dial error). Project the whole message to a safe category.
-	if publicURL.MatchString(summary) {
+	if publicURL.MatchString(message) {
 		return "collection request failed"
 	}
-	return summary
+	return message
 }
