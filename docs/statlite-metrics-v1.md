@@ -157,6 +157,14 @@ them when it deliberately exposes the execution environment visible to its
 process; StatLite displays those values with that application target rather
 than creating a separate target.
 
+For a collocated deployment, StatLite self-monitoring reports basic CPU,
+memory, and disk signals for the host or execution environment visible to
+StatLite, independently through the StatLite self target.
+Application producers can focus on application and runtime metrics they
+measure reliably. In a container, these measurements may describe the
+container-visible environment rather than the physical VPS host.
+Self-monitoring does not supply measurements for a remote application host.
+
 The configured StatLite target name is authoritative. The application should
 not provide `target_name`, polling timestamps, or other StatLite-owned metadata.
 Producers copied from a documented framework integration should emit that

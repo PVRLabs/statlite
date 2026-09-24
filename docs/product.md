@@ -61,6 +61,14 @@ vocabulary. Unknown framework or exporter metrics, arbitrary labels, route
 dimensions, histogram buckets, and similar source-specific data remain
 unsupported unless separately approved.
 
+Application integrations should report application and runtime metrics they
+can measure reliably. StatLite self-monitoring supplies basic host CPU,
+memory, and disk signals for the host or execution environment visible to
+StatLite. Framework helpers do not need to reproduce that sampling. This
+provides useful visibility
+for a small collocated VPS deployment without making StatLite a general host
+monitoring system.
+
 When prioritizing integrations, application-level HTTP signals have the
 highest value: request volume, HTTP status and error rates (especially 4xx and
 5xx), and latency. Health is also valuable when the target exposes an
@@ -189,8 +197,12 @@ non-healthy states use warning or error styling.
 For a collocated deployment, configure application targets (`spring`, `quarkus`,
 or `statlite-metrics`) for application and process data, and `statlite-self`
 through `/statlite/metrics` to monitor StatLite itself. The self response also
-provides the local host CPU, memory, and SQLite-filesystem disk capacity, so
+provides CPU and memory for the host or execution environment visible to
+StatLite, plus capacity for the filesystem containing its SQLite database, so
 one target presents StatLite's application, process, and host resources.
+Those host measurements belong to the StatLite self target, not each
+application target; consumers of per-target series should select it
+separately for trends in StatLite's visible environment.
 
 Host fields in `statlite-metrics/v1` remain optional for applications that
 deliberately expose the execution environment visible to their process. Those

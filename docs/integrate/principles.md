@@ -24,6 +24,21 @@ In particular:
 - A convenient measurement must not replace a semantically different one,
   such as process RSS in place of runtime-managed heap.
 
+## Keep host collection with the host observer
+
+Application integrations should report application and runtime metrics they
+can measure reliably. StatLite self-monitoring independently supplies basic
+CPU, memory, and disk measurements for the host or execution environment
+visible to StatLite. A Django, FastAPI, Express, Go, Spring, or other
+application integration does not need
+to collect host metrics for a collocated deployment. Keep the framework
+helper focused on its own application and process signals.
+
+Optional host fields in `statlite-metrics/v1` remain available when a producer
+deliberately measures its own execution environment, including a remote host.
+StatLite self-monitoring cannot observe a remote application's host. Host
+values stay attached to the target that reports them.
+
 ## Optimize for the normal application path
 
 Each integration should use the common, framework-native application path and

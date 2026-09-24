@@ -61,6 +61,14 @@ container memory, memory limits, or maximum heap values. First-class Spring
 Boot and Quarkus integrations report JVM heap used. StatLite self-monitoring
 reports current allocated Go heap with the same meaning as the Go helpers.
 
+Application integrations should focus on application and runtime signals they
+can measure reliably. On a collocated VPS, the StatLite self target supplies
+basic CPU, memory, and disk trends for the environment visible to StatLite.
+Framework helpers do not need to collect host metrics. See the
+[integration principles](principles.md)
+and [deployment topology](../product.md#deployment-topology) for the remote
+host boundary.
+
 ## Common guide structure
 
 Framework guides use this sequence:
