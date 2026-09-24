@@ -22,20 +22,13 @@ when a general-purpose observability stack is unnecessary. See `README.md` and
 * Make the smallest useful change and do not expand product scope without explicit approval.
 * Add tests where logic can regress, make errors descriptive, and keep docs in sync when behavior changes.
 * Use SQLite through Go `database/sql`. Prefer `modernc.org/sqlite` unless there is a concrete reason to switch.
-* Do not create commits unless the user explicitly approves committing after reviewing the changes.
+* Commit only when explicitly requested.
 * When the active implementation plan specifies an issue number, include it (for example, `#14`) in every related commit message.
 
 ## Product Boundaries
 
-Treat `docs/product.md` as the authoritative product and architecture scope.
-Unless explicitly requested, do not implement:
-
-* generic Prometheus or OpenMetrics targets or arbitrary scrape ingestion
-* arbitrary metric definitions
-* a full alert-management platform
-* logs or traces
-* plugin systems
-* Kubernetes-first deployment
+Follow `docs/product.md` for product scope; expand scope only when explicitly
+requested.
 
 ## Data Model Guardrails
 
@@ -47,17 +40,14 @@ Preserve the poll and storage model documented in `docs/product.md`:
 
 ## Verification
 
-When changing `internal/dashboard/static/index.html`, `dashboard.js`, or
-`dashboard.test.js`, run the dashboard unit tests locally:
-
 Use the `lite-tools` skill for routine npm/Node and Go test workflows.
 
-Go-only verification does not run the dashboard Node tests. When changing the
-dashboard, run its Node test separately:
+For dashboard changes, run
+`npm-lite node --test internal/dashboard/static/dashboard.test.js`; Go tests do
+not cover the dashboard.
 
-`npm-lite node --test internal/dashboard/static/dashboard.test.js`
-
-For large or ambiguous changes, propose the smallest independently testable slice first.
+Break large changes into independently testable slices; clarify scope when
+ambiguous.
 
 ## Related Repositories and Release Tooling
 
