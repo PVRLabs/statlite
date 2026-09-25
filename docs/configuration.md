@@ -395,6 +395,10 @@ A starter unit is in [statlite.service.example](statlite.service.example). Point
 
 ## View existing history without polling
 
+`--no-poll` is a troubleshooting convenience for inspecting existing SQLite
+history in the dashboard, not a separate supported operating mode; behavior
+of other interfaces in this mode is not part of the supported contract.
+
 Use `--no-poll` with a normal YAML configuration to serve the dashboard from
 existing SQLite history without contacting any configured target:
 
