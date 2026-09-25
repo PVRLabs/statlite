@@ -22,11 +22,19 @@ without treating reachability as application health.
 
 🌐 [Website](https://pvrlabs.xyz/statlite) · 👀 [Interactive demo](https://pvrlabs.xyz/statlite/demo.html)
 
-![StatLite example dashboard](docs/images/dashboard.webp)
+<p align="center">
+  <img src="docs/images/dashboard.webp" alt="StatLite dashboard monitoring a Spring Boot payments API">
+  <br><sub>Main application dashboard for the Spring target.</sub>
+</p>
 
 StatLite is built for [resource-constrained servers](docs/low-resource-monitoring.md).
 Low memory, CPU, disk, and operational overhead are treated as product
 constraints.
+
+<p align="center">
+  <img src="docs/images/dashboard-host-resources.webp" alt="StatLite host memory, CPU, and disk charts">
+  <br><sub>Host resources from the StatLite self-monitoring target.</sub>
+</p>
 
 Learn how to set up [lightweight Spring Boot monitoring without Prometheus and Grafana](https://pvrlabs.xyz/articles/lightweight-spring-boot-monitoring.html).
 
