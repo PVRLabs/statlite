@@ -23,8 +23,8 @@ a compatibility migration.
 > working-directory-relative location and warns; it does not preserve the old
 > lookup behavior.
 
-The release is the first version that warns about or documents the surface as
-deprecated. `v0.4.0` is currently unreleased.
+The "Deprecated since" version is the first release that warns about or
+documents the surface as deprecated.
 
 ## Configuration
 
