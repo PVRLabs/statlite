@@ -29,8 +29,8 @@ const palette = {
 };
 
 const lineStyle = {
-  borderWidth: 3,
-  pointRadius: 2,
+  borderWidth: 2,
+  pointRadius: 0,
   pointHoverRadius: 5,
   pointHitRadius: 8
 };
@@ -309,7 +309,6 @@ function renderSummary(summary) {
   renderDatabaseHealth(result.db_health_status);
   setText("process-start", formatDateTime(result.process_start_time));
   renderRestart(summary);
-  setText("last-success", formatDateTime(monitor.last_successful_poll_at));
   setText("failures", String(monitor.consecutive_poll_failures || 0));
   renderPollStatus(monitor);
 }
@@ -421,26 +420,33 @@ function renderPollStatus(monitor) {
   const status = document.getElementById("poll-status-state");
   const time = document.getElementById("poll-status-time");
   const error = document.getElementById("poll-error");
+  const lastSuccess = document.getElementById("poll-last-success");
   const failed = (monitor.consecutive_poll_failures || 0) > 0;
   const when = formatDateTime(monitor.last_poll_at);
 
   if (failed) {
     status.textContent = "Failed";
     status.className = "poll-status-state bad";
-    time.textContent = " · " + when;
+    time.textContent = when;
     const summary = monitor.last_poll_error_summary || "Poll failed";
     error.textContent = summary;
     error.title = summary;
     error.hidden = false;
+    lastSuccess.textContent = monitor.last_successful_poll_at
+      ? "Last success: " + formatDateTime(monitor.last_successful_poll_at)
+      : "No successful poll yet";
+    lastSuccess.hidden = false;
     return;
   }
 
   status.textContent = monitor.last_poll_at ? "Successful" : "Not yet polled";
-  status.className = "poll-status-state ok";
-  time.textContent = monitor.last_poll_at ? " · " + when : "";
+  status.className = monitor.last_poll_at ? "poll-status-state ok" : "poll-status-state";
+  time.textContent = monitor.last_poll_at ? when : "";
   error.textContent = "";
   error.title = "";
   error.hidden = true;
+  lastSuccess.textContent = "";
+  lastSuccess.hidden = true;
 }
 
 function renderRestart(summary) {
@@ -579,7 +585,14 @@ function bytesToGB(value) {
 function updateChart(chart, labels, values) {
   chart.data.labels = labels;
   values.forEach((datasetValues, index) => {
-    chart.data.datasets[index].data = datasetValues;
+    const dataset = chart.data.datasets[index];
+    dataset.data = datasetValues;
+    const isolated = datasetValues.map((value, pointIndex) =>
+      Number.isFinite(value) &&
+      !Number.isFinite(datasetValues[pointIndex - 1]) &&
+      !Number.isFinite(datasetValues[pointIndex + 1]) ? 3 : 0
+    );
+    dataset.pointRadius = isolated.some((radius) => radius > 0) ? isolated : 0;
   });
   chart.update();
 }
@@ -779,6 +792,6 @@ function initDashboard() {
   refreshWhenVisible();
 }
 
-const dashboardTestHooks = { detectCapabilities, foldRepeatedEvents, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, openEventGroupKeys, refresh, refreshWhenVisible, renderApplicationStatus, renderDatabaseHealth, renderError, renderFooterSummary, renderPollStatus, renderRangeSelection, renderSeries, renderTargetContext, runtimeHelp, shouldRenderSeries, state, targetPresentation, targetTypeHelp, validDiskPoint };
+const dashboardTestHooks = { buildCharts, detectCapabilities, foldRepeatedEvents, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, openEventGroupKeys, refresh, refreshWhenVisible, renderApplicationStatus, renderDatabaseHealth, renderError, renderFooterSummary, renderPollStatus, renderRangeSelection, renderSeries, renderTargetContext, runtimeHelp, shouldRenderSeries, state, targetPresentation, targetTypeHelp, updateChart, validDiskPoint };
 if (typeof module !== "undefined" && module.exports) module.exports = dashboardTestHooks;
 if (typeof document !== "undefined") initDashboard();

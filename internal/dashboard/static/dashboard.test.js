@@ -201,7 +201,54 @@ test("formatters reject non-finite inputs and show the current disk observation"
   assert.equal(dashboard.formatCurrentResource({ used_bytes: 30, total_bytes: 60, usage: 0.5 }, "Disk"), "Disk — 30 B / 60 B · 50.0%");
 });
 
-test("renderPollStatus shows the latest poll state and a failed-poll summary", () => {
+test("chart lines hide routine markers while preserving hover and dashed capacity lines", () => {
+  const originalDocument = global.document;
+  const originalChart = global.Chart;
+  global.document = dashboardDocument();
+  global.Chart = class { constructor(_canvas, config) { this.data = config.data; this.options = config.options; } };
+
+  try {
+    dashboard.buildCharts();
+    for (const chart of Object.values(dashboard.state.charts)) {
+      assert.equal(chart.options.animation, false);
+      assert.equal(chart.options.interaction.mode, "index");
+      assert.equal(chart.options.interaction.intersect, false);
+      assert.equal(typeof chart.options.plugins.tooltip.callbacks.label, "function");
+      for (const dataset of chart.data.datasets) {
+        assert.equal(dataset.spanGaps, false);
+        assert.equal(dataset.pointRadius, 0);
+        assert.equal(dataset.pointHitRadius, 8);
+        assert.ok(dataset.pointHoverRadius >= 4);
+        if (dataset.borderDash) {
+          assert.deepEqual(dataset.borderDash, [5, 4]);
+          assert.equal(dataset.borderWidth, 1);
+        } else {
+          assert.equal(dataset.borderWidth, 2);
+        }
+      }
+    }
+  } finally {
+    global.document = originalDocument;
+    global.Chart = originalChart;
+  }
+});
+
+test("isolated chart values remain visible across gaps and on capacity series", () => {
+  const chart = { data: { labels: [], datasets: [{ data: [], pointRadius: 0 }, { data: [], pointRadius: 0, borderDash: [5, 4] }] }, update() {} };
+  dashboard.updateChart(chart, ["a"], [[3], [10]]);
+  assert.deepEqual(chart.data.datasets[0].pointRadius, [3]);
+  assert.deepEqual(chart.data.datasets[1].pointRadius, [3]);
+
+  dashboard.updateChart(chart, ["a", "b", "c"], [[3, null, 5], [10, null, 10]]);
+  assert.deepEqual(chart.data.datasets[0].pointRadius, [3, 0, 3]);
+  assert.deepEqual(chart.data.datasets[1].pointRadius, [3, 0, 3]);
+
+  dashboard.updateChart(chart, ["a", "b", "c", "d"], [[3, 5, null, 7], [10, 10, 10, 10]]);
+  assert.deepEqual(chart.data.datasets[0].pointRadius, [0, 0, 0, 3]);
+  assert.equal(chart.data.datasets[1].pointRadius, 0);
+});
+
+test("renderPollStatus shows failed and successful polls with prior-success context", () => {
   const originalDocument = global.document;
   const document = dashboardDocument();
   global.document = document;
@@ -209,23 +256,41 @@ test("renderPollStatus shows the latest poll state and a failed-poll summary", (
   try {
     dashboard.renderPollStatus({
       last_poll_at: "2026-07-29T17:42:00Z",
+      last_successful_poll_at: "2026-07-29T17:40:00Z",
       consecutive_poll_failures: 1,
       last_poll_error_summary: "fetching statlite metrics: connection refused"
     });
     const failed = document.getElementById("poll-status-state");
     const failedTime = document.getElementById("poll-status-time");
     const error = document.getElementById("poll-error");
+    const lastSuccess = document.getElementById("poll-last-success");
     assert.equal(failed.textContent, "Failed");
     assert.match(failed.className, /bad/);
-    assert.match(failedTime.textContent, /^ · /);
+    assert.match(failedTime.textContent, /\S/);
+    assert.doesNotMatch(failedTime.textContent, /·/);
     assert.equal(error.textContent, "fetching statlite metrics: connection refused");
     assert.equal(error.hidden, false);
     assert.equal(error.title, error.textContent);
+    assert.match(lastSuccess.textContent, /^Last success: /);
+    assert.equal(lastSuccess.hidden, false);
 
     dashboard.renderPollStatus({ last_poll_at: "2026-07-29T17:45:00Z" });
     assert.equal(failed.textContent, "Successful");
     assert.match(failed.className, /ok/);
+    assert.match(failedTime.textContent, /\S/);
+    assert.doesNotMatch(failedTime.textContent, /·/);
     assert.equal(error.hidden, true);
+    assert.equal(lastSuccess.hidden, true);
+
+    dashboard.renderPollStatus({ last_poll_at: "2026-07-29T17:46:00Z", consecutive_poll_failures: 1 });
+    assert.equal(lastSuccess.textContent, "No successful poll yet");
+    assert.equal(lastSuccess.hidden, false);
+
+    dashboard.renderPollStatus({});
+    assert.equal(failed.textContent, "Not yet polled");
+    assert.equal(failedTime.textContent, "");
+    assert.doesNotMatch(failed.className, /ok|bad/);
+    assert.equal(lastSuccess.hidden, true);
   } finally {
     global.document = originalDocument;
   }
