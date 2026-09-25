@@ -86,6 +86,34 @@ func TestPublicMetricsResponseMapsFixedHourAndResourceUnits(t *testing.T) {
 	}
 }
 
+func TestPublicMetricsResponseOrdersUnsortedPoints(t *testing.T) {
+	base := time.Date(2026, 9, 24, 10, 0, 0, 0, time.UTC)
+	series := storage.PublicMetricSeries{Points: []storage.PublicMetricPoint{
+		{Timestamp: base.Add(2 * time.Minute), Requests: floatPointer(3)},
+		{Timestamp: base, Requests: floatPointer(1)},
+		{Timestamp: base.Add(time.Minute), Requests: floatPointer(2)},
+	}}
+	response := httptest.NewRecorder()
+	writePublicMetricsResponse(response, "app", base.Add(3*time.Minute), series)
+	if response.Code != http.StatusOK {
+		t.Fatalf("response status = %d", response.Code)
+	}
+	var body decodedPublicMetrics
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Points) != 3 {
+		t.Fatalf("points = %#v", body.Points)
+	}
+	for i, point := range body.Points {
+		wantTime := base.Add(time.Duration(i) * time.Minute)
+		if !point.Timestamp.Equal(wantTime) {
+			t.Errorf("point %d timestamp = %v, want %v", i, point.Timestamp, wantTime)
+		}
+		assertPublicMetricValue(t, "requests", point.Requests, float64(i+1))
+	}
+}
+
 func TestPublicMetricsEmptyAndRequestBoundaries(t *testing.T) {
 	store := newPublicTestStore(t)
 	alpha := newServerTestMonitor(t, "alpha", store, &countingCollector{})

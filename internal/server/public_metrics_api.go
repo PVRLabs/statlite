@@ -2,12 +2,14 @@ package server
 
 import (
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/pvrlabs/statlite/internal/storage"
 )
 
 // PublicMetricsResponse is the fixed one-hour operational metrics view.
+// Points are ordered from oldest to newest by timestamp.
 type PublicMetricsResponse struct {
 	Target                  string                      `json:"target"`
 	Range                   string                      `json:"range"`
@@ -53,8 +55,12 @@ func (s *Server) handlePublicMetrics(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "query target metrics failed", http.StatusInternalServerError)
 		return
 	}
+	writePublicMetricsResponse(w, target.Metadata.Name, evaluatedAt, series)
+}
+
+func writePublicMetricsResponse(w http.ResponseWriter, target string, evaluatedAt time.Time, series storage.PublicMetricSeries) {
 	response := PublicMetricsResponse{
-		Target:                  target.Metadata.Name,
+		Target:                  target,
 		Range:                   "1h",
 		BucketSeconds:           60,
 		EvaluatedAt:             evaluatedAt,
@@ -64,6 +70,10 @@ func (s *Server) handlePublicMetrics(w http.ResponseWriter, r *http.Request) {
 	for _, point := range series.Points {
 		response.Points = append(response.Points, publicMetricPoint(point))
 	}
+	// Keep the public ordering independent of storage query implementation.
+	sort.Slice(response.Points, func(i, j int) bool {
+		return response.Points[i].Timestamp.Before(response.Points[j].Timestamp)
+	})
 	writeJSON(w, http.StatusOK, response)
 }
 

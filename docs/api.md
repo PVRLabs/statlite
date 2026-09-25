@@ -10,6 +10,9 @@ The dashboard's other `/api/*` routes are internal and are not part of this
 contract. Callers own their thresholds, schedules, deduplication, and
 notification delivery. This API does not implement alert rules or delivery.
 
+For runnable one-shot checks with caller-owned thresholds, see the
+[automation cookbook](../examples/api-automation/).
+
 ## Access and target selection
 
 All endpoints are `GET` requests. Bind StatLite to loopback or protect access
@@ -143,7 +146,8 @@ The response contains `target`, fixed `range` (`1h`), fixed
 `latest_http_observation_at`, and `points`. Points are grouped into occupied
 UTC minute slots; empty slots are omitted. Each point's `timestamp` is the
 start of the minute containing its source poll time. A point can combine
-multiple poll observations.
+multiple poll observations. `points` is ordered by `timestamp` from oldest to
+newest.
 
 The complete point fields are:
 

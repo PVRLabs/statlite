@@ -33,3 +33,8 @@ go run ./cmd/statlite --config examples/actuator.yaml
 | [go-gin-demo](go-gin-demo/) | Runnable companion to the canonical [Gin guide](../docs/integrate/go/gin.md), with Gin middleware, recovery ordering, and tests |
 
 Each demo directory has its own README with run and verification steps.
+
+## External API automation
+
+The [automation cookbook](api-automation/) has one-shot status, HTTP error,
+host resource, and sustained CPU checks using the public `/api/v1` endpoints.
