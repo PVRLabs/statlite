@@ -3,6 +3,19 @@
 This file summarizes the main user-facing changes in each StatLite release.
 Detailed release notes are generated on GitHub from the commit history.
 
+## v0.5.0 (2026-09-25)
+
+- Added a read-only external API v1 for target status, recent events, and bounded
+  one-hour metrics, with runnable automation examples and end-to-end coverage.
+- Migrated known SQLite v1 databases to schema v2, preserving history while
+  recording target identity, application-run provenance, and effective poll
+  source for new data.
+- Improved dashboard status cards and charts, including clearer application,
+  collection, database, and host-resource presentation.
+- Added stricter startup configuration validation and clearer failure guidance.
+- Fixed missing database-health presentation and refreshed dashboard screenshots
+  and documentation.
+
 ## v0.4.3 (2026-09-22)
 
 - Added first-class integration guidance and runnable examples for FastAPI,
