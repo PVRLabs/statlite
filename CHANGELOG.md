@@ -1,7 +1,8 @@
 # Changelog
 
 This file summarizes the main user-facing changes in each StatLite release.
-Detailed release notes are generated on GitHub from the commit history.
+GitHub release notes use the matching version section, with commit history as
+a fallback when a section is missing.
 
 ## v0.5.0 (2026-09-25)
 

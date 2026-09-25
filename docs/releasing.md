@@ -100,6 +100,10 @@ assets and checksums, publishes the two GHCR tags for `linux/amd64` and
 the versioned image and smoke-tests readiness, self-metrics schema, and the
 dashboard response. The smoke-test container is always removed.
 
+Release notes use the matching version section from `CHANGELOG.md`, followed by
+the full comparison link. Keep that section focused on user-facing changes.
+When the section is missing, the release script falls back to commit history.
+
 ## 3. Verify the GitHub Release
 
 Manually confirm the GitHub Release contains the expected archives and
@@ -158,7 +162,24 @@ the tap workflow automatically.
 ## 6. Announcement
 
 Once the GitHub Release, GHCR images, and tap formula are verified, announce
-the release.
+the release in the repository's [Announcements discussion
+category](https://github.com/PVRLabs/statlite/discussions/categories/announcements).
+Use the release changelog, tagged documentation, and published artifacts as the
+source of truth. Follow this structure:
+
+- Title: `StatLite X.Y.Z: <two concise release themes>`.
+- A short opening paragraph stating what the release adds and who benefits.
+- `## What is new in X.Y.Z`, with `###` headings for the main user-facing
+  changes and concrete behavior or configuration details.
+- `## Try it`, with commands for the exact versioned container and relevant
+  install or update paths that have been verified.
+- `## Learn more`, linking the exact GitHub Release, tagged documentation, and
+  changelog, followed by a brief invitation for feedback or bug reports.
+
+Include certification results only when they were completed for this release.
+Use the exact release tag in links and examples so the announcement remains
+accurate after newer versions are published. The [v0.4.1
+announcement](https://github.com/PVRLabs/statlite/discussions/15) is an example.
 
 ## Recovery
 
