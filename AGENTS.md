@@ -51,10 +51,10 @@ ambiguous.
 
 ## Related Repositories and Release Tooling
 
-Use the `repo-map` skill to discover related repositories and their local paths.
-Project-specific workflow instructions remain authoritative. When a Homebrew
-formula update is in scope, use `repo-map get homebrew-tap` to locate the
-shared PVRLabs tap.
+Use the RepoLink skill to discover related repositories and their local
+paths. Project-specific workflow instructions remain authoritative. When a
+Homebrew formula update is in scope, use `repolink get homebrew-tap` to locate
+the shared PVRLabs tap.
 
 ## Capitalization Convention
 
