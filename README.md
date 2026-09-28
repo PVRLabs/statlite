@@ -16,7 +16,9 @@ Prometheus metrics, Quarkus applications through Micrometer metrics, and other
 applications that expose [a small, fixed JSON metrics
 endpoint](docs/statlite-metrics-v1.md), without requiring Prometheus or Grafana.
 It stores focused traffic, latency, CPU, memory, optional authoritative health,
-and optional host metrics in SQLite. When a target has no health signal, the
+and optional host metrics in SQLite on your server. Samples and history stay
+there, without continuously sending application metrics to a third-party
+monitoring SaaS. When a target has no health signal, the
 dashboard reports whether StatLite is successfully receiving its metrics
 without treating reachability as application health.
 

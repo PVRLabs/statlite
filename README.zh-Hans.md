@@ -8,6 +8,9 @@ SQLite 存储数据，专为 VPS 和小型服务器上的应用而设计。它�
 JVM/进程资源、健康状态，以及可选的主机指标，支持 Spring Boot、Quarkus，以及
 通过简单的 StatLite Metrics 接口接入的其他框架和语言。
 
+指标数据留在你自己的服务器上。StatLite 在你的服务器上采集，并把历史记录存在
+SQLite 里，不需要把应用指标持续送到第三方监控 SaaS。
+
 🌐 [官网](https://pvrlabs.xyz/statlite) · 👀 [在线演示](https://pvrlabs.xyz/statlite/demo.html) · [English README](README.md)
 
 <p align="center">
