@@ -21,6 +21,9 @@ type Series struct {
 	Start  time.Time     `json:"start"`
 	End    time.Time     `json:"end"`
 	Points []SeriesPoint `json:"points"`
+	// FirstPollID identifies the first native point even when chart sampling
+	// omits it. Retention must not confuse the first endpoint with this poll.
+	FirstPollID int64 `json:"-"`
 	// LatestPoint preserves the newest raw point when Points are aggregated so
 	// dashboard readiness does not depend on lossy bucket identity.
 	LatestPoint     *SeriesPoint     `json:"latest_point,omitempty"`

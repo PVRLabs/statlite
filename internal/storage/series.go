@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -77,27 +78,51 @@ func (s *Store) series(ctx context.Context, db seriesQuerier, targetName string,
 		return nil, fmt.Errorf("series start must be before end")
 	}
 
-	counterKeys := []string{
-		"http_requests_total",
-		"http_404_total",
-		"http_4xx_total",
-		"http_5xx_total",
-		"http_request_time_total_seconds",
+	var ids []int64
+	if bounded {
+		var err error
+		ids, err = publicPollIDs(ctx, db, targetName, start, end)
+		if err != nil {
+			return nil, err
+		}
 	}
-	keys := append(counterKeys, []string{
-		"runtime_heap_used_bytes",
-		"jvm_heap_used_bytes",
-		"process_cpu_usage",
-		"host_cpu_usage",
-		"host_memory_used_bytes",
-		"host_memory_total_bytes",
-		"host_disk_used_bytes",
-		"host_disk_total_bytes",
-	}...)
-	previous, err := s.previousCounterValuesFrom(ctx, db, targetName, start, counterKeys, retentionCutoff)
+	return s.seriesForPolls(ctx, db, targetName, start, end, ids, retentionCutoff)
+}
+
+var seriesCounterKeys = []string{
+	"http_requests_total",
+	"http_404_total",
+	"http_4xx_total",
+	"http_5xx_total",
+	"http_request_time_total_seconds",
+}
+var seriesMetricKeys = slices.Concat(seriesCounterKeys, []string{
+	"runtime_heap_used_bytes",
+	"jvm_heap_used_bytes",
+	"process_cpu_usage",
+	"host_cpu_usage",
+	"host_memory_used_bytes",
+	"host_memory_total_bytes",
+	"host_disk_used_bytes",
+	"host_disk_total_bytes",
+})
+
+// A nil ID list reads all polls; an empty non-nil list reads none. Internal
+// callers may use an inclusive single timestamp to read the native latest point.
+func (s *Store) seriesForPolls(ctx context.Context, db seriesQuerier, targetName string, start, end time.Time, ids []int64, retentionCutoff time.Time) (*Series, error) {
+	if ids != nil && len(ids) == 0 {
+		return &Series{Start: start.UTC(), End: end.UTC(), Points: []SeriesPoint{}}, nil
+	}
+	previous, err := s.previousCounterValuesFrom(ctx, db, targetName, start, seriesCounterKeys, retentionCutoff)
 	if err != nil {
 		return nil, err
 	}
+	return s.seriesWithBaseline(ctx, db, targetName, start, end, ids, previous)
+}
+
+// seriesWithBaseline consumes and updates previous while deriving the points.
+// Callers retaining a baseline for another read must pass a separate map.
+func (s *Store) seriesWithBaseline(ctx context.Context, db seriesQuerier, targetName string, start, end time.Time, ids []int64, previous map[string]counterValue) (*Series, error) {
 	query := `
 SELECT
   p.id,
@@ -112,24 +137,17 @@ JOIN metric_samples ms ON ms.poll_id = p.id
 WHERE t.name = ?
   AND p.started_at >= ?
   AND p.started_at <= ?
-  AND ms.metric_key IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  AND ms.metric_key IN (` + sqlPlaceholders(len(seriesMetricKeys)) + `)
 ORDER BY p.started_at ASC, p.id ASC, ms.metric_key ASC
 `
 	args := []any{targetName, formatSortableTime(start), formatSortableTime(end)}
-	if bounded {
-		ids, err := publicPollIDs(ctx, db, targetName, start, end)
-		if err != nil {
-			return nil, err
-		}
-		if len(ids) == 0 {
-			return &Series{Start: start.UTC(), End: end.UTC(), Points: []SeriesPoint{}}, nil
-		}
-		query = strings.Replace(query, "  AND ms.metric_key IN", "  AND p.id IN ("+strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")+")\n  AND ms.metric_key IN", 1)
+	if ids != nil {
+		query = strings.Replace(query, "  AND ms.metric_key IN", "  AND p.id IN ("+sqlPlaceholders(len(ids))+")\n  AND ms.metric_key IN", 1)
 		for _, id := range ids {
 			args = append(args, id)
 		}
 	}
-	for _, key := range keys {
+	for _, key := range seriesMetricKeys {
 		args = append(args, key)
 	}
 	rows, err := db.QueryContext(ctx, query, args...)
@@ -180,6 +198,7 @@ ORDER BY p.started_at ASC, p.id ASC, ms.metric_key ASC
 	}
 	flush()
 	if len(series.Points) > 0 {
+		series.FirstPollID = series.Points[0].PollID
 		latest := series.Points[len(series.Points)-1]
 		series.LatestPoint = &latest
 	}

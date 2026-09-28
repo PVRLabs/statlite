@@ -2443,6 +2443,7 @@ func TestClearCutoffCounterBaselineClearsEarliestRetainedPoint(t *testing.T) {
 	firstRetainedRequests := 2.0
 	laterRequests := 3.0
 	series := &storage.Series{
+		FirstPollID: 2,
 		LatestPoint: &storage.SeriesPoint{PollID: 1, Timestamp: cutoff.Add(time.Hour), Requests: &laterRequests},
 		Points: []storage.SeriesPoint{
 			{PollID: 1, Timestamp: cutoff.Add(time.Hour), Requests: &laterRequests},
@@ -2471,6 +2472,7 @@ func TestClearCutoffCounterBaselineClearsMatchingLatestRawPoint(t *testing.T) {
 	cutoff := time.Date(2026, 7, 7, 10, 0, 0, 0, time.UTC)
 	requests := 2.0
 	series := &storage.Series{
+		FirstPollID: 3,
 		LatestPoint: &storage.SeriesPoint{PollID: 3, Timestamp: cutoff, Requests: &requests},
 		Points:      []storage.SeriesPoint{{PollID: 3, Timestamp: cutoff, Requests: &requests}},
 	}
@@ -2674,5 +2676,118 @@ func saveServerRetentionPoll(t *testing.T, store *storage.Store, appRunID int64,
 	}
 	if _, err := store.SaveCollectionResultWithAppRun(context.Background(), result, &appRunID); err != nil {
 		t.Fatalf("SaveCollectionResultWithAppRun(%s) error = %v", startedAt, err)
+	}
+}
+
+// Endpoint sampling must be selected by the explicit dashboard scale, while
+// latest_point retains the native interval even on approximate chart ranges.
+func TestHandleSeriesLongRangeSamplingKeepsNativeLatest(t *testing.T) {
+	store, err := storage.Open(t.Context(), t.TempDir()+"/statlite.sqlite")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	registerServerTestTargets(t, store)
+	start := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	run, err := store.EnsureAppRun(t.Context(), "app", nil, start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, value := range []float64{100, 120, 5, 150} {
+		saveServerRetentionPoll(t, store, run, start.Add(time.Duration(i)*time.Minute), value, nil)
+	}
+	mon := newServerTestMonitor(t, "app", store, &noopCollector{})
+	app := New("127.0.0.1:0", mon)
+	app.now = func() time.Time { return start.Add(4 * time.Minute) }
+	for _, tc := range []struct {
+		query  string
+		total  float64
+		points int
+	}{
+		{"range=1h", 165, 4}, {"range=24h", 165, 1},
+		{"range=7d", 50, 1}, {"range=30d", 50, 1},
+		{"start=2026-09-01T12:00:00Z&end=2026-09-01T12:04:00Z", 165, 4},
+	} {
+		t.Run(tc.query, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			app.httpServer.Handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/series?"+tc.query, nil))
+			if response.Code != http.StatusOK {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+			var series storage.Series
+			if err := json.Unmarshal(response.Body.Bytes(), &series); err != nil {
+				t.Fatal(err)
+			}
+			var total float64
+			for _, point := range series.Points {
+				if point.Requests != nil {
+					total += *point.Requests
+				}
+			}
+			if total != tc.total || len(series.Points) != tc.points {
+				t.Fatalf("total=%v points=%d", total, len(series.Points))
+			}
+			if series.LatestPoint == nil || series.LatestPoint.Requests == nil || *series.LatestPoint.Requests != 145 {
+				t.Fatalf("latest=%+v", series.LatestPoint)
+			}
+		})
+	}
+}
+
+func TestHandleSampledSeriesRetentionPreservesNativeLatest(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		values []float64
+		want   *float64
+	}{
+		{"only native point skipped", []float64{-1, 120, -1}, nil},
+		{"only selected point is latest", []float64{-1, 120, 130, 140}, func() *float64 { v := 10.0; return &v }()},
+		{"both endpoints empty", []float64{-1, 120, 130, -1}, func() *float64 { v := 10.0; return &v }()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			store, err := storage.Open(t.Context(), t.TempDir()+"/statlite.sqlite")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer store.Close()
+			registerServerTestTargets(t, store)
+			cutoff := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+			run, err := store.EnsureAppRun(t.Context(), "app", nil, cutoff.Add(-time.Hour))
+			if err != nil {
+				t.Fatal(err)
+			}
+			saveServerRetentionPoll(t, store, run, cutoff.Add(-time.Minute), 100, nil)
+			for i, value := range tc.values {
+				at := cutoff.Add(time.Duration(i) * time.Minute)
+				if value >= 0 {
+					saveServerRetentionPoll(t, store, run, at, value, nil)
+					continue
+				}
+				result := &collector.CollectionResult{TargetName: "app", PollStartedAt: at, PollFinishedAt: at.Add(time.Second)}
+				if _, err := store.SaveCollectionResultWithAppRun(t.Context(), result, &run); err != nil {
+					t.Fatal(err)
+				}
+			}
+			app := New("127.0.0.1:0", newServerTestMonitor(t, "app", store, &noopCollector{}))
+			app.now = func() time.Time { return cutoff.Add(5 * time.Minute) }
+			app.retentionDays = 1
+			app.retentionCutoff = func() time.Time { return cutoff }
+			response := httptest.NewRecorder()
+			app.httpServer.Handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/series?range=7d", nil))
+			if response.Code != http.StatusOK {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+			var series storage.Series
+			if err := json.Unmarshal(response.Body.Bytes(), &series); err != nil {
+				t.Fatal(err)
+			}
+			if series.LatestPoint == nil {
+				t.Fatal("missing native latest")
+			}
+			got := series.LatestPoint.Requests
+			if (got == nil) != (tc.want == nil) || got != nil && *got != *tc.want {
+				t.Fatalf("latest requests=%v want=%v", got, tc.want)
+			}
+		})
 	}
 }

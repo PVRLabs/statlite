@@ -115,6 +115,9 @@ func NewWithManagerRetentionCutoffAndFilesystem(listen string, manager *monitor.
 	mux.HandleFunc(dashboard.OrbitronFontPath, s.handleDashboardVendor)
 	mux.HandleFunc("/healthz", s.handleHealthz)
 	mux.HandleFunc("/statlite/metrics", s.handleStatliteMetrics)
+	// Internal endpoints used by the embedded StatLite dashboard.
+	// Not a supported external API; may change incompatibly between releases.
+	// /api/v1/... is the supported compatibility-oriented external API.
 	mux.HandleFunc("/api/summary", s.handleSummary)
 	mux.HandleFunc("/api/series", s.handleSeries)
 	mux.HandleFunc("/api/latest", s.handleLatest)

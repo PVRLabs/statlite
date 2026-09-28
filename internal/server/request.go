@@ -98,8 +98,12 @@ func (s *Server) clampToRetention(start time.Time) (time.Time, time.Time, bool) 
 }
 
 func clearCutoffCounterBaseline(series *storage.Series, cutoff time.Time) {
-	if series == nil || len(series.Points) == 0 {
+	if series == nil {
 		return
+	}
+	if series.FirstPollID != 0 && series.LatestPoint != nil &&
+		series.LatestPoint.PollID == series.FirstPollID && !series.LatestPoint.Timestamp.Before(cutoff) {
+		clearSeriesCounterFields(series.LatestPoint)
 	}
 	// The first point at or after the retained cutoff is the new counter baseline.
 	// Search by timestamp rather than assuming storage order.
@@ -117,9 +121,6 @@ func clearCutoffCounterBaseline(series *storage.Series, cutoff time.Time) {
 	}
 	cutoffPoint := &series.Points[cutoffIndex]
 	clearSeriesCounterFields(cutoffPoint)
-	if series.LatestPoint != nil && series.LatestPoint.PollID == cutoffPoint.PollID {
-		clearSeriesCounterFields(series.LatestPoint)
-	}
 }
 
 func clearSeriesCounterFields(point *storage.SeriesPoint) {

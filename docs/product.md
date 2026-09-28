@@ -345,6 +345,17 @@ The dashboard presents a small set of normalized concepts:
 The supported dashboard ranges are the last hour, last 24 hours, 7 days, and 30 days.
 The dashboard is intentionally simple, local-first, and collector-neutral.
 
+The 7-day and 30-day charts use coarse sampling: the first and last polls per
+application run in each UTC chart bucket (30 minutes and 2 hours respectively).
+Gauges can miss intermediate spikes. Request and error counts, their placement
+in time, and average latency can differ from raw-history calculations when
+skipped polls contain missing counters or resets within the same application
+run. These charts are approximate overviews. Latest values and current disk
+readings retain native sample and counter-baseline semantics. The 1-hour and
+24-hour paths are unchanged, and raw stored samples remain authoritative.
+Excessive application-run churn or failed-poll groups fall back to reading the
+full raw series when selection would exceed 4096 poll IDs.
+
 ## Non-goals
 
 The current product scope does not include:

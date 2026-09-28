@@ -2,7 +2,14 @@ package storage
 
 // This file provides SQLite value conversion and timestamp formatting helpers.
 
-import "time"
+import (
+	"strings"
+	"time"
+)
+
+func sqlPlaceholders(count int) string {
+	return strings.TrimSuffix(strings.Repeat("?,", count), ",")
+}
 
 const sortableTimeLayout = "2006-01-02T15:04:05.999999999"
 
