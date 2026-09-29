@@ -256,7 +256,7 @@ func TestRunInspectDispatchesWithoutLoadingConfig(t *testing.T) {
 	if !strings.Contains(output, "Detected: Spring Boot Actuator") {
 		t.Fatalf("stdout = %q, want inspection result", stdout.String())
 	}
-	if !strings.Contains(output, "----- BEGIN statlite.yaml -----") || !strings.Contains(output, "url: http://app.test/actuator") || !strings.Contains(output, "New setup: save only the YAML between the markers as statlite.yaml.") {
+	if !strings.Contains(output, "----- BEGIN statlite.yaml -----") || !strings.Contains(output, "url: http://app.test/actuator") || !strings.Contains(output, "Create config: statlite inspect 'http://app.test' --create-config ./statlite.yaml") {
 		t.Fatalf("stdout = %q, want suggested YAML and next step", output)
 	}
 	if stderr.Len() != 0 {
@@ -317,17 +317,17 @@ storage:
 polling:
     interval: 30s
 targets:
-    - name: app
+    - name: spring-example-test-443
       type: spring
       url: https://example.test/service/actuator
 ----- END statlite.yaml -----
 
 Next:
-  New setup: save only the YAML between the markers as statlite.yaml.
-  Existing setup: add the target entry to your existing targets list, changing name if needed.
+  Create config: statlite inspect 'https://example.test/service/actuator' --create-config ./statlite.yaml
+  Add target: statlite inspect 'https://example.test/service/actuator' --add-to-config ./statlite.yaml
 
 Then run:
-  statlite
+  statlite --config './statlite.yaml'
 
 Open:
   http://127.0.0.1:9090
@@ -364,8 +364,8 @@ func TestRenderInspectionStatliteMetricsOutputOmitsIrrelevantFields(t *testing.T
 		"polling:",
 		"----- BEGIN statlite.yaml -----",
 		"----- END statlite.yaml -----",
-		"New setup: save only the YAML between the markers as statlite.yaml.",
-		"Existing setup: add the target entry to your existing targets list, changing name if needed.",
+		"Create config: statlite inspect 'http://localhost:9090/statlite/metrics' --create-config ./statlite.yaml",
+		"Add target: statlite inspect 'http://localhost:9090/statlite/metrics' --add-to-config ./statlite.yaml",
 		"More configuration options:",
 	} {
 		if !strings.Contains(got, want) {
@@ -453,7 +453,7 @@ func TestRunInspectTypeErrorsUseAccurateUsageMessages(t *testing.T) {
 
 func TestRenderInspectionRejectsInvalidSuggestedConfig(t *testing.T) {
 	_, err := renderInspection(&inspect.Result{TargetType: inspect.TargetSpring})
-	if err == nil || !strings.Contains(err.Error(), "url: is required") {
+	if err == nil || !strings.Contains(err.Error(), "endpoint") {
 		t.Fatalf("renderInspection() error = %v, want config validation error", err)
 	}
 }
@@ -524,7 +524,7 @@ func TestRunInspectHelp(t *testing.T) {
 		t.Fatalf("run() exit code = %d, want 0; stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	for _, want := range []string{
-		"statlite inspect <application-url>",
+		"statlite inspect [options] <application-url>",
 		"statlite inspect 'http://localhost:8080'",
 		"Quote the URL when pasting it from a browser",
 		"remove any query string or fragment first",

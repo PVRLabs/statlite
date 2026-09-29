@@ -75,16 +75,41 @@ to `/q/metrics`. A non-root URL is tried first as an exact endpoint and then,
 after a conclusive miss, with `/q/metrics` appended. A URL containing a query
 string is always an exact endpoint and is preserved.
 
-On success, `inspect` prints the recognized capabilities, a minimal
-configuration, and the next command. Save the configuration as `statlite.yaml`
-for a new setup, or copy only its target entry into an existing `targets` list.
+On success, plain `inspect` prints the recognized capabilities, a minimal
+configuration, and commands to create or add it. The suggested target gets a
+stable `<type>-<host>-<port>` name. Override it with `--name` if needed;
+target names identify stored history, so keep the name stable.
+
+To write a new config or add the detected target to an existing one:
+
+```bash
+statlite inspect 'http://localhost:8080' --create-config ./statlite.yaml
+statlite inspect 'http://localhost:8080' --add-to-config ./statlite.yaml
+statlite inspect 'http://localhost:9000' --type quarkus --name orders --add-to-config /etc/statlite/statlite.yaml
+```
+
+The options also work before the URL. Both write modes require an explicit
+destination path and one confidently detected target. `--create-config PATH`
+refuses an existing path and does not create parent directories. The relative
+`storage.sqlite_path` in a newly created config resolves from the config file's
+directory. `--add-to-config PATH` requires an existing file with `targets:` as
+its last top-level section and a normal list. Duplicate target names or
+endpoint URLs are rejected. A YAML `...` document terminator also prevents
+automatic append. If an existing target's name or endpoint uses an environment
+variable, add the new target manually because `inspect` cannot safely check for
+conflicts. For other layouts, copy the suggested entry manually. Restart
+StatLite after adding a target so it reads the updated config.
+
+`--add-to-config` updates the file in place and does not provide atomic
+replacement semantics. For production configuration changes, edit a copy and
+deploy it using your normal replacement procedure.
 
 > [!IMPORTANT]
 > Quote URLs containing `?` or `&`. Untyped inspection does not accept a query
-> string. All inspection is bounded and read-only: it does not load
+> string. Plain inspection is bounded and read-only: it does not load
 > configuration, create state, start monitoring, or accept authentication
 > options. Invalid, unreachable, unrecognized, or ambiguous targets fail without
-> printing configuration.
+> printing configuration or changing a config file.
 
 ## Server
 

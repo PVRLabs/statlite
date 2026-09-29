@@ -61,10 +61,35 @@ func runInspectWithTyped(args []string, stdout, stderr io.Writer, inspectApplica
 		printInspectHelp(stderr)
 	}
 	typed := inspectFlags.String("type", "", "inspect a specific target type (currently: quarkus)")
-	if err := inspectFlags.Parse(args); err != nil {
+	name := inspectFlags.String("name", "", "target name (default: derived from type, host, and port)")
+	createPath := inspectFlags.String("create-config", "", "create a new configuration file at PATH")
+	addPath := inspectFlags.String("add-to-config", "", "append a target to an existing configuration file at PATH")
+	reordered, err := reorderInspectArgs(args)
+	if err != nil {
+		fmt.Fprintf(stderr, "inspect: %v\n", err)
+		return 2
+	}
+	if err := inspectFlags.Parse(reordered); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
 		}
+		return 2
+	}
+	var createSet, addSet bool
+	inspectFlags.Visit(func(option *flag.Flag) {
+		switch option.Name {
+		case "create-config":
+			createSet = true
+		case "add-to-config":
+			addSet = true
+		}
+	})
+	if createSet && addSet {
+		fmt.Fprintln(stderr, "inspect: --create-config and --add-to-config cannot be used together")
+		return 2
+	}
+	if (createSet && *createPath == "") || (addSet && *addPath == "") {
+		fmt.Fprintln(stderr, "inspect: write operation requires a destination path")
 		return 2
 	}
 	if inspectFlags.NArg() != 1 {
@@ -78,7 +103,6 @@ func runInspectWithTyped(args []string, stdout, stderr io.Writer, inspectApplica
 	}
 
 	var result *inspect.Result
-	var err error
 	if *typed == "" {
 		result, err = inspectApplication(context.Background(), inspectFlags.Arg(0))
 	} else {
@@ -91,7 +115,31 @@ func runInspectWithTyped(args []string, stdout, stderr io.Writer, inspectApplica
 		}
 		return 1
 	}
-	output, err := renderInspection(result)
+	target, presentation, err := suggestedInspectionTarget(result, *name)
+	if err != nil {
+		fmt.Fprintf(stderr, "inspect: could not render suggested configuration: %v\n", err)
+		return 1
+	}
+	if createSet || addSet {
+		path := *createPath
+		if createSet {
+			err = createInspectionConfig(path, target, presentation.errorContext)
+		} else {
+			path = *addPath
+			err = addInspectionTarget(path, target)
+		}
+		if err != nil {
+			fmt.Fprintf(stderr, "inspect: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "Wrote %s with target %q.\n", path, target.Name)
+		if addSet {
+			fmt.Fprintln(stdout, "Restart StatLite to load the new target.")
+		}
+		fmt.Fprintf(stdout, "Next: %s\n", monitorCommand(path))
+		return 0
+	}
+	output, err := renderInspectionWithOptions(result, target, presentation, inspectFlags.Arg(0), *typed)
 	if err != nil {
 		fmt.Fprintf(stderr, "inspect: could not render suggested configuration: %v\n", err)
 		return 1
@@ -287,6 +335,8 @@ Usage:
   statlite [--config path] [--no-poll]
   statlite inspect <application-url>
   statlite inspect --type quarkus <application-or-metrics-url>
+  statlite inspect <application-url> --create-config PATH
+  statlite inspect <application-url> --add-to-config PATH
   statlite --version
   statlite --help
 
@@ -302,13 +352,20 @@ Docs: README.md, docs/configuration.md
 
 func printInspectHelp(w io.Writer) {
 	fmt.Fprintln(w, `Usage:
-  statlite inspect <application-url>
+  statlite inspect [options] <application-url>
 
 Example:
   statlite inspect 'http://localhost:8080'
+  statlite inspect 'http://localhost:8080' --create-config ./statlite.yaml
+  statlite inspect 'http://localhost:8080' --add-to-config ./statlite.yaml
 
 Probe a supported application endpoint and print an inspection summary.
-Inspection is read-only and does not require or create statlite.yaml.
+Plain inspection is read-only and does not require or create statlite.yaml.
+--create-config PATH writes a new config only if PATH does not exist.
+--add-to-config PATH appends a target to an existing config whose last section is
+a normal targets list. Existing names and endpoints cause an error.
+--name overrides the stable type-host-port name. Options may appear before
+or after the URL.
 
 Use --type quarkus with a Quarkus application URL or an exact customized
 Prometheus/OpenMetrics endpoint. A base URL uses the conventional /q/metrics path.
@@ -352,14 +409,18 @@ type inspectionTargetPresentation struct {
 }
 
 func renderInspection(result *inspect.Result) (string, error) {
-	if result == nil {
-		return "", errors.New("inspection returned no result")
-	}
-	presentation, err := inspectionPresentation(result.TargetType)
+	target, presentation, err := suggestedInspectionTarget(result, "")
 	if err != nil {
 		return "", err
 	}
-	configYAML, err := renderSuggestedTargetConfig(presentation.targetType, result.Endpoint, presentation.errorContext)
+	return renderInspectionWithOptions(result, target, presentation, result.Endpoint, "")
+}
+
+func renderInspectionWithOptions(result *inspect.Result, target suggestedTarget, presentation inspectionTargetPresentation, rawURL, typed string) (string, error) {
+	if result == nil {
+		return "", errors.New("inspection returned no result")
+	}
+	configYAML, err := renderSuggestedTargetConfig(target, presentation.errorContext)
 	if err != nil {
 		return "", err
 	}
@@ -375,7 +436,7 @@ func renderInspection(result *inspect.Result) (string, error) {
 	for _, warning := range result.Warnings {
 		fmt.Fprintf(&output, "\nWarning: %s\n", warning)
 	}
-	fmt.Fprintf(&output, "\nSuggested statlite.yaml:\n\n----- BEGIN statlite.yaml -----\n%s----- END statlite.yaml -----\n\nNext:\n  New setup: save only the YAML between the markers as statlite.yaml.\n  Existing setup: add the target entry to your existing targets list, changing name if needed.\n\nThen run:\n  statlite\n\nOpen:\n  http://127.0.0.1:9090\n\nMore configuration options:\n  %s\n", configYAML, configurationDocsURL)
+	fmt.Fprintf(&output, "\nSuggested statlite.yaml:\n\n----- BEGIN statlite.yaml -----\n%s----- END statlite.yaml -----\n\nNext:\n  Create config: %s\n  Add target: %s\n\nThen run:\n  %s\n\nOpen:\n  http://127.0.0.1:9090\n\nMore configuration options:\n  %s\n", configYAML, inspectWriteCommand(rawURL, result.Endpoint, typed, target, "--create-config"), inspectWriteCommand(rawURL, result.Endpoint, typed, target, "--add-to-config"), monitorCommand("./statlite.yaml"), configurationDocsURL)
 	return output.String(), nil
 }
 
@@ -404,18 +465,18 @@ func inspectionPresentation(targetType inspect.TargetType) (inspectionTargetPres
 	}
 }
 
-func renderSuggestedTargetConfig(targetType, endpoint, errorContext string) (string, error) {
+func renderSuggestedTargetConfig(target suggestedTarget, errorContext string) (string, error) {
 	cfg := suggestedConfig{
 		Server:  suggestedServerConfig{Listen: "127.0.0.1:9090"},
 		Storage: suggestedStorageConfig{SQLitePath: "./statlite.sqlite"},
 		Polling: suggestedPollingConfig{Interval: "30s"},
-		Targets: []suggestedTarget{{Name: "app", Type: targetType, URL: endpoint}},
+		Targets: []suggestedTarget{target},
 	}
 	validation := config.Config{
 		Server:  config.ServerConfig{Listen: "127.0.0.1:9090"},
 		Storage: config.StorageConfig{SQLitePath: "./statlite.sqlite"},
 		Polling: config.PollingConfig{Interval: "30s"},
-		Targets: []config.TargetConfig{{Name: "app", Type: targetType, URL: endpoint}},
+		Targets: []config.TargetConfig{{Name: target.Name, Type: target.Type, URL: target.URL}},
 	}
 	if err := config.Validate(&validation); err != nil {
 		return "", fmt.Errorf("%s: %w", errorContext, err)

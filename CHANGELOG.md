@@ -4,6 +4,13 @@ This file summarizes the main user-facing changes in each StatLite release.
 GitHub release notes use the matching version section, with commit history as
 a fallback when a section is missing.
 
+## Unreleased
+
+- Added `statlite inspect URL --create-config PATH` and `--add-to-config PATH`
+  to create a configuration or append one inspected target safely. Plain
+  inspection stays read-only, and suggested targets use stable names based on
+  type, host, and port.
+
 ## v0.5.0 (2026-09-25)
 
 - Added a read-only external API v1 for target status, recent events, and bounded
