@@ -54,14 +54,6 @@ func inspectQuarkusEndpoint(ctx context.Context, endpoint string, transport http
 	}, nil
 }
 
-func parseQuarkusEndpoint(raw string) (string, error) {
-	endpoints, err := quarkusInspectionEndpoints(raw)
-	if err != nil {
-		return "", err
-	}
-	return endpoints[0], nil
-}
-
 func quarkusInspectionEndpoints(raw string) ([]string, error) {
 	if strings.TrimSpace(raw) != raw || raw == "" {
 		return nil, fmt.Errorf("Quarkus metrics URL must be a nonblank absolute URL without surrounding whitespace")

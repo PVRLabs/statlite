@@ -20,7 +20,6 @@ func testLimits() Limits {
 	l.MaxSamples = 10
 	l.MaxLabelsPerSample = 3
 	l.MaxLabelBytes = 32
-	l.MaxAggregationStates = 2
 	return l
 }
 
@@ -255,26 +254,6 @@ func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { retu
 
 func testResponse(status int, header http.Header, body []byte) *http.Response {
 	return &http.Response{StatusCode: status, Header: header, Body: io.NopCloser(bytes.NewReader(body))}
-}
-
-func TestAccumulatorIsBounded(t *testing.T) {
-	a, err := NewAccumulator(2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := a.Add("one", 1); err != nil {
-		t.Fatal(err)
-	}
-	if err := a.Add("one", 2); err != nil {
-		t.Fatal(err)
-	}
-	if err := a.Add("two", 2); err != nil {
-		t.Fatal(err)
-	}
-	assertClass(t, a.Add("three", 3), FailureUnsafe)
-	if got, _ := a.Get("one"); got.Sum != 3 || got.Count != 2 {
-		t.Fatalf("aggregate = %+v", got)
-	}
 }
 
 func assertClass(t *testing.T, err error, want FailureClass) {

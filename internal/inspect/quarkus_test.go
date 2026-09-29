@@ -181,14 +181,14 @@ func TestTypedQuarkusInspectionRejectsUnsafeEndpointForms(t *testing.T) {
 	}
 }
 
-func TestParseQuarkusEndpointPreservesCustomizedEndpointAndQuery(t *testing.T) {
+func TestQuarkusInspectionEndpointsPreservesCustomizedEndpointAndQuery(t *testing.T) {
 	const endpoint = "http://app.test/custom/metrics?scope=app"
-	got, err := parseQuarkusEndpoint(endpoint)
+	got, err := quarkusInspectionEndpoints(endpoint)
 	if err != nil {
-		t.Fatalf("parseQuarkusEndpoint() error = %v", err)
+		t.Fatalf("quarkusInspectionEndpoints() error = %v", err)
 	}
-	if got != endpoint {
-		t.Fatalf("endpoint = %q, want exact %q", got, endpoint)
+	if len(got) != 1 || got[0] != endpoint {
+		t.Fatalf("endpoints = %q, want only exact endpoint %q", got, endpoint)
 	}
 }
 

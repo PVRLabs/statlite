@@ -65,7 +65,6 @@ func (e *actuatorFailure) Unwrap() error {
 type HealthResponse struct {
 	Status     string                     `json:"status"`
 	Components map[string]HealthComponent `json:"components,omitempty"`
-	Raw        json.RawMessage            `json:"raw,omitempty"`
 }
 
 type HealthComponent struct {
@@ -79,7 +78,6 @@ type MetricResponse struct {
 	BaseUnit      string              `json:"baseUnit,omitempty"`
 	Measurements  []MetricMeasurement `json:"measurements,omitempty"`
 	AvailableTags []MetricTag         `json:"availableTags,omitempty"`
-	Raw           json.RawMessage     `json:"raw,omitempty"`
 }
 
 type MetricMeasurement struct {
@@ -140,7 +138,6 @@ func (c *ActuatorClient) decodeHealth(raw actuatorRawResult) (*HealthResponse, e
 			return nil, newActuatorHTTPFailure(raw.effectiveURL, endpointPath, statusCode, body)
 		}
 	}
-	setRaw(&health, body)
 	return &health, nil
 }
 
@@ -180,23 +177,6 @@ func (h *HealthResponse) DBStatus() string {
 	return findComponentStatus(h.Components, "db")
 }
 
-func (c *ActuatorClient) getJSON(ctx context.Context, endpointPath string, query url.Values, dest interface{}) error {
-	raw := c.fetchRaw(ctx, endpointPath, query)
-	if raw.err != nil {
-		return raw.err
-	}
-	body, statusCode := raw.body, raw.statusCode
-	if statusCode < 200 || statusCode >= 300 {
-		return newActuatorHTTPFailure(raw.effectiveURL, endpointPath, statusCode, body)
-	}
-
-	if err := json.Unmarshal(body, dest); err != nil {
-		return newActuatorFailure(actuatorFailureMalformed, raw.effectiveURL, 0, err.Error(), fmt.Sprintf("parsing actuator %s response: %v", endpointPath, err), err)
-	}
-	setRaw(dest, body)
-	return nil
-}
-
 func (c *ActuatorClient) decodeMetric(endpointPath string, raw actuatorRawResult) (*MetricResponse, error) {
 	if raw.err != nil {
 		return nil, raw.err
@@ -209,7 +189,6 @@ func (c *ActuatorClient) decodeMetric(endpointPath string, raw actuatorRawResult
 	if err := json.Unmarshal(raw.body, &metric); err != nil {
 		return nil, newActuatorFailure(actuatorFailureMalformed, raw.effectiveURL, 0, err.Error(), fmt.Sprintf("parsing actuator %s response: %v", endpointPath, err), err)
 	}
-	setRaw(&metric, raw.body)
 	return &metric, nil
 }
 
@@ -302,15 +281,6 @@ func joinURLPath(basePath, endpointPath string) string {
 		return "/" + endpointPath
 	}
 	return path.Join(basePath, endpointPath)
-}
-
-func setRaw(dest interface{}, body []byte) {
-	switch v := dest.(type) {
-	case *HealthResponse:
-		v.Raw = append(v.Raw[:0], body...)
-	case *MetricResponse:
-		v.Raw = append(v.Raw[:0], body...)
-	}
 }
 
 func findComponentStatus(components map[string]HealthComponent, name string) string {

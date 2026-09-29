@@ -2348,14 +2348,16 @@ func TestHandleMonitorStatusReturns500WithoutMonitor(t *testing.T) {
 	}
 }
 
+var rangeTestNow = time.Date(2026, 7, 7, 12, 0, 0, 0, time.UTC)
+
 func TestParseRangeDefaultsToOneHour(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/series", nil)
-	start, end, dashRange, err := parseRange(req)
+	start, end, dashRange, err := parseRangeAt(req, rangeTestNow)
 	if err != nil {
-		t.Fatalf("parseRange() error = %v", err)
+		t.Fatalf("parseRangeAt() error = %v", err)
 	}
-	if end.Sub(start) != time.Hour {
-		t.Fatalf("range = %v, want 1h", end.Sub(start))
+	if !start.Equal(rangeTestNow.Add(-time.Hour)) || !end.Equal(rangeTestNow) {
+		t.Fatalf("range = [%v, %v], want [%v, %v]", start, end, rangeTestNow.Add(-time.Hour), rangeTestNow)
 	}
 	if dashRange != DashboardRange1H {
 		t.Fatalf("DashboardRange = %q, want %q", dashRange, DashboardRange1H)
@@ -2364,9 +2366,9 @@ func TestParseRangeDefaultsToOneHour(t *testing.T) {
 
 func TestParseRangeSupportsRolling24Hours(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/series?range=24h", nil)
-	start, end, dashRange, err := parseRange(req)
+	start, end, dashRange, err := parseRangeAt(req, rangeTestNow)
 	if err != nil {
-		t.Fatalf("parseRange(24h) error = %v", err)
+		t.Fatalf("parseRangeAt(24h) error = %v", err)
 	}
 	if got := end.Sub(start); got != 24*time.Hour {
 		t.Fatalf("24h range = %v, want 24h", got)
@@ -2385,9 +2387,9 @@ func TestParseRangeSupports7dAnd30d(t *testing.T) {
 		{"30d", DashboardRange30D},
 	} {
 		req := httptest.NewRequest(http.MethodGet, "/api/series?range="+tc.name, nil)
-		start, end, dashRange, err := parseRange(req)
+		start, end, dashRange, err := parseRangeAt(req, rangeTestNow)
 		if err != nil {
-			t.Fatalf("parseRange(%s) error = %v", tc.name, err)
+			t.Fatalf("parseRangeAt(%s) error = %v", tc.name, err)
 		}
 		if !start.Before(end) {
 			t.Fatalf("%s: start %v not before end %v", tc.name, start, end)
@@ -2401,18 +2403,18 @@ func TestParseRangeSupports7dAnd30d(t *testing.T) {
 func TestParseRangeRejectsUnsupportedRanges(t *testing.T) {
 	for _, value := range []string{"bad", "today"} {
 		req := httptest.NewRequest(http.MethodGet, "/api/series?range="+value, nil)
-		_, _, _, err := parseRange(req)
+		_, _, _, err := parseRangeAt(req, rangeTestNow)
 		if err == nil {
-			t.Fatalf("parseRange(%s) error = nil, want error", value)
+			t.Fatalf("parseRangeAt(%s) error = nil, want error", value)
 		}
 	}
 }
 
 func TestParseRangeSupportsCustomStartEnd(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/series?start=2026-07-07T00:00:00Z&end=2026-07-07T12:00:00Z", nil)
-	start, end, dashRange, err := parseRange(req)
+	start, end, dashRange, err := parseRangeAt(req, rangeTestNow)
 	if err != nil {
-		t.Fatalf("parseRange(custom) error = %v", err)
+		t.Fatalf("parseRangeAt(custom) error = %v", err)
 	}
 	if !start.Equal(time.Date(2026, 7, 7, 0, 0, 0, 0, time.UTC)) {
 		t.Fatalf("start = %v, want 2026-07-07T00:00:00Z", start)
@@ -2486,16 +2488,15 @@ func TestClearCutoffCounterBaselineClearsMatchingLatestRawPoint(t *testing.T) {
 
 func TestParseRangeCustomStartOnlyDefaultsEndToNow(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/series?start=2026-07-07T00:00:00Z", nil)
-	start, end, dashRange, err := parseRange(req)
+	start, end, dashRange, err := parseRangeAt(req, rangeTestNow)
 	if err != nil {
-		t.Fatalf("parseRange(start only) error = %v", err)
+		t.Fatalf("parseRangeAt(start only) error = %v", err)
 	}
 	if !start.Equal(time.Date(2026, 7, 7, 0, 0, 0, 0, time.UTC)) {
 		t.Fatalf("start = %v, want 2026-07-07T00:00:00Z", start)
 	}
-	now := time.Now().UTC()
-	if d := now.Sub(end); d < 0 || d > time.Second {
-		t.Fatalf("end = %v, want ~now (%v), diff=%v", end, now, d)
+	if !end.Equal(rangeTestNow) {
+		t.Fatalf("end = %v, want fixed now %v", end, rangeTestNow)
 	}
 	if dashRange != DashboardRangeCustom {
 		t.Fatalf("DashboardRange = %q, want %q", dashRange, DashboardRangeCustom)
@@ -2504,9 +2505,9 @@ func TestParseRangeCustomStartOnlyDefaultsEndToNow(t *testing.T) {
 
 func TestParseRangeErrorsOnStartAfterEnd(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/series?start=2026-07-07T12:00:00Z&end=2026-07-07T00:00:00Z", nil)
-	_, _, _, err := parseRange(req)
+	_, _, _, err := parseRangeAt(req, rangeTestNow)
 	if err == nil {
-		t.Fatal("parseRange(start>end) error = nil, want error")
+		t.Fatal("parseRangeAt(start>end) error = nil, want error")
 	}
 }
 

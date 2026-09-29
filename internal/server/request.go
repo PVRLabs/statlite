@@ -131,10 +131,6 @@ func clearSeriesCounterFields(point *storage.SeriesPoint) {
 	point.AverageLatencySeconds = nil
 }
 
-func parseRange(r *http.Request) (time.Time, time.Time, DashboardRange, error) {
-	return parseRangeAt(r, time.Now().UTC())
-}
-
 func parseRangeAt(r *http.Request, now time.Time) (time.Time, time.Time, DashboardRange, error) {
 	query := r.URL.Query()
 	now = now.UTC()

@@ -26,18 +26,17 @@ type Limits struct {
 	MaxSamples           int
 	MaxLabelsPerSample   int
 	MaxLabelBytes        int
-	MaxAggregationStates int
 }
 
 var DefaultLimits = Limits{
 	MaxCompressedBytes: 1 << 20, MaxDecompressedBytes: 4 << 20,
 	MaxRedirects: 3, MaxSamples: 100_000, MaxLabelsPerSample: 32,
-	MaxLabelBytes: 1024, MaxAggregationStates: 10_000,
+	MaxLabelBytes: 1024,
 }
 
 func (l Limits) validate() error {
 	if l.MaxCompressedBytes <= 0 || l.MaxDecompressedBytes <= 0 || l.MaxRedirects < 0 ||
-		l.MaxSamples <= 0 || l.MaxLabelsPerSample < 0 || l.MaxLabelBytes <= 0 || l.MaxAggregationStates <= 0 {
+		l.MaxSamples <= 0 || l.MaxLabelsPerSample < 0 || l.MaxLabelBytes <= 0 {
 		return errors.New("all Prometheus limits must be positive (redirects may be zero)")
 	}
 	return nil
@@ -528,33 +527,3 @@ func (r *countingReader) Read(p []byte) (int, error) {
 func failure(class FailureClass, status int, message string, err error) error {
 	return &Error{Class: class, StatusCode: status, Message: message, Err: err}
 }
-
-// Accumulator bounds aggregation state while allowing target-owned selection
-// and grouping. It intentionally has no knowledge of metric families or labels.
-type Accumulator struct {
-	max    int
-	values map[string]Aggregate
-}
-type Aggregate struct {
-	Sum   float64
-	Count uint64
-}
-
-func NewAccumulator(maxStates int) (*Accumulator, error) {
-	if maxStates <= 0 {
-		return nil, errors.New("aggregation-state limit must be positive")
-	}
-	return &Accumulator{max: maxStates, values: make(map[string]Aggregate)}, nil
-}
-func (a *Accumulator) Add(key string, value float64) error {
-	v, ok := a.values[key]
-	if !ok && len(a.values) >= a.max {
-		return failure(FailureUnsafe, 0, "Prometheus retained-aggregation-state limit exceeded", nil)
-	}
-	v.Sum += value
-	v.Count++
-	a.values[key] = v
-	return nil
-}
-func (a *Accumulator) Get(key string) (Aggregate, bool) { v, ok := a.values[key]; return v, ok }
-func (a *Accumulator) Len() int                         { return len(a.values) }

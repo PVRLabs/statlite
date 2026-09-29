@@ -486,7 +486,7 @@ function renderTargetContext(targets, selected) {
   document.getElementById("target-endpoint").title = endpoint;
   document.getElementById("target-type").textContent = selected.type || "target";
   document.getElementById("target-type-tooltip").textContent = targetTypeHelp(selected.type);
-  document.getElementById("runtime-tooltip").textContent = runtimeHelp(selected.type);
+  document.getElementById("runtime-tooltip").textContent = runtimeHelp();
   select.classList.toggle("hidden", !multiple);
 
   if (!multiple) return;
@@ -710,7 +710,7 @@ function targetTypeHelp(value) {
   }
 }
 
-function runtimeHelp(value) {
+function runtimeHelp() {
   return "CPU usage and runtime memory reported by the target. Their exact measurements depend on the integration and may differ from OS process CPU and total process memory.";
 }
 
