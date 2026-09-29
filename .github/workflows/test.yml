@@ -68,6 +68,9 @@ jobs:
       - name: Run Go tests
         run: go test ./...
 
+      - name: Run storage poll limit integration test
+        run: go test -tags=integration ./test/integration/storage
+
       - name: Run Go static analysis
         run: go vet ./...
 

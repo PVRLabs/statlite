@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"math"
-	"strings"
 	"testing"
 	"time"
 
@@ -143,35 +142,6 @@ func TestPublicMetricsRejectsDifferentStatusBaselinePolls(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestBoundedSeriesRejectsPollOverflowBeforeSamples(t *testing.T) {
-	store := openTestStore(t)
-	defer store.Close()
-	base := time.Date(2026, 9, 24, 10, 0, 0, 0, time.UTC)
-	ctx := context.Background()
-	stmt, err := store.db.PrepareContext(ctx, `INSERT INTO polls (target_id, started_at, finished_at, status) VALUES ((SELECT id FROM targets WHERE name = 'app'), ?, ?, 'ok')`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer stmt.Close()
-	for i := 0; i < PublicMetricsPollLimit; i++ {
-		ts := formatSortableTime(base.Add(time.Duration(i) * time.Millisecond))
-		if _, err := stmt.ExecContext(ctx, ts, ts); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if _, err := store.BoundedSeries(ctx, "app", base, base.Add(time.Minute), time.Time{}); err != nil {
-		t.Fatalf("at poll limit: %v", err)
-	}
-	ts := formatSortableTime(base.Add(time.Duration(PublicMetricsPollLimit) * time.Millisecond))
-	if _, err := stmt.ExecContext(ctx, ts, ts); err != nil {
-		t.Fatal(err)
-	}
-	_, err = store.BoundedSeries(ctx, "app", base, base.Add(time.Minute), time.Time{})
-	if err == nil || !strings.Contains(err.Error(), "poll limit exceeded") {
-		t.Fatalf("overflow error = %v", err)
 	}
 }
 
