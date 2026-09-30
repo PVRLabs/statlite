@@ -4,7 +4,7 @@ This file summarizes the main user-facing changes in each StatLite release.
 GitHub release notes use the matching version section, with commit history as
 a fallback when a section is missing.
 
-## Unreleased
+## v0.5.1 (2026-09-30)
 
 - Improved 7-day and 30-day dashboard chart performance with bounded sampling.
   These charts are approximate overviews and can miss intermediate spikes or
@@ -17,6 +17,8 @@ a fallback when a section is missing.
   inspection stays read-only, and suggested targets use stable names based on
   type, host, and port.
 - Added a compact Simplified Chinese README landing page.
+
+## Unreleased
 
 ## v0.5.0 (2026-09-25)
 
