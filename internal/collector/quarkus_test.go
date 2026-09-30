@@ -399,15 +399,15 @@ process_cpu_usage 0.1
 }
 
 func TestQuarkusHTTPDurationMatchingStateIsBounded(t *testing.T) {
-	v := quarkusHTTPValues{completeCountLabels: true}
-	for i := 0; i < quarkusHTTPMatchingStateLimit+100; i++ {
+	v := micrometerHTTPValues{}
+	for i := 0; i < micrometerHTTPMatchingStateLimit+100; i++ {
 		v.acceptCount(prometheus.Sample{
 			Name:   "http_server_requests_seconds_count",
 			Value:  1,
 			Labels: []prometheus.Label{{Name: "method", Value: "METHOD_" + strconv.Itoa(i)}, {Name: "outcome", Value: "SUCCESS"}, {Name: "status", Value: "200"}},
-		})
+		}, validateQuarkusHTTPLabels)
 	}
-	if !v.matchingOverflow || v.matchingStates != quarkusHTTPMatchingStateLimit || len(v.countDimensions) != quarkusHTTPMatchingStateLimit {
+	if !v.matchingOverflow || v.matchingStates != micrometerHTTPMatchingStateLimit || len(v.countDimensions) != micrometerHTTPMatchingStateLimit {
 		t.Fatalf("matching state = overflow:%v states:%d groups:%d", v.matchingOverflow, v.matchingStates, len(v.countDimensions))
 	}
 }
@@ -773,4 +773,74 @@ func hasQuarkusCollectorEvent(events []CollectorEvent, eventType, metricKey stri
 		}
 	}
 	return false
+}
+
+func TestQuarkusExtractionPreservesStatusSyntax(t *testing.T) {
+	// Preserve Quarkus's existing Atoi boundary when another adapter introduces
+	// stricter status syntax. Neither uri nor exception is required here.
+	for _, status := range []string{"+404", "0404"} {
+		t.Run(status, func(t *testing.T) {
+			labels := `{method="GET",outcome="CLIENT_ERROR",status="` + status + `"}`
+			result := collectQuarkusBody(t, "process_cpu_usage 0.1\nhttp_server_requests_seconds_count"+labels+" 2\nhttp_server_requests_seconds_sum"+labels+" 0.5\n")
+			assertSample(t, result, "http_404_total", MetricKindCounter, 2, "requests")
+			assertSample(t, result, "http_request_time_total_seconds", MetricKindCounter, 0.5, "seconds")
+			if len(result.Events) != 0 {
+				t.Fatalf("events = %#v", result.Events)
+			}
+		})
+	}
+}
+
+func TestQuarkusExtractionRejectsInvalidHTTPValues(t *testing.T) {
+	for _, value := range []string{"-1", "NaN", "+Inf", "-Inf"} {
+		t.Run(value, func(t *testing.T) {
+			result := collectQuarkusBody(t, `process_cpu_usage 0.1
+http_server_requests_seconds_count{method="GET",outcome="SUCCESS",status="200"} 3
+http_server_requests_seconds_sum{method="GET",outcome="SUCCESS",status="200"} 2
+http_server_requests_seconds_count{method="GET",outcome="SUCCESS",status="200",uri="/bad"} `+value+`
+http_server_requests_seconds_sum{method="GET",outcome="SUCCESS",status="200",uri="/bad"} `+value+"\n")
+			assertSample(t, result, "http_requests_total", MetricKindCounter, 3, "requests")
+			assertSample(t, result, "http_request_time_total_seconds", MetricKindCounter, 2, "seconds")
+			if hasSample(result, "http_4xx_total") || len(result.Events) != 2 {
+				t.Fatalf("result = %#v", result)
+			}
+			for _, event := range result.Events {
+				if event.Type != "metric_dimension_invalid" {
+					t.Fatalf("event = %#v", event)
+				}
+			}
+		})
+	}
+}
+
+func TestQuarkusExtractionDurationDuplicatePreservesCounts(t *testing.T) {
+	result := collectQuarkusBody(t, `process_cpu_usage 0.1
+http_server_requests_seconds_count{method="GET",outcome="SUCCESS",status="200"} 3
+http_server_requests_seconds_sum{method="GET",outcome="SUCCESS",status="200"} 2
+http_server_requests_seconds_sum{status="200",outcome="SUCCESS",method="GET"} 2
+`)
+	assertSample(t, result, "http_requests_total", MetricKindCounter, 3, "requests")
+	assertSample(t, result, "http_4xx_total", MetricKindCounter, 0, "requests")
+	if hasSample(result, "http_request_time_total_seconds") || len(result.Events) != 1 || result.Events[0].Type != "metric_series_duplicate" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestQuarkusExtractionCombinedMatchingLimit(t *testing.T) {
+	v := micrometerHTTPValues{}
+	for i := 0; i < micrometerHTTPMatchingStateLimit/2; i++ {
+		sample := prometheus.Sample{Value: 1, Labels: []prometheus.Label{{Name: "method", Value: "GET"}, {Name: "outcome", Value: "SUCCESS"}, {Name: "status", Value: "200"}, {Name: "uri", Value: strconv.Itoa(i)}}}
+		v.acceptCount(sample, validateQuarkusHTTPLabels)
+		v.acceptDuration(sample, validateQuarkusHTTPLabels)
+	}
+	if v.matchingOverflow || !v.durationMatchesCounts() {
+		t.Fatal("exact combined limit must remain usable")
+	}
+	v.acceptDuration(prometheus.Sample{Value: 1, Labels: []prometheus.Label{{Name: "method", Value: "POST"}, {Name: "outcome", Value: "SUCCESS"}, {Name: "status", Value: "200"}}}, validateQuarkusHTTPLabels)
+	result := &CollectionResult{}
+	v.addTo(result)
+	addQuarkusHTTPWarnings(result, &v)
+	if !v.matchingOverflow || v.matchingStates != micrometerHTTPMatchingStateLimit || len(v.countDimensions)+len(v.durationDimensions) != micrometerHTTPMatchingStateLimit || len(result.Samples) != 0 || len(result.Events) != 1 || result.Events[0].Type != "metric_aggregation_limit" {
+		t.Fatalf("result = %#v, states = %d", result, v.matchingStates)
+	}
 }
