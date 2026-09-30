@@ -103,12 +103,14 @@ Accepted reports are indexed in
   smoke checks.
 - Independent release asset verification: PASS via
   `statlite-private/scripts/release.py verify v0.5.1 --candidate-commit ef154ea882647faa7f7593eb0097bc99e319df77`.
-- Post-release development version and CI: pending.
+- Post-release development version: `v0.5.2-dev`, commit
+  `6f51c3c` on `main`.
+- Post-release main CI: PASS, run `36787427724`.
 - Homebrew updater: PASS, run `36787181229`.
 - Homebrew verification: PASS; formula audit, upgrade from 0.5.0, `brew test`,
   and installed version `statlite v0.5.1` all passed. Homebrew identified this
   Intel macOS host as Tier 3 and built the formula from source.
-- Release announcement URL and date: pending.
+- Release announcement: [StatLite 0.5.1: Faster charts and safer setup](https://github.com/PVRLabs/statlite/discussions/22), published 2026-09-30.
 
 ## Blockers, limitations, and accepted risks
 
@@ -123,6 +125,8 @@ Accepted reports are indexed in
   `b1f0d368f74c7b88b08c782c74e7a30e537b16432a180341f67cc27a09c08880`.
 - Prepare manifest: `/private/tmp/statlite-0.5.1-prepare.json`.
 - Candidate/final tagged commit: `ef154ea882647faa7f7593eb0097bc99e319df77`.
-- Main CI: `36774982209`; release workflow: `36785875739`.
+- Candidate main CI: `36774982209`; release workflow: `36785875739`.
+- Post-release main CI: `36787427724` on `6f51c3c`.
 - Homebrew updater: `36787181229`.
+- Release announcement: [discussion #22](https://github.com/PVRLabs/statlite/discussions/22), 2026-09-30.
 - Reviewer and date: release operator, 2026-09-30.
