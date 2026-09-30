@@ -32,6 +32,7 @@ type Server struct {
 	httpServer        *http.Server
 	manager           *monitor.Manager
 	retentionDays     int
+	rawSeries         bool
 	retentionCutoff   func() time.Time
 	startedAt         time.Time
 	requestsTotal     atomic.Uint64
@@ -138,6 +139,11 @@ func NewWithManagerRetentionCutoffAndFilesystem(listen string, manager *monitor.
 	}
 
 	return s
+}
+
+// SetRawSeries disables dashboard sampling and aggregation. Call before serving.
+func (s *Server) SetRawSeries(enabled bool) {
+	s.rawSeries = enabled
 }
 
 // FreezeDashboardTime makes dashboard ranges relative to a stored point in

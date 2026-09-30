@@ -158,6 +158,7 @@ func runMonitor(args []string, stdout, stderr io.Writer) int {
 
 	configPath := monitorFlags.String("config", "statlite.yaml", "path to config file")
 	noPoll := monitorFlags.Bool("no-poll", false, "serve stored data without polling targets")
+	rawSeries := monitorFlags.Bool("raw-series", false, "serve full-resolution series within the effective range without dashboard sampling or aggregation")
 	showVersion := monitorFlags.Bool("version", false, "print version and exit")
 	if err := monitorFlags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -239,6 +240,7 @@ func runMonitor(args []string, stdout, stderr io.Writer) int {
 		serverRetentionDays = 0
 	}
 	srv := server.NewWithManagerRetentionCutoffAndFilesystem(cfg.Server.Listen, manager, serverRetentionDays, retentionCutoff.Current, cfg.Storage.SQLitePath)
+	srv.SetRawSeries(*rawSeries)
 	if dashboardNow != nil {
 		srv.FreezeDashboardTime(*dashboardNow)
 	}
@@ -332,7 +334,7 @@ Polls Spring Boot Actuator and StatLite self-monitoring endpoints, stores
 samples in local SQLite, and serves a localhost dashboard.
 
 Usage:
-  statlite [--config path] [--no-poll]
+  statlite [--config path] [--no-poll] [--raw-series]
   statlite inspect <application-url>
   statlite inspect --type quarkus <application-or-metrics-url>
   statlite inspect <application-url> --create-config PATH
@@ -343,6 +345,7 @@ Usage:
 Options:
   --config path   Config file (default: statlite.yaml)
   --no-poll       Serve stored data without polling targets
+  --raw-series    Serve full-resolution series within the effective range
   --version       Print version and exit
   --help          Show this help
 

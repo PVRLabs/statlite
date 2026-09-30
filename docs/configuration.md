@@ -435,3 +435,9 @@ This mode disables startup, periodic, and manual debug polling. It also skips
 retention cleanup, shows stored history outside the configured retention
 window, and freezes dashboard time ranges at the newest stored poll. When the
 database has no polls, the dashboard uses the current time instead.
+
+For troubleshooting chart optimizations, the CLI-only `--raw-series` flag
+bypasses dashboard sampling and aggregation, returning the full-resolution series
+within the effective requested range. Normal retention clamping applies while
+polling is enabled. It can be combined with `--no-poll`; counter/restart semantics
+still apply, but long ranges require more server and browser work.

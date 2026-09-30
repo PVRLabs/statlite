@@ -2704,12 +2704,16 @@ func TestHandleSeriesLongRangeSamplingKeepsNativeLatest(t *testing.T) {
 		query  string
 		total  float64
 		points int
+		raw    bool
 	}{
-		{"range=1h", 165, 4}, {"range=24h", 165, 1},
-		{"range=7d", 50, 1}, {"range=30d", 50, 1},
-		{"start=2026-09-01T12:00:00Z&end=2026-09-01T12:04:00Z", 165, 4},
+		{"range=1h", 165, 4, false}, {"range=24h", 165, 1, false},
+		{"range=7d", 50, 1, false}, {"range=30d", 50, 1, false},
+		{"start=2026-09-01T12:00:00Z&end=2026-09-01T12:04:00Z", 165, 4, false},
+		{"range=24h", 165, 4, true}, {"range=7d", 165, 4, true},
+		{"range=30d", 165, 4, true},
 	} {
 		t.Run(tc.query, func(t *testing.T) {
+			app.SetRawSeries(tc.raw)
 			response := httptest.NewRecorder()
 			app.httpServer.Handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/series?"+tc.query, nil))
 			if response.Code != http.StatusOK {

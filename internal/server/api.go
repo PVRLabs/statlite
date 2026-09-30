@@ -123,7 +123,12 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 	}
 	target := s.selectedTarget(r)
 	bucket := dashboardBucketDuration(dashRange)
-	series, err := target.Monitor.DashboardSeries(r.Context(), start, end, bucket)
+	var series *storage.Series
+	if s.rawSeries {
+		series, err = target.Monitor.Series(r.Context(), start, end)
+	} else {
+		series, err = target.Monitor.DashboardSeries(r.Context(), start, end, bucket)
+	}
 	if err != nil {
 		http.Error(w, fmt.Sprintf("target %q: %v", target.Metadata.Name, err), http.StatusInternalServerError)
 		return
@@ -133,7 +138,9 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 	}
 	// Aggregate after restart-aware deltas using the explicit dashboard scale.
 	// Sparse series (at most one point per bucket) stay at native resolution.
-	series = storage.AggregateSeries(series, bucket)
+	if !s.rawSeries {
+		series = storage.AggregateSeries(series, bucket)
+	}
 	writeJSON(w, http.StatusOK, series)
 }
 

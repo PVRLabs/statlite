@@ -6,10 +6,17 @@ a fallback when a section is missing.
 
 ## Unreleased
 
+- Improved 7-day and 30-day dashboard chart performance with bounded sampling.
+  These charts are approximate overviews and can miss intermediate spikes or
+  counter resets; raw stored history remains authoritative.
+- Added `--raw-series` for troubleshooting chart optimizations by returning the
+  full-resolution series within the effective requested range without dashboard
+  sampling or aggregation.
 - Added `statlite inspect URL --create-config PATH` and `--add-to-config PATH`
   to create a configuration or append one inspected target safely. Plain
   inspection stays read-only, and suggested targets use stable names based on
   type, host, and port.
+- Added a compact Simplified Chinese README landing page.
 
 ## v0.5.0 (2026-09-25)
 
