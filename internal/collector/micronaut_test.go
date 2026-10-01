@@ -37,7 +37,7 @@ func newTestMicronautCollector(t *testing.T, handler http.HandlerFunc) *Micronau
 	if err != nil {
 		t.Fatal(err)
 	}
-	return NewMicronautCollector("orders", server.URL+"/prometheus", client)
+	return NewMicronautCollector("orders", server.URL+"/prometheus", client, nil)
 }
 
 func micronautBodyCollector(t *testing.T, body string) *MicronautCollector {
@@ -413,7 +413,7 @@ func TestMicronautCollectorNotConfigured(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, c := range []*MicronautCollector{NewMicronautCollector("orders", "http://localhost/prometheus", nil), NewMicronautCollector("orders", "", client)} {
+	for _, c := range []*MicronautCollector{NewMicronautCollector("orders", "http://localhost/prometheus", nil, nil), NewMicronautCollector("orders", "", client, nil)} {
 		result, err := c.Collect(context.Background())
 		if err == nil || len(result.Events) != 1 || result.Events[0].Type != "collector_not_configured" || result.PollFinishedAt.IsZero() {
 			t.Fatalf("result = %#v, error = %v", result, err)

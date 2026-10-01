@@ -46,6 +46,8 @@ func newCollector(target config.TargetConfig, timeout time.Duration) (monitor.Co
 		return newSpringCollector(target, timeout)
 	case config.TargetTypeStatliteMetrics:
 		return newStatliteMetricsCollector(target, timeout)
+	case config.TargetTypeMicronaut:
+		return newMicronautCollector(target, timeout)
 	case config.TargetTypeQuarkus:
 		return newQuarkusCollector(target, timeout)
 	default:
@@ -149,4 +151,29 @@ func springEndpoint(base, endpoint string) (string, error) {
 	u.RawQuery = ""
 	u.Fragment = ""
 	return u.String(), nil
+}
+
+func newMicronautCollector(target config.TargetConfig, timeout time.Duration) (monitor.Collector, error) {
+	client, err := prometheus.NewClient(timeout, prometheus.DefaultLimits, prometheusAuthConfig(target.Auth))
+	if err != nil {
+		return nil, fmt.Errorf("micronaut metrics client: %w", err)
+	}
+	healthURL := target.HealthURL
+	if healthURL == "" {
+		healthURL, err = config.DefaultMicronautHealthURL(target.URL)
+		if err != nil {
+			return nil, fmt.Errorf("micronaut health URL: %w", err)
+		}
+	}
+	var healthClient *collector.MicronautHealthClient
+	if healthURL != "" {
+		healthClient, err = collector.NewMicronautHealthClient(healthURL, timeout, collectorAuthConfig(target.Auth))
+		if err != nil {
+			return nil, fmt.Errorf("micronaut health client: %w", err)
+		}
+		if target.HealthURL == "" {
+			healthClient.TreatNotFoundAsOptional()
+		}
+	}
+	return collector.NewMicronautCollector(target.Name, target.URL, client, healthClient), nil
 }

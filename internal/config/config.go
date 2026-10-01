@@ -18,6 +18,7 @@ const (
 	// When adding a target type, also update targetTypeHelp in the dashboard.
 	TargetTypeSpring          = "spring"
 	TargetTypeQuarkus         = "quarkus"
+	TargetTypeMicronaut       = "micronaut"
 	TargetTypeStatliteMetrics = "statlite-metrics"
 
 	SpringMetricsSourceAuto       = "auto"
@@ -266,16 +267,20 @@ func (c *Config) validateTargets() error {
 			if err := validateQuarkusTarget(target); err != nil {
 				return err
 			}
+		case TargetTypeMicronaut:
+			if err := validateMicronautTarget(target); err != nil {
+				return err
+			}
 		case TargetTypeStatliteMetrics:
 			if err := validateStatliteMetricsTarget(target); err != nil {
 				return err
 			}
 		default:
-			return targetError(target, "type", fmt.Sprintf("unsupported value %q (supported: spring, quarkus, statlite-metrics)", targetType))
+			return targetError(target, "type", fmt.Sprintf("unsupported value %q (supported: spring, quarkus, micronaut, statlite-metrics)", targetType))
 		}
 		if target.Auth != nil {
-			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus {
-				return targetError(target, "auth", "is supported only for type spring and quarkus")
+			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus && targetType != TargetTypeMicronaut {
+				return targetError(target, "auth", "is supported only for type spring, quarkus, and micronaut")
 			}
 			if target.Auth.Type != "basic" {
 				return targetError(target, "auth.type", fmt.Sprintf("unsupported value %q (only basic is supported)", target.Auth.Type))
@@ -293,8 +298,8 @@ func (c *Config) validateTargets() error {
 		if (target.CollectHostMetrics || target.collectHostSet) && targetType != TargetTypeSpring {
 			return targetError(target, "collect_host_metrics", "is supported only for type spring")
 		}
-		if (target.HealthURL != "" || target.healthURLSet) && targetType != TargetTypeQuarkus {
-			return targetError(target, "health_url", "is supported only for type quarkus")
+		if (target.HealthURL != "" || target.healthURLSet) && targetType != TargetTypeQuarkus && targetType != TargetTypeMicronaut {
+			return targetError(target, "health_url", "is supported only for type quarkus and micronaut")
 		}
 	}
 	return nil
@@ -327,6 +332,33 @@ func validateSpringTarget(target *TargetConfig) error {
 func validateQuarkusTarget(target *TargetConfig) error {
 	if target.URL == "" {
 		return targetError(target, "url", "is required for type quarkus")
+	}
+	if target.ActuatorBaseURL != "" || target.actuatorURLSet {
+		return targetError(target, "actuator_base_url", "is supported only for type spring")
+	}
+	if target.metricsSourceSet {
+		return targetError(target, "metrics_source", "is supported only for type spring")
+	}
+	if target.collectHostSet {
+		return targetError(target, "collect_host_metrics", "is supported only for type spring")
+	}
+	if err := validateTargetURL(target.URL, true, false); err != nil {
+		return targetURLValidationError(target, "url", err)
+	}
+	if target.HealthURL != "" {
+		if err := validateTargetURL(target.HealthURL, true, false); err != nil {
+			return targetURLValidationError(target, "health_url", err)
+		}
+	}
+	if target.MetricsSource != "" {
+		return targetError(target, "metrics_source", "is supported only for type spring")
+	}
+	return nil
+}
+
+func validateMicronautTarget(target *TargetConfig) error {
+	if target.URL == "" {
+		return targetError(target, "url", "is required for type micronaut")
 	}
 	if target.ActuatorBaseURL != "" || target.actuatorURLSet {
 		return targetError(target, "actuator_base_url", "is supported only for type spring")
@@ -458,4 +490,22 @@ func sanitizeEndpoint(endpoint string) string {
 	}
 	parsed.User = nil
 	return parsed.String()
+}
+
+// DefaultMicronautHealthURL preserves the escaped context path and derives
+// health only from a literal conventional metrics suffix.
+func DefaultMicronautHealthURL(metricsURL string) (string, error) {
+	if err := validateTargetURL(metricsURL, true, false); err != nil {
+		return "", err
+	}
+	u, _ := url.Parse(metricsURL)
+	escaped := strings.TrimSuffix(u.EscapedPath(), "/")
+	if !strings.HasSuffix(escaped, "/prometheus") {
+		return "", nil
+	}
+	u.RawPath = strings.TrimSuffix(escaped, "/prometheus") + "/health"
+	u.Path, _ = url.PathUnescape(u.RawPath)
+	u.RawQuery = ""
+	u.ForceQuery = false
+	return u.String(), nil
 }

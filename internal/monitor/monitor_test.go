@@ -1113,3 +1113,106 @@ func assertMonitorFloatPointer(t *testing.T, name string, got *float64, want flo
 		t.Fatalf("%s = %v, want %v", name, *got, want)
 	}
 }
+
+func TestPollNowDetectsMicronautRestartWithoutNegativeCounterDelta(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	var scrape int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		scrape++
+		if scrape == 1 {
+			_, _ = w.Write([]byte("process_start_time_seconds 1770000000\nprocess_cpu_usage 0.2\nhttp_server_requests_seconds_count{method=\"GET\",uri=\"/probe\",exception=\"none\",status=\"200\"} 100\n"))
+			return
+		}
+		_, _ = w.Write([]byte("process_start_time_seconds 1770000060\nprocess_cpu_usage 0.1\nhttp_server_requests_seconds_count{method=\"GET\",uri=\"/probe\",exception=\"none\",status=\"200\"} 2\n"))
+	}))
+	defer server.Close()
+	client, err := prometheus.NewClient(time.Second, prometheus.DefaultLimits, nil)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	mon := newTestMonitor(t, store, collector.NewMicronautCollector("app", server.URL, client, nil))
+
+	first, err := mon.PollNow(context.Background())
+	if err != nil {
+		t.Fatalf("first PollNow() error = %v", err)
+	}
+	second, err := mon.PollNow(context.Background())
+	if err != nil {
+		t.Fatalf("second PollNow() error = %v", err)
+	}
+	if first.AppRunID == nil || second.AppRunID == nil || *first.AppRunID == *second.AppRunID {
+		t.Fatalf("app run ids = %v/%v, want distinct Micronaut runs", first.AppRunID, second.AppRunID)
+	}
+	if !hasEvent(second.Result.Events, EventTypeRestartDetected) {
+		t.Fatalf("events = %#v, want restart detection", second.Result.Events)
+	}
+	series, err := store.Series(context.Background(), "app", first.Result.PollStartedAt.Add(-time.Second), second.Result.PollFinishedAt.Add(time.Second))
+	if err != nil {
+		t.Fatalf("Series() error = %v", err)
+	}
+	if len(series.Points) != 2 || second.PollID != first.PollID+1 || mon.IntegrationType() != "micronaut" {
+		t.Fatalf("expected two logical Micronaut polls: %#v", series)
+	}
+	for _, point := range series.Points {
+		if point.Requests != nil && *point.Requests < 0 {
+			t.Fatalf("requests delta = %v after Micronaut restart, want nonnegative", *point.Requests)
+		}
+	}
+}
+
+func TestMicronautPollPersistsHealthIndependently(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+	healthBody := `{"status":"UP","details":{"jdbc":{"status":"DOWN"}}}`
+	metricsFail := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			fmt.Fprint(w, healthBody)
+			return
+		}
+		if metricsFail {
+			http.Error(w, "failed", 500)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain")
+		fmt.Fprint(w, "process_cpu_usage 0.2\n")
+	}))
+	defer server.Close()
+	pc, err := prometheus.NewClient(time.Second, prometheus.DefaultLimits, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hc, err := collector.NewMicronautHealthClient(server.URL+"/health", time.Second, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mon := newTestMonitor(t, store, collector.NewMicronautCollector("app", server.URL+"/prometheus", pc, hc))
+	for _, tt := range []struct {
+		body, app, db, status string
+		failed                bool
+	}{
+		{healthBody, "UP", "DOWN", "ok", false},
+		{`{"status":"UNKNOWN"}`, "", "", "ok", false},
+		{`{"status":"UP","details":[]}`, "UP", "", "ok", false},
+		{`{"status":"DOWN","details":{"jdbc":{"status":"UP"}}}`, "DOWN", "UP", "error", true},
+	} {
+		healthBody, metricsFail = tt.body, tt.failed
+		polled, err := mon.PollNow(context.Background())
+		if (err != nil) != tt.failed {
+			t.Fatalf("poll error %v", err)
+		}
+		saved, err := store.LatestSnapshot(context.Background(), "app")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if saved.PollID != polled.PollID || saved.Status != tt.status || saved.Result.HealthStatus != tt.app || saved.Result.DBHealthStatus != tt.db {
+			t.Fatalf("persisted %#v result %#v", saved, saved.Result)
+		}
+		if !tt.failed && mon.Status().ConsecutivePollFailures != 0 {
+			t.Fatal("health warning failed metrics poll")
+		}
+	}
+}

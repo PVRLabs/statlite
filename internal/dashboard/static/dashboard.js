@@ -703,6 +703,8 @@ function targetTypeHelp(value) {
     return "Monitors a Spring Boot application through Actuator health and metrics endpoints.";
   case "quarkus":
     return "Monitors a Quarkus application through its metrics endpoint; SmallRye Health is used when available.";
+  case "micronaut":
+    return "Monitors a Micronaut application through its metrics endpoint; management health is used when available.";
   case "statlite-metrics":
     return "Monitors an app that exposes metrics in StatLite’s standard format.";
   default:

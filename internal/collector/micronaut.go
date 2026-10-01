@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pvrlabs/statlite/internal/prometheus"
@@ -14,10 +15,22 @@ import (
 
 // MicronautCollector performs one bounded scrape of the exact metrics endpoint.
 type MicronautCollector struct {
-	targetName string
-	endpoint   string
-	client     *prometheus.Client
+	targetName             string
+	endpoint               string
+	client                 *prometheus.Client
+	healthClient           *MicronautHealthClient
+	healthStateMu          sync.Mutex
+	healthCapability       micronautHealthCapability
+	healthProcessStartTime *time.Time
 }
+
+type micronautHealthCapability uint8
+
+const (
+	micronautHealthUnknown micronautHealthCapability = iota
+	micronautHealthAvailable
+	micronautHealthAbsent
+)
 
 var ErrMicronautIncompatible = errors.New("Micronaut metrics endpoint does not expose a finite recognized runtime family")
 
@@ -34,12 +47,12 @@ type micronautEvaluation struct {
 	processStartTime *time.Time
 }
 
-func NewMicronautCollector(targetName, endpoint string, client *prometheus.Client) *MicronautCollector {
-	return &MicronautCollector{targetName: targetName, endpoint: endpoint, client: client}
+func NewMicronautCollector(targetName, endpoint string, client *prometheus.Client, healthClient *MicronautHealthClient) *MicronautCollector {
+	return &MicronautCollector{targetName: targetName, endpoint: endpoint, client: client, healthClient: healthClient}
 }
 
 func InspectMicronaut(ctx context.Context, endpoint string, client *prometheus.Client) (*MicronautInspection, error) {
-	evaluation, err := NewMicronautCollector("", endpoint, client).evaluate(ctx)
+	evaluation, err := NewMicronautCollector("", endpoint, client, nil).evaluate(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -60,26 +73,82 @@ func InspectMicronaut(ctx context.Context, endpoint string, client *prometheus.C
 }
 
 func (c *MicronautCollector) Collect(ctx context.Context) (*CollectionResult, error) {
-	result := &CollectionResult{TargetName: c.targetName, PollStartedAt: time.Now().UTC()}
+	started := time.Now().UTC()
+	result := &CollectionResult{TargetName: c.targetName, PollStartedAt: started}
 	defer func() { result.PollFinishedAt = time.Now().UTC() }()
 	if c.client == nil || c.endpoint == "" {
 		err := errors.New("Micronaut metrics client is not configured")
 		result.addEvent(EventSeverityError, "collector_not_configured", "", err.Error())
 		return result, err
 	}
-	evaluation, err := c.evaluate(ctx)
-	if err != nil {
-		if errors.Is(err, ErrMicronautIncompatible) {
-			result.addEvent(EventSeverityError, "metrics_source_incompatible", "", err.Error())
+	evaluation, metricsErr := c.evaluate(ctx)
+	if metricsErr != nil {
+		if errors.Is(metricsErr, ErrMicronautIncompatible) {
+			result.addEvent(EventSeverityError, "metrics_source_incompatible", "", metricsErr.Error())
 		} else {
-			result.addEvent(EventSeverityError, "metrics_fetch_failed", "", err.Error())
+			result.addEvent(EventSeverityError, "metrics_fetch_failed", "", metricsErr.Error())
 		}
-		return result, err
+	} else {
+		result.Samples = evaluation.samples
+		result.Events = append(result.Events, evaluation.events...)
+		result.ProcessStartTime = evaluation.processStartTime
 	}
-	result.Samples = evaluation.samples
-	result.Events = evaluation.events
-	result.ProcessStartTime = evaluation.processStartTime
-	return result, nil
+
+	if c.healthClient != nil {
+		if c.shouldProbeHealth(result.ProcessStartTime) {
+			health, err := c.healthClient.Fetch(ctx)
+			if err != nil {
+				if c.healthClient.notFoundOptional && errors.Is(err, ErrMicronautHealthNotFound) && c.health404IsOptional() && metricsErr == nil {
+					c.markHealthAbsent(result.ProcessStartTime)
+				} else {
+					result.addEvent(EventSeverityWarning, "health_fetch_failed", "", err.Error())
+				}
+			} else {
+				result.HealthStatus = health.Status
+				result.DBHealthStatus = health.DatabaseStatus
+				if health.Warning != "" {
+					result.addEvent(EventSeverityWarning, "health_partial", "", health.Warning)
+				}
+				c.markHealthAvailable(result.ProcessStartTime)
+			}
+		}
+	}
+	return result, metricsErr
+}
+
+func (c *MicronautCollector) shouldProbeHealth(processStartTime *time.Time) bool {
+	c.healthStateMu.Lock()
+	defer c.healthStateMu.Unlock()
+	if processStartTime != nil {
+		if c.healthProcessStartTime != nil && !processStartTime.Equal(*c.healthProcessStartTime) {
+			c.healthCapability = micronautHealthUnknown
+		}
+		c.healthProcessStartTime = cloneTime(processStartTime)
+	}
+	if c.healthCapability == micronautHealthAbsent {
+		return false
+	}
+	return true
+}
+
+func (c *MicronautCollector) markHealthAbsent(processStartTime *time.Time) {
+	c.healthStateMu.Lock()
+	defer c.healthStateMu.Unlock()
+	c.healthCapability = micronautHealthAbsent
+	c.healthProcessStartTime = cloneTime(processStartTime)
+}
+
+func (c *MicronautCollector) health404IsOptional() bool {
+	c.healthStateMu.Lock()
+	defer c.healthStateMu.Unlock()
+	return c.healthCapability == micronautHealthUnknown
+}
+
+func (c *MicronautCollector) markHealthAvailable(processStartTime *time.Time) {
+	c.healthStateMu.Lock()
+	defer c.healthStateMu.Unlock()
+	c.healthCapability = micronautHealthAvailable
+	c.healthProcessStartTime = cloneTime(processStartTime)
 }
 
 func (c *MicronautCollector) evaluate(ctx context.Context) (*micronautEvaluation, error) {

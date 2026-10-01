@@ -161,6 +161,8 @@ func (m *Monitor) IntegrationType() string {
 	switch m.collector.(type) {
 	case *collector.SpringActuatorCollector:
 		return config.TargetTypeSpring
+	case *collector.MicronautCollector:
+		return config.TargetTypeMicronaut
 	case *collector.QuarkusCollector:
 		return config.TargetTypeQuarkus
 	case *collector.StatliteMetricsCollector:

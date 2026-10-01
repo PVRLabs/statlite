@@ -27,6 +27,13 @@ test("targetTypeHelp describes the Quarkus metrics endpoint", () => {
   );
 });
 
+test("targetTypeHelp describes the Micronaut metrics endpoint and optional health", () => {
+  assert.equal(
+    dashboard.targetTypeHelp("micronaut"),
+    "Monitors a Micronaut application through its metrics endpoint; management health is used when available."
+  );
+});
+
 test("runtimeHelp describes integration-dependent CPU and runtime memory", () => {
   const expected = "CPU usage and runtime memory reported by the target. Their exact measurements depend on the integration and may differ from OS process CPU and total process memory.";
   assert.equal(dashboard.runtimeHelp(), expected);

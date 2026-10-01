@@ -167,7 +167,7 @@ func TestValidateRejectsProgrammaticUnsupportedTargetFields(t *testing.T) {
 			targetType: TargetTypeSpring,
 			url:        "http://example.com/actuator",
 			healthURL:  "http://example.com/health",
-			want:       "health_url: is supported only for type quarkus",
+			want:       "health_url: is supported only for type quarkus and micronaut",
 		},
 	}
 	for _, tt := range tests {
@@ -184,15 +184,16 @@ func TestValidateRejectsProgrammaticUnsupportedTargetFields(t *testing.T) {
 					HealthURL:       tt.healthURL,
 				}},
 			}
-			if err := Validate(cfg); err == nil || !strings.Contains(err.Error(), tt.want) {
-				t.Fatalf("Validate() error = %v, want %q", err, tt.want)
+			want := `invalid target "app": ` + tt.want
+			if err := Validate(cfg); err == nil || err.Error() != want {
+				t.Fatalf("Validate() error = %v, want %q", err, want)
 			}
 		})
 	}
 }
 
 func TestValidateTargetURLsHaveSupportedStructure(t *testing.T) {
-	types := []string{TargetTypeSpring, TargetTypeQuarkus, TargetTypeStatliteMetrics}
+	types := []string{TargetTypeSpring, TargetTypeQuarkus, TargetTypeMicronaut, TargetTypeStatliteMetrics}
 	invalidURLs := []struct{ value, reason string }{
 		{"ftp://example.com/metrics", `unsupported URL scheme "ftp"`},
 		{"http:///metrics", "must include a host"},
@@ -239,7 +240,7 @@ func TestValidateStructurallyValidUnreachableURL(t *testing.T) {
 }
 
 func TestValidateAcceptsPercentEncodedHashInTargetURLs(t *testing.T) {
-	for _, targetType := range []string{TargetTypeSpring, TargetTypeQuarkus, TargetTypeStatliteMetrics} {
+	for _, targetType := range []string{TargetTypeSpring, TargetTypeQuarkus, TargetTypeMicronaut, TargetTypeStatliteMetrics} {
 		t.Run(targetType, func(t *testing.T) {
 			cfg := validConfig(targetType, "http://example.com/metrics%23suffix")
 			if err := Validate(cfg); err != nil {
@@ -897,7 +898,7 @@ targets:
 			if err == nil {
 				t.Fatal("Load() error = nil, want error")
 			}
-			if !strings.Contains(err.Error(), "auth: is supported only for type spring and quarkus") {
+			if !strings.Contains(err.Error(), "auth: is supported only for type spring, quarkus, and micronaut") {
 				t.Fatalf("Load() error = %q, want spring-only auth error", err)
 			}
 		})

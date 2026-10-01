@@ -474,3 +474,120 @@ targets:
 func typeName(value any) string {
 	return reflect.TypeOf(value).String()
 }
+
+func TestNewCollectorAllowsCustomMicronautMetricsEndpointWithoutHealth(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if u, p, ok := r.BasicAuth(); !ok || u != "u" || p != "p" {
+			t.Error("missing metrics auth")
+		}
+		if r.RequestURI != "/manage%2Fprom/?scope=app" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		_, _ = w.Write([]byte("process_cpu_usage 0.25\n"))
+	}))
+	defer server.Close()
+
+	targetCollector, err := newCollector(config.TargetConfig{
+		Name: "orders",
+		Type: config.TargetTypeMicronaut,
+		Auth: &config.AuthConfig{Type: "basic", Username: "u", Password: "p"},
+		URL:  server.URL + "/manage%2Fprom/?scope=app",
+	}, time.Second)
+	if err != nil {
+		t.Fatalf("newCollector() error = %v", err)
+	}
+	result, err := targetCollector.Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if len(result.Samples) != 1 || result.Samples[0].Key != "process_cpu_usage" || result.HealthStatus != "" || result.DBHealthStatus != "" || len(result.Events) != 0 {
+		t.Fatalf("result = %#v, want metrics-only custom endpoint without synthesized health", result)
+	}
+}
+
+func TestNewCollectorDerivesMicronautHealthEndpointAndSharesAuth(t *testing.T) {
+	var metricsRequests, healthRequests int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, password, ok := r.BasicAuth()
+		if !ok || user != "user" || password != "secret" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		switch r.URL.EscapedPath() {
+		case "/svc%2Fwest/prometheus/":
+			metricsRequests++
+			w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+			_, _ = w.Write([]byte("process_cpu_usage 0.25\n"))
+		case "/svc%2Fwest/health":
+			healthRequests++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"UP","details":{"jdbc":{"status":"UP"}}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	targetCollector, err := newCollector(config.TargetConfig{
+		Name: "orders",
+		Type: config.TargetTypeMicronaut,
+		URL:  server.URL + "/svc%2Fwest/prometheus/",
+		Auth: &config.AuthConfig{Type: "basic", Username: "user", Password: "secret"},
+	}, time.Second)
+	if err != nil {
+		t.Fatalf("newCollector() error = %v", err)
+	}
+	result, err := targetCollector.Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if metricsRequests != 1 || healthRequests != 1 {
+		t.Fatalf("requests = metrics:%d health:%d, want 1/1", metricsRequests, healthRequests)
+	}
+	if result.HealthStatus != "UP" || result.DBHealthStatus != "UP" {
+		t.Fatalf("health = %q/%q, want UP/UP", result.HealthStatus, result.DBHealthStatus)
+	}
+}
+
+func TestNewCollectorUsesExplicitMicronautHealthURL(t *testing.T) {
+	var healthRequests int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, password, ok := r.BasicAuth()
+		if !ok || user != "user" || password != "secret" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		switch r.URL.EscapedPath() {
+		case "/manage/prom":
+			w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+			_, _ = w.Write([]byte("process_cpu_usage 0.25\n"))
+		case "/manage/health":
+			healthRequests++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"UP","details":{"jdbc":{"status":"UP"}}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	targetCollector, err := newCollector(config.TargetConfig{
+		Name:      "orders",
+		Type:      config.TargetTypeMicronaut,
+		URL:       server.URL + "/manage/prom",
+		HealthURL: server.URL + "/manage/health",
+		Auth:      &config.AuthConfig{Type: "basic", Username: "user", Password: "secret"},
+	}, time.Second)
+	if err != nil {
+		t.Fatalf("newCollector() error = %v", err)
+	}
+	result, err := targetCollector.Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if healthRequests != 1 || result.HealthStatus != "UP" || result.DBHealthStatus != "UP" {
+		t.Fatalf("health requests/status = %d %q/%q, want 1 UP/UP", healthRequests, result.HealthStatus, result.DBHealthStatus)
+	}
+}
