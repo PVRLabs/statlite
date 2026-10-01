@@ -3,8 +3,6 @@ package inspect
 import (
 	"context"
 	"fmt"
-	"github.com/pvrlabs/statlite/internal/collector"
-	"github.com/pvrlabs/statlite/internal/prometheus"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +10,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/pvrlabs/statlite/internal/collector"
+	"github.com/pvrlabs/statlite/internal/prometheus"
 )
 
 func TestTypedMicronautInspectionUsesExactEndpointAndOneBoundedScrape(t *testing.T) {

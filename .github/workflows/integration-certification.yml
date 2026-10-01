@@ -32,6 +32,7 @@ jobs:
           - case: gin
             app_port: 8080
           - case: spring
+          - case: micronaut
           - case: quarkus
     steps:
       - name: Checkout
@@ -74,7 +75,7 @@ jobs:
           cache-dependency-path: examples/node-express-demo/package-lock.json
 
       - name: Set up Java
-        if: matrix.case == 'spring' || matrix.case == 'quarkus'
+        if: matrix.case == 'spring' || matrix.case == 'quarkus' || matrix.case == 'micronaut'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -123,6 +124,19 @@ jobs:
         working-directory: examples/quarkus-metrics-demo
         run: mvn --batch-mode --no-transfer-progress package
 
+      - name: Build Micronaut demo
+        if: matrix.case == 'micronaut'
+        working-directory: examples/micronaut-metrics-demo
+        run: mvn --batch-mode --no-transfer-progress package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt
+
+      - name: Report Micronaut versions
+        if: matrix.case == 'micronaut'
+        working-directory: examples/micronaut-metrics-demo
+        run: |
+          java --version
+          mvn --version
+          mvn --batch-mode --no-transfer-progress dependency:tree '-Dincludes=io.micronaut:micronaut-core,io.micronaut:micronaut-management,io.micronaut.micrometer:*,io.micrometer:*'
+
       - name: Report Spring Boot versions
         if: matrix.case == 'spring'
         working-directory: examples/spring-actuator-demo
@@ -161,3 +175,9 @@ jobs:
         env:
           STATLITE_BIN: ${{ runner.temp }}/statlite
         run: ./scripts/ci/integration-quarkus.sh
+
+      - name: Run Micronaut integration journey
+        if: matrix.case == 'micronaut'
+        env:
+          STATLITE_BIN: ${{ runner.temp }}/statlite
+        run: ./scripts/ci/integration-micronaut.sh

@@ -330,6 +330,9 @@ incompatible.
 
 ### Micronaut Micrometer metrics
 
+Run the [Micronaut demo](../examples/micronaut-metrics-demo/) for a complete
+application, management configuration, and deterministic traffic recipe.
+
 ```yaml
 targets:
   - name: "orders"

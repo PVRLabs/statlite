@@ -1,0 +1,11 @@
+server:
+  listen: "127.0.0.1:8090"
+storage:
+  sqlite_path: "micronaut-demo.sqlite"
+polling:
+  interval: "30s"
+  timeout: "5s"
+targets:
+  - name: micronaut-metrics-demo
+    type: micronaut
+    url: http://127.0.0.1:18084/prometheus

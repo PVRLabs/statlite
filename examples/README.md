@@ -26,6 +26,7 @@ go run ./cmd/statlite --config examples/actuator.yaml
 | Directory | What it shows |
 |-----------|---------------|
 | [spring-actuator-demo](spring-actuator-demo/) | Runnable Spring Boot app with Actuator and Micrometer metrics, traffic generator, and dashboard preview |
+| [micronaut-metrics-demo](micronaut-metrics-demo/) | Pinned Micronaut 4.9.9 application with Prometheus metrics, ordinary management health, and deterministic traffic |
 | [quarkus-metrics-demo](quarkus-metrics-demo/) | Pinned Quarkus 3.39.1 Micrometer metrics fixture, contract captures, and traffic recipe |
 | [python-fastapi-demo](python-fastapi-demo/) | Runnable companion to the canonical [FastAPI guide](../docs/integrate/python/fastapi.md), with middleware and framework-level tests |
 | [node-express-demo](node-express-demo/) | Runnable companion to the canonical [Express guide](../docs/integrate/node/express.md), with middleware and framework-level tests |

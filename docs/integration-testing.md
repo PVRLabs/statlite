@@ -30,7 +30,10 @@ not increase application counters. The Go `net/http` and Gin cases establish
 a baseline, then assert exact two-poll counter deltas and derived average
 latency, including Gin's recovered pre-commit panic. The Spring Boot and
 Quarkus cases check the framework-specific health or process/runtime signals
-that their examples publish.
+that their examples publish. The Micronaut case checks typed inspection, exact
+404/4xx/5xx deltas between successful stored polls, accumulated duration, runtime
+signals, aggregate UP health, and unavailable database health. Management
+self-traffic contributes to its total, so the total increase is a lower bound.
 
 ## Integrations in the public checks
 
@@ -51,6 +54,9 @@ The shared matrix currently exercises:
 - [Quarkus](../examples/quarkus-metrics-demo/) through the Micrometer metrics
   integration.
 
+- [Micronaut](../examples/micronaut-metrics-demo/) through the
+  [Micrometer metrics integration](configuration.md#micronaut-micrometer-metrics).
+
 Inspect the implementation and current triggers in the public
 [`integration certification` workflow](https://github.com/PVRLabs/statlite/actions/workflows/integration-certification.yml).
 It runs for every pull request, every push to `main`, and weekly on Monday at
@@ -58,7 +64,7 @@ It runs for every pull request, every push to `main`, and weekly on Monday at
 not hide the results for the others.
 
 The release workflow reuses this same workflow as a prerequisite before it
-creates a release tag, so a release cannot proceed until all seven public cases
+creates a release tag, so a release cannot proceed until all eight public cases
 pass on the dispatched commit.
 
 These are focused public integration checks for the documented monitoring
