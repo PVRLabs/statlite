@@ -14,6 +14,7 @@ not a generic Prometheus scraper or metrics database.
 | Spring Boot Actuator | Supported | Actuator JSON | `/actuator` management base URL | Actuator health is the normal Spring health source; application request, JVM, process, and optional host concepts are normalized into StatLite's fixed vocabulary. |
 | Spring Micrometer Prometheus | Supported | Prometheus/OpenMetrics exposition | Configured Prometheus endpoint | This is a Spring source option, not a generic `prometheus` target. |
 | Quarkus 3.39.x | Supported | Micrometer Prometheus/OpenMetrics exposition; optional SmallRye Health | Conventional `/q/metrics`; optional `/q/health` | Explicit `quarkus` target; datasource health is normalized when published. |
+| Micronaut 4.9.9 (certified setup) | Supported | Micrometer 1.15.0 Prometheus exposition; optional management health | Exact `/prometheus`; optional `/health` | Explicit `micronaut` target; JDBC health requires visible aggregate details. |
 | StatLite Metrics v1 | Supported | Fixed `statlite-metrics/v1` response | `/statlite/metrics` | Fixed producer contract for StatLite and compatible applications. See the [direct integration guides](integrate/). |
 
 Support means that the integration has an owned endpoint and source contract,
@@ -76,7 +77,7 @@ established `/q/metrics` location; it does not identify arbitrary Micrometer
 exposition as Quarkus. Basic Auth uses the shared `auth.type: basic`
 configuration for both endpoints.
 
-Spring Boot and Quarkus memory is JVM heap used. It is runtime-managed
+Spring Boot, Quarkus, and Micronaut memory is JVM heap used. It is runtime-managed
 application memory, not process RSS, container memory, or a configured maximum
 heap size.
 
@@ -84,6 +85,40 @@ The public pinned fixture is
 [`examples/quarkus-metrics-demo/`](../examples/quarkus-metrics-demo/). It uses
 Quarkus 3.39.1, Java 21 LTS, the Micrometer Prometheus registry, and SmallRye
 Health.
+
+## Micronaut
+
+Micronaut uses an explicit `type: micronaut` target and the exact metrics
+endpoint, conventionally `http://localhost:8080/prometheus`. The certified
+setup uses Micronaut 4.9.9 (platform parent 4.9.2), Micronaut Micrometer 5.12.0,
+Micrometer 1.15.0, and optional JDBC Hikari integration 6.2.1. Certification
+uses Temurin 25.0.4.1+1-LTS with Java 17 fixture bytecode and H2 2.3.232.
+Support covers this setup and the fixed contract, not arbitrary Micrometer
+exposition. Quarkus and Micronaut retain separate label and health contracts.
+
+The adapter normalizes request count, 404/4xx/5xx counts, accumulated duration,
+process CPU, JVM heap used, process start, and uptime. HTTP timers are lazy at
+idle and restart, and include management self-traffic once requests complete.
+Missing timers remain unavailable. Source routes, exceptions, datasource names,
+and other labels are not stored as dimensions. Invalid concepts produce focused
+partial warnings while independent valid metrics remain usable.
+
+Management health is independent and optional. A conventional `/prometheus`
+path derives sibling `/health`; custom paths can use `health_url`. Database
+health requires visible `details.jdbc.status`, and remains unavailable when
+JDBC details are absent or hidden. UP/DOWN aggregate application health is
+accepted over HTTP 200 or 503. Metrics success does not synthesize stored health.
+As with Quarkus, successful metrics without explicit health can appear as
+operational `UP` on the dashboard. Initial derived-health absence is cached until
+a detectable process restart or collector recreation; known failures warn and
+are retried. Disabling health can leave metrics usable; removing management
+from the certified dependency graph removes both endpoints.
+
+Use `statlite inspect --type micronaut` with a base URL or exact endpoint.
+Inspection checks the same metrics contract as collection and does not probe
+health. It does not prove Micronaut identity, and untyped inspection does not
+attempt Micronaut recognition. See [configuration and setup](configuration.md#micronaut-micrometer-metrics)
+for dependencies, endpoint resolution, health visibility, and overrides.
 
 ## Scope boundaries
 

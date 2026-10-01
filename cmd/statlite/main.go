@@ -360,6 +360,7 @@ func printInspectHelp(w io.Writer) {
 
 Example:
   statlite inspect 'http://localhost:8080'
+  statlite inspect --type micronaut 'http://localhost:8080/prometheus'
   statlite inspect 'http://localhost:8080' --create-config ./statlite.yaml
   statlite inspect 'http://localhost:8080' --add-to-config ./statlite.yaml
 
@@ -377,8 +378,11 @@ Prometheus/OpenMetrics endpoint. A base URL uses the conventional /q/metrics pat
 Quote the URL when pasting it from a browser, especially if it contains ? or &.
 Untyped inspection requires a base URL, so remove any query string or fragment first.
 Typed Quarkus inspection accepts a base URL or exact metrics endpoint URL.
-Use --type micronaut with a base URL or exact Prometheus endpoint. Micronaut
-inspection checks compatibility without proving framework identity.`)
+Use --type micronaut with a base URL or exact Prometheus endpoint. A root base
+URL resolves to /prometheus; non-root paths allow one context fallback after a
+conclusive miss. URLs with a query are exact endpoints. Micronaut inspection
+checks compatibility without proving framework identity; untyped inspection
+does not recognize Micronaut.`)
 }
 
 const configurationDocsURL = "https://github.com/PVRLabs/statlite/blob/main/docs/configuration.md"

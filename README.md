@@ -5,7 +5,7 @@
 
 [![GitHub release](https://img.shields.io/github/v/release/PVRLabs/statlite)](https://github.com/PVRLabs/statlite/releases)
 [![Go powered](https://img.shields.io/github/go-mod/go-version/PVRLabs/statlite?label=Go%20powered&logo=go&logoColor=white)](go.mod)
-[![Frameworks: Spring Boot · Quarkus](https://img.shields.io/badge/Frameworks-Spring%20Boot%20%C2%B7%20Quarkus-e7e7e7?labelColor=333)](docs/integrations.md)
+[![Frameworks: Spring Boot · Quarkus · Micronaut](https://img.shields.io/badge/Frameworks-Spring%20Boot%20%C2%B7%20Quarkus%20%C2%B7%20Micronaut-e7e7e7?labelColor=333)](docs/integrations.md)
 [![CI](https://github.com/PVRLabs/statlite/actions/workflows/test.yml/badge.svg)](https://github.com/PVRLabs/statlite/actions/workflows/test.yml)
 [![License](https://img.shields.io/github/license/PVRLabs/statlite)](LICENSE)
 
@@ -21,7 +21,7 @@ charts, without requiring Prometheus or Grafana.
   <br><sub>Main application dashboard for the Spring target.</sub>
 </p>
 
-StatLite supports Spring Boot and Quarkus integrations, and other
+StatLite supports Spring Boot, Quarkus, and Micronaut integrations, and other
 applications through [a small, fixed JSON metrics endpoint](docs/statlite-metrics-v1.md).
 It collects traffic, latency, CPU, memory, optional application health, and
 optional host metrics. Metrics and history stay on your server, without
@@ -114,11 +114,13 @@ For other supported frameworks, select the type explicitly when needed:
 
 ```bash
 statlite inspect --type quarkus 'http://localhost:9000'
+statlite inspect --type micronaut 'http://localhost:8080'
 ```
 
 Inspection checks conventional supported endpoints and is bounded and
-read-only. For untyped discovery, start with a base HTTP or HTTPS URL without a
-query string or fragment.
+read-only. Micronaut requires `--type micronaut`; inspection validates its
+supported contract without proving framework identity. For untyped discovery, start with
+a base HTTP or HTTPS URL without a query string or fragment.
 
 See [Configuration](docs/configuration.md) for exact endpoint forms, discovery
 limits, authentication limitations, all settings, and manual target
@@ -145,6 +147,11 @@ health.
 - **Quarkus Micrometer:** Collects bounded request, latency, CPU, heap, process,
   and restart concepts from an exact Prometheus/OpenMetrics endpoint. SmallRye
   Health is an optional capability when the application publishes it.
+- **Micronaut Micrometer:** Collects the existing request, duration, CPU, heap,
+  process, and restart concepts from an exact configured Prometheus endpoint,
+  conventionally `/prometheus`. Management health is optional; database health
+  requires visible JDBC aggregate status.
+  See the [certified setup](docs/configuration.md#micronaut-micrometer-metrics).
 - **[StatLite Metrics v1](docs/statlite-metrics-v1.md):** A small, fixed JSON
   endpoint that applications in any language or framework can implement. See
   the [direct integration guides](docs/integrate/) for FastAPI, Express,

@@ -9,8 +9,8 @@ applications, local SQLite history, retention, host visibility, and a dashboard
 in one small process. Current measurements show roughly 10 to 15 MiB of idle
 RSS. This is an observed range, not a maximum-memory guarantee.
 
-Beyond its Spring Boot and Quarkus integrations, applications can expose the
-small, fixed [StatLite Metrics v1 profile](statlite-metrics-v1.md) to use the
+Beyond its Spring Boot, Quarkus, and Micronaut integrations, applications can
+expose the small, fixed [StatLite Metrics v1 profile](statlite-metrics-v1.md) to use the
 same collection, history, and dashboard without adopting a general-purpose
 telemetry pipeline.
 

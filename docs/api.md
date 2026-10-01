@@ -47,7 +47,7 @@ application and dependency health for the selected target.
 | Field | Meaning |
 |---|---|
 | `target` | Configured target name. |
-| `type` | Canonical integration type, such as `spring`, `quarkus`, or `statlite-metrics`. |
+| `type` | Canonical integration type, such as `spring`, `quarkus`, `micronaut`, or `statlite-metrics`. |
 | `collection_status` | `not_polled` before any poll, `ok` after a successful latest poll, or `error` when the latest poll failed. |
 | `last_poll_at` | Completion time of the latest collection attempt, or `null`. |
 | `last_successful_poll_at` | Completion time of the latest successful collection, or `null`. |

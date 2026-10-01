@@ -83,7 +83,7 @@ value is clear; any future target still requires a separate product decision.
 
 ### Currently supported targets
 
-StatLite has three supported target types:
+StatLite has four supported target types:
 
 * `spring`: Spring Boot Actuator and a fixed set of Micrometer metrics. This
   is the default target type when `type` is omitted.
@@ -94,8 +94,12 @@ StatLite has three supported target types:
 * `quarkus`: Quarkus Micrometer Prometheus/OpenMetrics metrics at an exact
   configured exposition endpoint. It normalizes a fixed request, latency,
   process, heap, and restart vocabulary.
-Spring, Quarkus, and StatLite Metrics are application integrations. None of
-these boundaries is an arbitrary metrics API.
+* `micronaut`: the certified Micronaut Micrometer setup at an exact
+  exposition endpoint, with independent optional management health and visible
+  JDBC aggregate health. It uses the existing normalized concepts.
+
+Spring, Quarkus, Micronaut, and StatLite Metrics are application integrations.
+None of these boundaries is an arbitrary metrics API.
 
 ### Framework-first integration model
 
@@ -153,8 +157,8 @@ metrics reachability. A successful metrics scrape establishes that the target
 is reporting to StatLite, but is not equivalent to framework aggregate health.
 Spring Boot
 Actuator health is normally an established part of the `spring` integration;
-SmallRye Health for Quarkus and health endpoints for any future framework
-target remain optional capabilities. If Spring health retrieval
+SmallRye Health for Quarkus, Micronaut management health, and health endpoints
+for any future framework target remain optional capabilities. If Spring health retrieval
 fails, StatLite retains independently usable metrics, leaves health
 unavailable, and records a focused warning. A poll without any usable metric
 sample remains a collection failure even when health responded.
@@ -195,7 +199,7 @@ non-healthy states use warning or error styling.
 ## Deployment topology
 
 For a collocated deployment, configure application targets (`spring`, `quarkus`,
-or `statlite-metrics`) for application and process data, and `statlite-self`
+`micronaut`, or `statlite-metrics`) for application and process data, and `statlite-self`
 through `/statlite/metrics` to monitor StatLite itself. The self response also
 provides CPU and memory for the host or execution environment visible to
 StatLite, plus capacity for the filesystem containing its SQLite database, so

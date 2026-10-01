@@ -1,0 +1,13 @@
+# Requires the Micronaut setup documented in docs/configuration.md.
+server:
+  listen: "127.0.0.1:9090"
+storage:
+  sqlite_path: "./statlite.sqlite"
+polling:
+  interval: "30s"
+targets:
+  - name: "orders"
+    type: "micronaut"
+    url: "http://localhost:8080/prometheus"
+    # For a custom metrics path, set the exact optional health_url.
+    # health_url: "http://localhost:8080/health"

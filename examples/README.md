@@ -11,6 +11,7 @@ FastAPI, Express, Django, Go `net/http`, and Gin application setup.
 | File | Purpose |
 |------|---------|
 | `actuator.yaml` | Single Spring Boot Actuator target with Basic Auth placeholders |
+| [micronaut.yaml](micronaut.yaml) | Exact Micronaut Prometheus endpoint; optional management health |
 | `statlite.yaml` | Monitor another StatLite instance via `statlite-metrics` |
 | `multi-target.yaml` | Mixed targets: Actuator, StatLite Metrics, and self-monitoring |
 
