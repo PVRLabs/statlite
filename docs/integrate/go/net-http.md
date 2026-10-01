@@ -5,6 +5,31 @@ the fixed `statlite-metrics/v1` JSON profile and a standard-library-only
 helper. A [runnable and tested demo](../../../examples/go-net-http-demo/)
 contains the same helper.
 
+Copy `statlite.go` into your application package, then wrap your HTTP handler
+and register `GET /statlite/metrics` as shown below.
+
+> [!NOTE]
+> No StatLite SDK or package and no additional third-party runtime
+> dependency are required. The helper uses only the Go standard library. The
+> complete helper is shown below and included in the runnable demo. You can
+> inspect, modify, and test it as application-owned source using your usual
+> code-review and security tools.
+
+Your own StatLite instance polls the endpoint; the helper makes no outbound
+network requests and sends no telemetry to PVR Labs or another external
+service. Snapshot collection reads in-memory counters and runtime APIs without
+database I/O. The JSON response contains aggregate request and HTTP error
+counts, cumulative request duration, process CPU and runtime memory values,
+uptime, start time, application status, and schema/integration identifiers. It
+does not include request or response bodies, headers, URL lists, or user
+identifiers.
+
+> [!CAUTION]
+> Those operational metrics leave the application in the endpoint response,
+> so restrict access through loopback, a private network, or proxy controls.
+> The StatLite Metrics target currently sends no authentication credentials;
+> see the access caveats below.
+
 ## When to use this integration
 
 Go does not have a first-class StatLite target type. Use this direct v1

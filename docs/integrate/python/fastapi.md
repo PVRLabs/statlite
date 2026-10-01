@@ -1,9 +1,34 @@
 # Integrate FastAPI with StatLite Metrics
 
 This guide adds lightweight FastAPI application monitoring using the fixed
-`statlite-metrics/v1` JSON profile and one small, dependency-light helper. A
+`statlite-metrics/v1` JSON profile and a copyable application-owned helper. A
 [runnable and tested demo](../../../examples/python-fastapi-demo/) accompanies
 the guide.
+
+Copy `statlite_metrics.py` into your application, then register its HTTP
+middleware and `GET /statlite/metrics` route as shown below.
+
+> [!NOTE]
+> No StatLite SDK or package and no additional third-party runtime
+> dependency are required. The helper uses the Python standard library;
+> registration uses FastAPI. The complete helper is shown below and included
+> in the runnable demo. You can inspect, modify, and test it as application-
+> owned source using your usual code-review and security tools.
+
+Your own StatLite instance polls the endpoint; the helper makes no outbound
+network requests and sends no telemetry to PVR Labs or another external
+service. Snapshot collection reads in-memory counters and runtime APIs without
+database I/O. The JSON response contains aggregate request and HTTP error
+counts, cumulative request duration, process CPU and runtime memory values,
+uptime, start time, application status, and schema/integration identifiers. It
+does not include request or response bodies, headers, URL lists, or user
+identifiers.
+
+> [!CAUTION]
+> Those operational metrics leave the application in the endpoint response,
+> so restrict access through loopback, a private network, or proxy controls.
+> The StatLite Metrics target currently sends no authentication credentials;
+> see the access caveats below.
 
 ## When to use this integration
 
@@ -16,6 +41,8 @@ prefork, and replica deployments are outside this drop-in integration.
 The helper captures one stable application start time during initialization,
 uses it for restart detection, and reports elapsed uptime. It uses Python's
 standard-library `tracemalloc` support for a useful application-memory value.
+It starts allocation tracing if it is not already active; tracing adds runtime
+CPU and memory overhead, which you should evaluate with your application.
 
 StatLite cannot determine request counts, HTTP errors, or request latency from
 outside the application. The middleware below measures those values where
@@ -26,7 +53,7 @@ The example was exercised with Python 3.14.6, FastAPI 0.140.7, and Uvicorn
 guide claims only that tested baseline rather than compatibility with every
 supported FastAPI release.
 
-## Minimal dependency-light integration
+## Copyable helper
 
 Save this complete helper as `statlite_metrics.py`:
 
@@ -285,6 +312,8 @@ require StatLite to authenticate. Restrict access because the endpoint exposes
 operational data.
 
 ## References and future first-class support
+
+- [Article: Monitoring a FastAPI app on a small VPS](https://pvrlabs.xyz/articles/monitoring-fastapi-app-small-vps.html)
 
 - [Runnable FastAPI demo](../../../examples/python-fastapi-demo/)
 - [StatLite Metrics v1 specification](../../statlite-metrics-v1.md)

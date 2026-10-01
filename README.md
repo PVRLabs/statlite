@@ -146,7 +146,12 @@ when the application needs to add the `/statlite/metrics` endpoint. See
 - **[StatLite Metrics v1](docs/statlite-metrics-v1.md):** A small, fixed JSON
   endpoint that applications in any language or framework can implement. See
   the [direct integration guides](docs/integrate/) for FastAPI, Express,
-  Django, Go `net/http`, and Gin.
+  Django, Go `net/http`, and Gin. Those guides provide complete, copyable
+  application-owned helpers with no StatLite SDK/package or additional
+  third-party monitoring runtime dependency. Your own StatLite instance polls
+  the endpoint; the supplied helpers make no outbound requests and send no
+  telemetry to PVR Labs. They expose aggregate operational metrics, so restrict
+  endpoint access as described in each guide.
 - **StatLite self-monitoring:** StatLite can report its own health, traffic,
   process, and host metrics.
 

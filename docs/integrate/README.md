@@ -44,6 +44,34 @@ These frameworks do not have first-class target types; their guides use
 from configuration tools. Each guide uses the conventional `/statlite/metrics`
 endpoint and requires an application setup step.
 
+## What the direct helpers add
+
+The five guides above show the complete helper and application registration,
+with runnable source and tests in each demo. You copy the helper into your own
+source tree and can inspect, modify, test, and review it with your usual tools.
+None requires a StatLite SDK/package or an additional third-party monitoring
+runtime dependency: they use the application's framework and standard runtime
+APIs. FastAPI's helper itself uses only Python's standard library, and Go
+`net/http` uses only Go's standard library.
+
+These helpers make no outbound network requests, send no telemetry to PVR Labs
+or another external service, and perform no database I/O during snapshot
+collection. Your own StatLite instance pulls JSON from the application endpoint.
+The response exposes aggregate traffic, error and duration metrics, CPU and
+runtime memory, uptime, start time, status, and schema/integration identifiers.
+It contains no request/response bodies, headers, URL lists, or user identifiers.
+These claims describe the supplied helpers, not arbitrary v1 producers or
+application middleware you add around them.
+
+> [!CAUTION]
+> Restrict endpoint access: operational metrics are still exposed to any
+> caller that can reach it. The StatLite Metrics target sends no
+> authentication credentials. Follow each guide's network/proxy and
+> single-process deployment caveats.
+
+Python helpers also enable `tracemalloc` allocation tracing, which
+adds CPU and memory overhead; no added package does not mean no runtime cost.
+
 ## Memory reported by each integration
 
 The dashboard presents one normalized application-memory series. Each runtime
@@ -74,7 +102,7 @@ host boundary.
 Framework guides use this sequence:
 
 1. When to use the integration and whether a first-class target exists.
-2. The minimal dependency-light integration.
+2. The copyable application-owned helper.
 3. An established-library path only when it is materially useful, or an
    explicit statement that no additional library path is recommended.
 4. Complete middleware, helper, endpoint, and exact `GET /statlite/metrics`

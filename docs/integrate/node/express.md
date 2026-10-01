@@ -1,18 +1,43 @@
 # Integrate Express with StatLite Metrics
 
 This guide adds lightweight Node.js/Express application monitoring using the
-fixed `statlite-metrics/v1` JSON profile and one small, dependency-light
+fixed `statlite-metrics/v1` JSON profile and a copyable application-owned
 helper.
 
 A [runnable and tested demo](../../../examples/node-express-demo/) accompanies
 the guide.
+
+Copy `statlite-metrics.js` into your application, then register its Express
+middleware and `GET /statlite/metrics` route as shown below.
+
+> [!NOTE]
+> No StatLite SDK or package and no additional third-party runtime
+> dependency are required. It uses Express and Node.js built-in APIs. The
+> complete helper is shown below and included in the runnable demo. You can
+> inspect, modify, and test it as application-owned source using your usual
+> code-review and security tools.
+
+Your own StatLite instance polls the endpoint; the helper makes no outbound
+network requests and sends no telemetry to PVR Labs or another external
+service. Snapshot collection reads in-memory counters and runtime APIs without
+database I/O. The JSON response contains aggregate request and HTTP error
+counts, cumulative request duration, process CPU and runtime memory values,
+uptime, start time, application status, and schema/integration identifiers. It
+does not include request or response bodies, headers, URL lists, or user
+identifiers.
+
+> [!CAUTION]
+> Those operational metrics leave the application in the endpoint response,
+> so restrict access through loopback, a private network, or proxy controls.
+> The StatLite Metrics target currently sends no authentication credentials;
+> see the access caveats below.
 
 ## When to use this integration
 
 Express does not have a first-class StatLite target type. Use this direct v1
 integration when StatLite's fixed traffic, error, average-latency, status,
 restart, and process signals fit the application's operational needs. This
-dependency-light example supports one process or worker. Cluster mode,
+in-memory helper supports one process or worker. Cluster mode,
 multi-process managers, and replica deployments are outside this drop-in
 integration.
 
@@ -25,7 +50,7 @@ Node.js process APIs and the standard Express middleware and response APIs, but
 this guide claims only that tested baseline rather than compatibility with
 every supported Express release.
 
-## Minimal dependency-light integration
+## Copyable helper
 
 Save this complete helper as `statlite-metrics.js`:
 
@@ -246,6 +271,8 @@ challenge between StatLite and this endpoint. Restrict access because the
 endpoint exposes operational data.
 
 ## References and future first-class support
+
+- [Article: Lightweight Express monitoring](https://pvrlabs.xyz/articles/lightweight-express-monitoring.html)
 
 - [Runnable Express demo](../../../examples/node-express-demo/)
 - [StatLite Metrics v1 specification](../../statlite-metrics-v1.md)
