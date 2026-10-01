@@ -434,8 +434,8 @@ func TestRunInspectTypeErrorsUseAccurateUsageMessages(t *testing.T) {
 		targetType string
 		want       string
 	}{
-		{targetType: "prometheus", want: `unsupported inspection type "prometheus" (supported: quarkus)`},
-		{targetType: "spring", want: `typed inspection type "spring" is not available (supported: quarkus)`},
+		{targetType: "prometheus", want: `unsupported inspection type "prometheus" (supported: quarkus, micronaut)`},
+		{targetType: "spring", want: `typed inspection type "spring" is not available (supported: quarkus, micronaut)`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.targetType, func(t *testing.T) {
@@ -705,5 +705,55 @@ func TestRunExplicitAndMalformedConfigDoNotSuggestInspect(t *testing.T) {
 	}
 	if strings.Contains(stderr.String(), "statlite inspect <application-url>") {
 		t.Fatalf("stderr = %q, explicitly supplied default config must not get inspect suggestion", stderr.String())
+	}
+}
+
+func TestRenderInspectionMicronautOutputRoundTripsExactEndpoint(t *testing.T) {
+	result := &inspect.Result{
+		TargetType:   inspect.TargetMicronaut,
+		Endpoint:     "http://localhost:9000/prometheus/?scope=app",
+		Status:       inspect.CompatibilityCompatible,
+		Capabilities: []string{"process_cpu_usage", "jvm_heap_used_bytes"},
+	}
+
+	got, err := renderInspection(result)
+	if err != nil {
+		t.Fatalf("renderInspection() error = %v", err)
+	}
+	for _, want := range []string{
+		"Detected: Micronaut Metrics",
+		"Compatibility: compatible",
+		"type: micronaut",
+		"url: http://localhost:9000/prometheus/?scope=app",
+		"process_cpu_usage",
+		"jvm_heap_used_bytes",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("renderInspection() = %q, missing %q", got, want)
+		}
+	}
+	assertSuggestedConfigLoads(t, got, config.TargetTypeMicronaut, "http://localhost:9000/prometheus/?scope=app")
+}
+
+func TestRunTypedMicronautInspectDispatchesOnlyToRequestedTarget(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	var untypedCalls, typedCalls int
+	code := runWithInspectors([]string{"inspect", "--type", "micronaut", "http://app.test/prometheus?scope=app"}, &stdout, &stderr,
+		func(context.Context, string) (*inspect.Result, error) {
+			untypedCalls++
+			return nil, errors.New("untyped inspector must not run")
+		},
+		func(_ context.Context, targetType inspect.TargetType, endpoint string) (*inspect.Result, error) {
+			typedCalls++
+			if targetType != inspect.TargetMicronaut || endpoint != "http://app.test/prometheus?scope=app" {
+				t.Fatalf("typed inspection arguments = %q, %q", targetType, endpoint)
+			}
+			return &inspect.Result{TargetType: inspect.TargetMicronaut, Endpoint: endpoint, Status: inspect.CompatibilityPartial, Capabilities: []string{"jvm_heap_used_bytes"}}, nil
+		})
+	if code != 0 || untypedCalls != 0 || typedCalls != 1 {
+		t.Fatalf("code=%d untyped=%d typed=%d stdout=%q stderr=%q", code, untypedCalls, typedCalls, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Detected: Micronaut Metrics") || !strings.Contains(stdout.String(), "type: micronaut") || !strings.Contains(stdout.String(), "Compatibility: partial") {
+		t.Fatalf("stdout = %q, want typed Micronaut output", stdout.String())
 	}
 }

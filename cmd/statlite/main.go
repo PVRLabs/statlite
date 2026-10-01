@@ -60,7 +60,7 @@ func runInspectWithTyped(args []string, stdout, stderr io.Writer, inspectApplica
 	inspectFlags.Usage = func() {
 		printInspectHelp(stderr)
 	}
-	typed := inspectFlags.String("type", "", "inspect a specific target type (currently: quarkus)")
+	typed := inspectFlags.String("type", "", "inspect a specific target type (currently: quarkus, micronaut)")
 	name := inspectFlags.String("name", "", "target name (default: derived from type, host, and port)")
 	createPath := inspectFlags.String("create-config", "", "create a new configuration file at PATH")
 	addPath := inspectFlags.String("add-to-config", "", "append a target to an existing configuration file at PATH")
@@ -330,13 +330,14 @@ func noPollStartupMessages(hasStoredPoll bool) []string {
 func printHelp(w io.Writer) {
 	fmt.Fprintf(w, `StatLite - tiny self-hosted metrics dashboard for small servers.
 
-Polls Spring Boot Actuator and StatLite self-monitoring endpoints, stores
-samples in local SQLite, and serves a localhost dashboard.
+Polls Spring Boot Actuator, Quarkus, Micronaut, and StatLite Metrics endpoints,
+stores samples in local SQLite, and serves a localhost dashboard.
 
 Usage:
   statlite [--config path] [--no-poll] [--raw-series]
   statlite inspect <application-url>
   statlite inspect --type quarkus <application-or-metrics-url>
+  statlite inspect --type micronaut <application-or-metrics-url>
   statlite inspect <application-url> --create-config PATH
   statlite inspect <application-url> --add-to-config PATH
   statlite --version
@@ -375,7 +376,9 @@ Prometheus/OpenMetrics endpoint. A base URL uses the conventional /q/metrics pat
 
 Quote the URL when pasting it from a browser, especially if it contains ? or &.
 Untyped inspection requires a base URL, so remove any query string or fragment first.
-Typed Quarkus inspection accepts a base URL or exact metrics endpoint URL.`)
+Typed Quarkus inspection accepts a base URL or exact metrics endpoint URL.
+Use --type micronaut with a base URL or exact Prometheus endpoint. Micronaut
+inspection checks compatibility without proving framework identity.`)
 }
 
 const configurationDocsURL = "https://github.com/PVRLabs/statlite/blob/main/docs/configuration.md"
@@ -457,6 +460,8 @@ func inspectionPresentation(targetType inspect.TargetType) (inspectionTargetPres
 			targetType:   config.TargetTypeStatliteMetrics,
 			errorContext: "statlite-metrics target",
 		}, nil
+	case inspect.TargetMicronaut:
+		return inspectionTargetPresentation{displayName: "Micronaut Metrics", targetType: config.TargetTypeMicronaut, errorContext: "micronaut target"}, nil
 	case inspect.TargetQuarkus:
 		return inspectionTargetPresentation{
 			displayName:  "Quarkus Metrics",
@@ -511,7 +516,7 @@ func printInspectFailure(w io.Writer, err error) {
 	case inspect.FailureMultiple:
 		fmt.Fprintln(w, "inspect: more than one supported integration was found")
 	case inspect.FailureIncompatible:
-		fmt.Fprintf(w, "inspect: the configured Quarkus metrics endpoint is incompatible: %v\n", failure.Err)
+		fmt.Fprintf(w, "inspect: the configured metrics endpoint is incompatible: %v\n", failure.Err)
 	case inspect.FailureTypeUnsupported, inspect.FailureTypeUnavailable:
 		fmt.Fprintf(w, "inspect: %v\n", failure)
 	default:
