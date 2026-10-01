@@ -4,7 +4,8 @@ A self-contained public example for StatLite's explicit `micronaut` target.
 Platform parent 4.9.2 pins Micronaut 4.9.9, Micronaut Micrometer 5.12.0,
 and Micrometer 1.15.0. Sources compile to Java 17 bytecode. Public CI builds
 and runs with Eclipse Temurin Java 21 LTS; private certification uses its
-separately pinned Java 25 runtime.
+separately pinned Java 25 runtime for the default 5.x certification and the
+retained 4.9.9 regression. This public example keeps the 4.9.9 / Java 21 setup.
 
 From this directory, with Java 21 and Maven installed:
 
