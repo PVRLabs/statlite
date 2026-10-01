@@ -552,8 +552,8 @@ func TestStatliteMetricsEmitsCanonicalProfileAndExcludesScrape(t *testing.T) {
 	if err := json.NewDecoder(first.Body).Decode(&response); err != nil {
 		t.Fatalf("decode metrics: %v", err)
 	}
-	if response.Schema != collector.StatliteMetricsV1Schema || response.Status == "" || response.StartedAt.IsZero() {
-		t.Fatalf("profile identity = %#v, want schema/status/started_at", response)
+	if response.Schema != collector.StatliteMetricsV1Schema || response.Integration != "statlite-self-monitoring" || response.Status == "" || response.StartedAt.IsZero() {
+		t.Fatalf("profile identity = %#v, want schema/integration/status/started_at", response)
 	}
 	if response.Metrics.RequestsTotal != 1 {
 		t.Fatalf("requests_total = %d, want 1", response.Metrics.RequestsTotal)

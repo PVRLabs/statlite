@@ -15,6 +15,17 @@ to serve metrics. StatLite exposes this canonical profile at
 `/statlite/metrics`; its `/healthz` endpoint is readiness-only and is not a
 profile endpoint.
 
+A non-2xx metrics response is a collection failure; consumers should not treat
+its body as a valid metrics snapshot.
+
+The endpoint exposes operational data and should normally be kept on loopback,
+a private network, or behind appropriate network/proxy controls. The built-in
+`statlite-metrics` target currently does not send authentication credentials.
+
+The endpoint should return a current snapshot rather than a cached response.
+If it is routed through a reverse proxy, configure that path so intermediary
+caching does not serve stale metrics.
+
 A complete response looks like this:
 
 ```json
@@ -85,7 +96,7 @@ copyable implementations, runnable examples, and setup instructions.
 | Field | Type | Unit | Optional | Semantics |
 |---|---|---|---|---|
 | `schema` | string | N/A | No | Must be `statlite-metrics/v1`. |
-| `integration` | string | N/A | Yes | Non-empty identifier for the documented producer implementation family, such as `express`, `django`, or `fastapi`. It is informational provenance for troubleshooting, not runtime detection or an authenticated assertion. StatLite currently ignores it and it does not affect collection semantics. |
+| `integration` | string | N/A | Yes | Non-empty identifier for the documented producer implementation family, such as `express`, `django`, `fastapi`, or `statlite-self-monitoring`. It is informational provenance for troubleshooting, not runtime detection or an authenticated assertion. StatLite currently ignores it and it does not affect collection semantics. |
 | `status` | string | N/A | No | Non-empty application health/status text. |
 | `database_status` | string | N/A | Yes | Non-empty status text for an application database dependency when the producer can safely determine it. StatLite self-monitoring emits `UP` or `DOWN` from a cached SQLite `PingContext` check, refreshed on startup and every 60 seconds; a closed local store reports `DOWN` immediately. |
 | `started_at` | string | RFC 3339 timestamp | Yes | Process start time; recommended for restart detection. |
@@ -167,10 +178,14 @@ Self-monitoring does not supply measurements for a remote application host.
 
 The configured StatLite target name is authoritative. The application should
 not provide `target_name`, polling timestamps, or other StatLite-owned metadata.
-Producers copied from a documented framework integration should emit that
-implementation family's stable, lowercase `integration` identifier. Custom
-producers may omit it. Consumers must treat it as untrusted informational
-metadata rather than proof of the producer's framework or runtime.
+When emitting `integration`, use a stable lowercase identifier, preferably
+kebab-case. Producers copied from a documented framework integration should
+emit that implementation family's identifier. Custom producers may choose
+their own identifier or omit it. StatLite's built-in
+`/statlite/metrics` endpoint emits `integration: "statlite-self-monitoring"` to
+distinguish its producer implementation from application-owned integrations.
+Consumers must treat it as untrusted informational metadata rather than proof
+of the producer's framework or runtime.
 
 Unknown fields are ignored for forward compatibility. Invalid optional fields
 are skipped and reported as warnings without discarding otherwise valid metrics.

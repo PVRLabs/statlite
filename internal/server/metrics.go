@@ -12,6 +12,7 @@ import (
 
 type statliteMetricsResponse struct {
 	Schema         string                `json:"schema"`
+	Integration    string                `json:"integration"`
 	Status         string                `json:"status"`
 	DatabaseStatus *string               `json:"database_status,omitempty"`
 	StartedAt      time.Time             `json:"started_at"`
@@ -45,6 +46,7 @@ func (s *Server) handleStatliteMetrics(w http.ResponseWriter, _ *http.Request) {
 
 	response := statliteMetricsResponse{
 		Schema:         collector.StatliteMetricsV1Schema,
+		Integration:    "statlite-self-monitoring",
 		Status:         "UP",
 		DatabaseStatus: s.databaseStatus(),
 		StartedAt:      s.startedAt,
