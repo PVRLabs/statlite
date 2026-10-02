@@ -266,11 +266,12 @@ small and focused.
 
 ### Alerts and automation
 
-StatLite does not currently send alerts or pages. A lightweight,
-machine-readable recent-events or API surface is being explored so cron jobs
-and external automation can react to StatLite events without requiring a full
-notification subsystem inside StatLite. Broader paging and escalation systems
-remain outside StatLite's intended scope.
+StatLite does not currently send alerts or pages. Its read-only [external
+API](api.md) exposes collection status, recent collector events, and derived
+metrics so cron jobs and external automation can react to StatLite events.
+Callers own their thresholds, schedules, deduplication, and notification
+delivery. Broader paging and escalation systems remain outside StatLite's
+intended scope.
 
 ## What StatLite deliberately leaves out
 
