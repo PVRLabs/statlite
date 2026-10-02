@@ -9,16 +9,20 @@
 [![CI](https://github.com/PVRLabs/statlite/actions/workflows/test.yml/badge.svg)](https://github.com/PVRLabs/statlite/actions/workflows/test.yml)
 [![License](https://img.shields.io/github/license/PVRLabs/statlite)](LICENSE)
 
-A lightweight, self-hosted metrics dashboard with a small memory and operational
-footprint, designed for applications running on VPSs and small servers. A single
-Go binary monitors Spring Boot applications through Actuator JSON or Micrometer
-Prometheus metrics, Quarkus applications through Micrometer metrics, and other
+StatLite provides lightweight, self-hosted application monitoring for apps running
+in production on VPSs and small servers. One Go binary polls multiple configured
+applications, stores metrics locally in SQLite, and provides built-in historical
+charts, without requiring Prometheus or Grafana.
+
+It supports Spring Boot and Quarkus integrations, and other
 applications that expose [a small, fixed JSON metrics
-endpoint](docs/statlite-metrics-v1.md), without requiring Prometheus or Grafana.
+endpoint](docs/statlite-metrics-v1.md).
+
 It stores focused traffic, latency, CPU, memory, optional authoritative health,
-and optional host metrics in SQLite on your server. Samples and history stay
-there, without continuously sending application metrics to a third-party
-monitoring SaaS. When a target has no health signal, the
+and optional host metrics on your server. Historical samples are retained for
+90 days by default, with [configurable retention](docs/configuration.md#retention).
+Metrics and history stay local, without continuously sending application metrics
+to a third-party monitoring SaaS. When a target has no health signal, the
 dashboard reports whether StatLite is successfully receiving its metrics
 without treating reachability as application health.
 
@@ -54,11 +58,11 @@ dashboard starts with live data.
 See the [Docker guide](docs/docker.md) for persistent storage, container
 networking, local builds, and access guidance.
 
-StatLite is intentionally focused and is not a replacement for Prometheus and
-Grafana. See [monitoring options for small applications and VPS
-deployments](docs/monitoring-options.md) for the practical tradeoffs between
-StatLite, a general-purpose self-hosted stack, telemetry pipelines, and hosted
-platforms.
+StatLite provides predefined application and host metrics with built-in charts.
+It does not provide PromQL, unrestricted custom metrics, custom dashboard
+building, distributed tracing, centralized logs, or built-in alert delivery.
+See [monitoring options for small applications and VPS
+deployments](docs/monitoring-options.md) for the practical tradeoffs.
 
 ## Install
 
