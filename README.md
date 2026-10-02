@@ -11,8 +11,7 @@
 
 StatLite provides lightweight, self-hosted application monitoring for apps running
 on VPSs and small servers. One Go binary polls multiple applications, stores
-metrics locally in SQLite with [configurable 90-day default
-retention](docs/configuration.md#retention), and provides built-in historical
+metrics locally in SQLite, and provides built-in historical
 charts, without requiring Prometheus or Grafana.
 
 🌐 [Website](https://pvrlabs.xyz/statlite) · 👀 [Interactive demo](https://pvrlabs.xyz/statlite/demo.html) · [简体中文](README.zh-Hans.md)
