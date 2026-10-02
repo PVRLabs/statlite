@@ -14,7 +14,10 @@ useful, documented contract; they do not need feature parity with Spring.
 
 It is intended for solo developers and small teams that need practical
 production visibility without operating Prometheus and Grafana. StatLite is a
-focused production-support tool, not a general observability platform.
+focused production-support tool for understanding recent application and host
+behavior around operational problems. It does not provide external uptime
+guarantees or replace independent availability monitoring. It is not a general
+observability platform.
 
 ## Product principles
 
@@ -197,6 +200,12 @@ provides no database health signal. Reported healthy states are green; reported
 non-healthy states use warning or error styling.
 
 ## Deployment topology
+
+StatLite's small footprint, bounded metric set, and compact local SQLite history
+make collocated monitoring practical without requiring a separate metrics
+backend or monitoring host. Other deployment topologies are also valid when
+they better fit the environment. Independent monitoring is appropriate when
+external availability checks are required.
 
 For a collocated deployment, configure application targets (`spring`, `quarkus`,
 `micronaut`, or `statlite-metrics`) for application and process data, and `statlite-self`
