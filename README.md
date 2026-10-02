@@ -139,19 +139,19 @@ When a target has no health signal, the dashboard reports whether StatLite is
 successfully receiving its metrics without treating reachability as application
 health.
 
-- **Spring Boot:** Collects authoritative health when Actuator health is
-  available and automatically selects a compatible Micrometer Prometheus
+- **[Spring Boot](docs/targets/spring.md):** Collects authoritative health
+  when Actuator health is available and automatically selects a compatible Micrometer Prometheus
   endpoint or Actuator JSON for request, JVM, process, and optional host
   metrics. Independently usable metrics remain reportable if health retrieval
   fails.
-- **Quarkus Micrometer:** Collects bounded request, latency, CPU, heap, process,
-  and restart concepts from an exact Prometheus/OpenMetrics endpoint. SmallRye
+- **[Quarkus Micrometer](docs/targets/quarkus.md):** Collects bounded request,
+  latency, CPU, heap, process, and restart concepts from an exact Prometheus/OpenMetrics endpoint. SmallRye
   Health is an optional capability when the application publishes it.
-- **Micronaut Micrometer:** Collects the existing request, duration, CPU, heap,
-  process, and restart concepts from an exact configured Prometheus endpoint,
+- **[Micronaut Micrometer](docs/targets/micronaut.md):** Collects the existing request,
+  duration, CPU, heap, process, and restart concepts from an exact configured Prometheus endpoint,
   conventionally `/prometheus`. Management health is optional; database health
   requires visible JDBC aggregate status.
-  See the [certified setup](docs/configuration.md#micronaut-micrometer-metrics).
+  See the [certified setup](docs/targets/micronaut.md).
 - **[StatLite Metrics v1](docs/statlite-metrics-v1.md):** A small, fixed JSON
   endpoint that applications in any language or framework can implement. See
   the [direct integration guides](docs/integrate/) for FastAPI, Express,

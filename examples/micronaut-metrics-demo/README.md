@@ -31,7 +31,7 @@ go run ./cmd/statlite inspect --type micronaut http://127.0.0.1:18084
 
 Typed inspection checks the supported metrics contract and resolves the base
 URL to `/prometheus`. Compatibility does not establish framework identity.
-See [configuration](../../docs/configuration.md#micronaut-micrometer-metrics)
+See the [Micronaut target reference](../../docs/targets/micronaut.md)
 for normalization and optional health behavior.
 
 To run the CI journey, stop the manually started application first, then from

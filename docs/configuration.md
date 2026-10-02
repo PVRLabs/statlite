@@ -71,11 +71,8 @@ statlite inspect --type quarkus 'http://localhost:9000'
 statlite inspect --type quarkus 'http://localhost:9000/q/metrics'
 ```
 
-Typed Quarkus inspection accepts only StatLite's bounded Quarkus contract, not
-arbitrary Prometheus or Micrometer exposition. A root application URL resolves
-to `/q/metrics`. A non-root URL is tried first as an exact endpoint and then,
-after a conclusive miss, with `/q/metrics` appended. A URL containing a query
-string is always an exact endpoint and is preserved.
+See the [Quarkus target reference](targets/quarkus.md#target-inspection) for
+bounded compatibility and exact/custom endpoint resolution.
 
 Micronaut requires explicit typed inspection:
 
@@ -85,18 +82,10 @@ statlite inspect --type micronaut 'http://localhost:8080/prometheus'
 statlite inspect --type micronaut 'http://localhost:8080/service'
 ```
 
-A root base URL resolves to `/prometheus`. A non-root path is tried exactly;
-after HTTP 404/410 or parsed incompatible metrics, one context-path fallback
-appends `/prometheus`. Conventional `/prometheus` paths and URLs with a query
-(including a bare `?`) are exact and have no fallback. Escaped paths and queries
-are preserved. Authentication failures, malformed responses, timeouts, and other
-inconclusive failures stop resolution. Inspection has a five-second overall
-deadline and at most two scrapes, each with at most three same-origin redirects.
-It uses the runtime metrics evaluator, reports `partial` for compatible scrapes
-with warnings, and does not request health. Compatibility does not prove
-Micronaut identity. Untyped inspection adds no Micronaut probe or inference from
-arbitrary Micrometer exposition. Inspection has no new authentication options;
-configure authenticated targets manually with the shared Basic Auth block.
+See the [Micronaut target reference](targets/micronaut.md#target-inspection)
+for endpoint resolution, compatibility, and inspection limits. Inspection
+checks metrics and does not request health; configure authenticated targets
+manually with the shared Basic Auth block.
 
 On success, plain `inspect` prints the recognized capabilities, a minimal
 configuration, and commands to create or add it. The suggested target gets a
@@ -260,6 +249,9 @@ resulting CPU and disk values describe the execution environment visible to
 the Spring Boot process, which may be a container rather than the physical
 host.
 
+See the [Spring target reference](targets/spring.md) for source selection,
+health, remote host metrics, and the Spring demo.
+
 ### Quarkus Micrometer metrics
 
 ```yaml
@@ -269,69 +261,15 @@ targets:
     url: "http://localhost:9000/q/metrics"
 ```
 
-For Quarkus, `url` is the conventional `/q/metrics` Prometheus/OpenMetrics
-endpoint, not a management base URL. StatLite derives the aggregate SmallRye
-Health endpoint by replacing `/q/metrics` with `/q/health` on the same origin
-and context path when the conventional capability is available. It performs
-one bounded health request and one bounded metrics scrape per polling cycle
-when health is configured or conventionally available, and uses the poll time
-rather than exposition timestamps. The pinned fixture includes Quarkus 3.39.1
-with Java 21 LTS, `quarkus-micrometer-registry-prometheus`, and the optional
-`quarkus-smallrye-health` extension.
+`url` is the exact metrics endpoint, normally `/q/metrics`. Optional SmallRye
+Health is collected independently; unavailable health does not discard valid
+metrics or synthesize stored application health. Successful metrics collection
+without explicit health can display `UP` with a collection-based dashboard hint.
 
-Health collection is best-effort and independent from metrics collection. If
-the derived `/q/health` endpoint is absent, aggregate framework health is
-unavailable. A successful metrics scrape is shown as `UP` on the dashboard,
-with its hint explaining that the label is based on collection rather than an
-explicit application-health assertion. Internally this remains reporting
-availability; StatLite does not synthesize or store application health `UP`.
-Database health remains unavailable without a datasource check. The absent
-capability is quiet and does not produce a recurring warning. A known or
-explicitly configured endpoint that returns an invalid or failed response may
-produce a focused warning without discarding valid metrics. Exact custom
-metrics paths remain supported; when the path is not a conventional
-`/q/metrics` path, StatLite does not infer a health endpoint.
-Customized Quarkus layouts can provide an exact optional override:
-
-```yaml
-targets:
-  - name: "orders"
-    type: "quarkus"
-    url: "http://localhost:9000/manage/prom"
-    health_url: "http://localhost:9000/manage/health"
-```
-
-`health_url` is optional and accepted for Quarkus and Micronaut targets. The target's
-Basic Auth configuration applies to both metrics and health requests.
-
-If the derived `/q/health` endpoint returns `404`, StatLite treats SmallRye
-Health as absent, keeps the metrics poll quiet, and leaves application health
-unavailable. A successful metrics scrape is still shown as `UP`, with the
-dashboard hint identifying successful metrics collection as the source. A
-current collection failure is shown as `DOWN`; the underlying collection
-states remain reporting and unavailable. That absence is cached for the
-collector session. Health discovery resumes when
-the observed process-start identity changes, when that identity is available,
-or when the collector is recreated.
-
-The adapter normalizes only these existing StatLite concepts: HTTP request
-count, request duration, 404/4xx/5xx counts, process CPU ratio, heap used bytes,
-process start time, and optional uptime. Request dimensions, histogram buckets,
-exemplars, timestamps, and unrelated metric families are discarded before
-persistence. HTTP meters can be absent while an idle application remains
-compatible when a finite CPU, heap, or process-start family is present.
-
-When published, Quarkus targets normalize overall SmallRye Health status and
-aggregate Quarkus datasource health checks into `db_health_status`. Database
-health stays unavailable when the application publishes no datasource check.
-Host resources are not inferred or populated. Missing optional concepts produce
-partial data; an endpoint without a usable required runtime family is
-incompatible.
+See the [Quarkus target reference](targets/quarkus.md) for health derivation and
+overrides, compatibility, normalized metrics, and the tested setup.
 
 ### Micronaut Micrometer metrics
-
-Run the [Micronaut demo](../examples/micronaut-metrics-demo/) for a complete
-application, management configuration, and deterministic traffic recipe.
 
 ```yaml
 targets:
@@ -340,128 +278,12 @@ targets:
     url: "http://localhost:8080/prometheus"
 ```
 
-Collection requests the exact `url`, including its path, trailing slash, and
-query, without endpoint discovery. Omitted `type` still defaults to Spring.
-Spring-only `actuator_base_url`, `metrics_source`, and `collect_host_metrics`
-are rejected for Micronaut, including explicit empty/false values. Host metrics
-are not inferred from application metrics.
+Use explicit `type: "micronaut"`; omitted `type` still defaults to Spring.
+`url` is the exact metrics endpoint, normally `/prometheus`. The application
+requires management and Micrometer configuration.
 
-The primary tested graph uses platform parent 5.2.1, Micronaut core 5.2.11,
-Micronaut Micrometer 6.1.0, and Micrometer 1.17.1. The same adapter also passes
-the retained 4.9.9 regression (parent 4.9.2, Micronaut Micrometer 5.12.0,
-Micrometer 1.15.0), which the public Java 21 demo exercises. In an application
-using either platform, include these dependencies:
-
-```xml
-<dependency>
-  <groupId>io.micronaut</groupId>
-  <artifactId>micronaut-management</artifactId>
-</dependency>
-<dependency>
-  <groupId>io.micronaut.micrometer</groupId>
-  <artifactId>micronaut-micrometer-core</artifactId>
-</dependency>
-<dependency>
-  <groupId>io.micronaut.micrometer</groupId>
-  <artifactId>micronaut-micrometer-registry-prometheus</artifactId>
-</dependency>
-```
-
-Enable metrics and permit access to the Prometheus endpoint in the application's
-configuration. The minimal certified graph uses properties:
-
-```properties
-micronaut.metrics.enabled=true
-endpoints.prometheus.sensitive=false
-```
-
-Certification runs with Eclipse Temurin 25.0.4.1+1-LTS. The 5.x fixture uses
-Java 25 bytecode; the 4.9.9 regression fixture uses Java 17 bytecode. These are tested versions, not a claim that every runtime or
-Micrometer setup is compatible. No Prometheus server or Grafana is required.
-Removing management from this graph removes both `/prometheus` and `/health`.
-To retain metrics with absent health, keep management installed and set
-`endpoints.health.enabled=false`.
-
-Only existing StatLite concepts are normalized:
-
-| StatLite sample | Micronaut source |
-| --- | --- |
-| `http_requests_total` | Sum `http_server_requests_seconds_count` |
-| `http_404_total` | Count with exact status 404 |
-| `http_4xx_total` | Count with status 400–499, including 404 |
-| `http_5xx_total` | Count with status 500–599 |
-| `http_request_time_total_seconds` | Sum `_sum` with matching accepted count/sum identities |
-| `process_cpu_usage` | Finite `process_cpu_usage` ratio from 0 to 1 |
-| `jvm_heap_used_bytes` | Sum nonnegative `jvm_memory_used_bytes{area="heap"}` |
-| `process_start_time` | Valid `process_start_time_seconds`, also used for restart identity |
-| `process_uptime` | Finite nonnegative `process_uptime_seconds` |
-
-Both HTTP count and sum require nonempty `method`, `status`, `uri`, and
-`exception` labels. Status is exactly three ASCII digits from 100 through 599.
-Count/sum matching uses the entire source label identity; extra labels take part
-in matching but are not stored. Matching state is bounded to 20,000 combined
-identities. Invalid or duplicate series, mismatches, and overflowing aggregates
-omit affected concepts and record focused warnings. Independent valid concepts
-remain usable. Missing optional families do not warn. Compatibility requires a
-valid CPU, heap, or process-start concept; uptime or HTTP metrics alone are
-insufficient. Runtime-only idle exposition is compatible.
-
-HTTP timers are absent before the first completed request at startup and
-restart, so HTTP samples remain unavailable until meters exist. Once present,
-counters include application and management requests, including scrapes,
-health requests, and inspection probes. Scrape timing differs: the tested 4.9.9
-setup excludes its own unfinished request, while 5.x can record the scrape timer
-before generating the response body. The first scrape can therefore already
-contain real HTTP samples. StatLite stores raw cumulative counters and derives
-nonnegative deltas at query time; process-start changes retain the existing
-restart boundary semantics. Routes, exceptions, arbitrary labels, histogram
-buckets, and percentiles are not stored.
-
-Health is an independent optional request after the metrics attempt. For a
-literal `/prometheus` suffix with at most one trailing slash, StatLite derives
-same-origin `/health`, preserves the escaped context prefix, and removes the
-query. A custom metrics path requires an explicit override for health:
-
-```yaml
-targets:
-  - name: "orders"
-    type: "micronaut"
-    url: "http://localhost:8080/manage/metrics"
-    health_url: "http://localhost:8080/manage/health"
-```
-
-`health_url` retains its exact path/query and may specify a different origin.
-The target's Basic Auth applies to both endpoints. Redirects stay within each
-endpoint's origin, and requests share the configured poll timeout and existing
-body limits. When a health endpoint is configured or derived, StatLite attempts
-at most one logical health request per poll unless derived health is cached
-absent.
-
-Application health requires a valid aggregate UP/DOWN `status` over HTTP 200 or
-503. Unknown status, malformed payloads, or fetch errors leave health unavailable
-and warn without discarding good metrics. Database health requires visible
-`details.jdbc.status` with UP/DOWN. Absent or hidden details leave DB health
-unavailable; invalid optional JDBC details warn while preserving valid app
-health. Nested datasource details are ignored, and overall app health never
-fills in DB health. The primary 5.x JDBC setup uses `micronaut-jdbc-hikari` 7.2.0
-and H2 2.5.250; the retained 4.9.9 regression uses 6.2.1 and H2 2.3.232.
-Exposing JDBC details to anonymous clients requires:
-
-```properties
-endpoints.health.details-visible=ANONYMOUS
-```
-
-The default authenticated visibility hides those details from anonymous
-requests. Health absence never fabricates stored application or DB status.
-Successful collection with unavailable explicit health can still display
-operational `UP` on the dashboard, with its existing collection-based hint.
-
-An initial derived-health 404 with compatible metrics is quiet and cached until
-a detectable process-start change or collector recreation. There is no periodic
-reprobe. Enabling health without a detectable restart requires collector
-recreation to discover it. After health was available, its loss warns and is
-retried each poll. Explicit overrides always probe and warn on 404. These rules
-preserve usable metrics and avoid carrying forward stale health values.
+See the [Micronaut target reference](targets/micronaut.md) for application
+setup, tested versions, metric mapping, and optional management/JDBC health.
 
 ### Basic Auth
 

@@ -1,4 +1,4 @@
-# Requires the Micronaut setup documented in docs/configuration.md.
+# Requires the Micronaut setup documented in docs/targets/micronaut.md.
 server:
   listen: "127.0.0.1:9090"
 storage:

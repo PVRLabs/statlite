@@ -26,27 +26,7 @@ targets:
     url: http://localhost:9000/q/metrics
 ```
 
-StatLite accepts the bounded Micrometer Prometheus/OpenMetrics contract and
-normalizes request count and duration, 404/4xx/5xx counts, process CPU, heap
-used, process start time, and optional uptime. HTTP meters are lazy, so an idle
-application can still be compatible through its runtime families. Memory is
-current JVM heap used, not process RSS, container memory, or the configured
-maximum heap size. Quarkus targets may provide application health through the
-optional SmallRye Health extension. Database health is available when the
-application publishes a datasource health check; this metrics-only fixture does
-not configure a datasource. Quarkus targets do not infer host resources. Untyped
-`statlite inspect` may discover Quarkus by probing the conventional `/q/metrics`
-location relative to the supplied application base URL, but it does not
-classify arbitrary Prometheus or Micrometer endpoints as Quarkus. Use
-`statlite inspect --type quarkus` for explicit framework-aware inspection,
-including custom or exact endpoints and endpoint resolution from a base URL.
-
-For a conventional Quarkus metrics URL ending in `/q/metrics`, StatLite derives
-the sibling `/q/health` endpoint when SmallRye Health is available. Health
-collection is best-effort and does not prevent valid metrics from being stored.
-If the capability is absent, aggregate framework health is unavailable, but a
-successful metrics scrape reports application reachability as health `UP`;
-database health remains unavailable unless a datasource check is published.
-The absence is quiet and cached until a changed process-start identity when
-available, or collector recreation. A customized metrics path can either
-remain metrics-only or configure an exact `health_url` override.
+See the [Quarkus target reference](../../docs/targets/quarkus.md) for the
+bounded metric contract, inspection, and independent optional health behavior.
+This metrics-only fixture does not configure a datasource, so database health
+is unavailable.

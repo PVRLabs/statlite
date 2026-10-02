@@ -2,6 +2,9 @@
 
 Minimal Spring Boot application for testing StatLite dashboards and collectors with Actuator and Micrometer metrics.
 
+See the [Spring target reference](../../docs/targets/spring.md)
+for configuration and collection semantics.
+
 ## Requirements
 
 - Java 21

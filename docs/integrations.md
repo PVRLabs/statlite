@@ -14,7 +14,8 @@ not a generic Prometheus scraper or metrics database.
 | Spring Boot Actuator | Supported | Actuator JSON | `/actuator` management base URL | Actuator health is the normal Spring health source; application request, JVM, process, and optional host concepts are normalized into StatLite's fixed vocabulary. |
 | Spring Micrometer Prometheus | Supported | Prometheus/OpenMetrics exposition | Configured Prometheus endpoint | This is a Spring source option, not a generic `prometheus` target. |
 | Quarkus 3.39.x | Supported | Micrometer Prometheus/OpenMetrics exposition; optional SmallRye Health | Conventional `/q/metrics`; optional `/q/health` | Explicit `quarkus` target; datasource health is normalized when published. |
-| Micronaut 4.9.9 (certified setup) | Supported | Micrometer 1.15.0 Prometheus exposition; optional management health | Exact `/prometheus`; optional `/health` | Explicit `micronaut` target; JDBC health requires visible aggregate details. |
+| [Micronaut 5.2.11 (tested setup)](targets/micronaut.md#tested-versions) | Supported | Micrometer 1.17.1 Prometheus exposition; optional management health | Exact `/prometheus`; optional `/health` | Primary tested setup; explicit `micronaut` target; JDBC health requires visible aggregate details. |
+| [Micronaut 4.9.9 (tested setup)](targets/micronaut.md#tested-versions) | Supported | Micrometer 1.15.0 Prometheus exposition; optional management health | Exact `/prometheus`; optional `/health` | Retained regression setup used by the public demo and CI; JDBC health requires visible aggregate details. |
 | StatLite Metrics v1 | Supported | Fixed `statlite-metrics/v1` response | `/statlite/metrics` | Fixed producer contract for StatLite and compatible applications. See the [direct integration guides](integrate/). |
 
 Support means that the integration has an owned endpoint and source contract,
@@ -36,89 +37,38 @@ examples are exercised in the shared public workflow.
 
 Configure Spring applications with `type: spring` or omit `type` for the
 default. The `url` is the Actuator management base URL. Spring can use its
-Actuator source, its Micrometer Prometheus source, or the configured automatic
-source selection described in [configuration](configuration.md). Health is an
+Actuator source, its Micrometer Prometheus source, or
+[automatic source selection](targets/spring.md#metrics-source-and-health). Health is an
 independent authoritative Actuator signal. If its retrieval fails, StatLite
 leaves health unavailable, retains independently usable metrics, and records a
 focused warning. A poll still requires at least one usable metric sample to
 count as reporting.
 
+See the [Spring target reference](targets/spring.md) for configuration,
+source selection, health, and remote host metrics.
+
 ## Quarkus
 
-Quarkus is a framework-first `type: quarkus` target. Its `url` is the exact
-metrics exposition endpoint, conventionally
-`http://localhost:9000/q/metrics`, rather than a management base URL. The
-adapter accepts only the documented, bounded Quarkus/Micrometer contract; it
-does not persist arbitrary source dimensions or infer host metrics from a
-successful scrape. SmallRye Health is an optional Quarkus capability. For a
-conventional Quarkus metrics path ending in `/q/metrics`, StatLite derives the
-sibling `/q/health` endpoint where practical, requests it separately when
-available, and normalizes the overall and datasource statuses. A missing health
-capability is quiet: aggregate framework health is unavailable, while a
-successful metrics scrape is presented as `UP` on the dashboard. Its hint
-explains that `UP` is derived from successful metrics collection rather than
-explicit application health. A current collection failure is presented as
-`DOWN`. These are presentation labels only: reporting and unavailable remain
-the underlying collection concepts, and StatLite does not synthesize stored
-health values.
-Database health remains unavailable unless a datasource check is published.
-The absent capability is cached until the observed process-start identity
-changes when available, or the collector is recreated. A known health failure
-can record a focused warning without discarding valid metrics. For a customized
-layout, set `health_url` as an optional override; a custom metrics path without
-that override remains a supported metrics-only target.
+Quarkus is a first-class `type: quarkus` target with an exact metrics endpoint,
+normally `/q/metrics`, and optional SmallRye Health. Support covers StatLite's
+bounded Quarkus/Micrometer contract, including datasource health when published.
+See the [Quarkus target reference](targets/quarkus.md) for normalized concepts,
+compatibility, health behavior, custom endpoints, inspection, and the pinned
+Quarkus 3.39.1 / Java 21 fixture.
 
-The normalized concepts are HTTP request count and duration, 404/4xx/5xx
-counts, process CPU, heap used, process start time, and optional uptime. HTTP
-meters are lazy, so an idle endpoint can be compatible with finite runtime
-families alone. Typed inspection accepts either an application base URL or an
-exact customized metrics endpoint. Untyped inspection probes only the
-established `/q/metrics` location; it does not identify arbitrary Micrometer
-exposition as Quarkus. Basic Auth uses the shared `auth.type: basic`
-configuration for both endpoints.
+## Micronaut
+
+Micronaut is a first-class explicit `type: micronaut` target with an exact
+metrics endpoint, normally `/prometheus`, and optional management health.
+Support covers the named 5.2.11 and 4.9.9 setups and fixed contract, not arbitrary
+Micrometer exposition. Quarkus and Micronaut retain separate label and health
+contracts. See the [Micronaut target reference](targets/micronaut.md) for
+application setup, tested versions, normalization, JDBC health visibility,
+custom endpoints, and typed inspection.
 
 Spring Boot, Quarkus, and Micronaut memory is JVM heap used. It is runtime-managed
 application memory, not process RSS, container memory, or a configured maximum
 heap size.
-
-The public pinned fixture is
-[`examples/quarkus-metrics-demo/`](../examples/quarkus-metrics-demo/). It uses
-Quarkus 3.39.1, Java 21 LTS, the Micrometer Prometheus registry, and SmallRye
-Health.
-
-## Micronaut
-
-Micronaut uses an explicit `type: micronaut` target and the exact metrics
-endpoint, conventionally `http://localhost:8080/prometheus`. The certified
-setup uses Micronaut 4.9.9 (platform parent 4.9.2), Micronaut Micrometer 5.12.0,
-Micrometer 1.15.0, and optional JDBC Hikari integration 6.2.1. Certification
-uses Temurin 25.0.4.1+1-LTS with Java 17 fixture bytecode and H2 2.3.232.
-Support covers this setup and the fixed contract, not arbitrary Micrometer
-exposition. Quarkus and Micronaut retain separate label and health contracts.
-
-The adapter normalizes request count, 404/4xx/5xx counts, accumulated duration,
-process CPU, JVM heap used, process start, and uptime. HTTP timers are lazy at
-idle and restart, and include management self-traffic once requests complete.
-Missing timers remain unavailable. Source routes, exceptions, datasource names,
-and other labels are not stored as dimensions. Invalid concepts produce focused
-partial warnings while independent valid metrics remain usable.
-
-Management health is independent and optional. A conventional `/prometheus`
-path derives sibling `/health`; custom paths can use `health_url`. Database
-health requires visible `details.jdbc.status`, and remains unavailable when
-JDBC details are absent or hidden. UP/DOWN aggregate application health is
-accepted over HTTP 200 or 503. Metrics success does not synthesize stored health.
-As with Quarkus, successful metrics without explicit health can appear as
-operational `UP` on the dashboard. Initial derived-health absence is cached until
-a detectable process restart or collector recreation; known failures warn and
-are retried. Disabling health can leave metrics usable; removing management
-from the certified dependency graph removes both endpoints.
-
-Use `statlite inspect --type micronaut` with a base URL or exact endpoint.
-Inspection checks the same metrics contract as collection and does not probe
-health. It does not prove Micronaut identity, and untyped inspection does not
-attempt Micronaut recognition. See [configuration and setup](configuration.md#micronaut-micrometer-metrics)
-for dependencies, endpoint resolution, health visibility, and overrides.
 
 ## Scope boundaries
 

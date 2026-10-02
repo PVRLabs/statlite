@@ -49,13 +49,13 @@ The shared matrix currently exercises:
   [`statlite-metrics/v1` guide](integrate/go/net-http.md).
 - [Gin](../examples/go-gin-demo/) through the
   [`statlite-metrics/v1` guide](integrate/go/gin.md).
-- [Spring Boot](../examples/spring-actuator-demo/) through the Actuator
-  integration.
-- [Quarkus](../examples/quarkus-metrics-demo/) through the Micrometer metrics
-  integration.
+- [Spring Boot](../examples/spring-actuator-demo/) through the [Spring target](targets/spring.md)
+  Actuator integration.
+- [Quarkus](../examples/quarkus-metrics-demo/) through the [Quarkus target](targets/quarkus.md)
+  Micrometer metrics integration.
 
 - [Micronaut](../examples/micronaut-metrics-demo/) through the
-  [Micrometer metrics integration](configuration.md#micronaut-micrometer-metrics).
+  [Micrometer metrics integration](targets/micronaut.md).
 
 Inspect the implementation and current triggers in the public
 [`integration certification` workflow](https://github.com/PVRLabs/statlite/actions/workflows/integration-certification.yml).
