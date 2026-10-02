@@ -10,21 +10,10 @@
 [![License](https://img.shields.io/github/license/PVRLabs/statlite)](LICENSE)
 
 StatLite provides lightweight, self-hosted application monitoring for apps running
-in production on VPSs and small servers. One Go binary polls multiple configured
-applications, stores metrics locally in SQLite, and provides built-in historical
+on VPSs and small servers. One Go binary polls multiple applications, stores
+metrics locally in SQLite with [configurable 90-day default
+retention](docs/configuration.md#retention), and provides built-in historical
 charts, without requiring Prometheus or Grafana.
-
-It supports Spring Boot and Quarkus integrations, and other
-applications that expose [a small, fixed JSON metrics
-endpoint](docs/statlite-metrics-v1.md).
-
-It stores focused traffic, latency, CPU, memory, optional authoritative health,
-and optional host metrics on your server. Historical samples are retained for
-90 days by default, with [configurable retention](docs/configuration.md#retention).
-Metrics and history stay local, without continuously sending application metrics
-to a third-party monitoring SaaS. When a target has no health signal, the
-dashboard reports whether StatLite is successfully receiving its metrics
-without treating reachability as application health.
 
 🌐 [Website](https://pvrlabs.xyz/statlite) · 👀 [Interactive demo](https://pvrlabs.xyz/statlite/demo.html) · [简体中文](README.zh-Hans.md)
 
@@ -32,6 +21,12 @@ without treating reachability as application health.
   <img src="docs/images/dashboard.webp" alt="StatLite dashboard monitoring a Spring Boot payments API">
   <br><sub>Main application dashboard for the Spring target.</sub>
 </p>
+
+StatLite supports Spring Boot and Quarkus integrations, and other
+applications through [a small, fixed JSON metrics endpoint](docs/statlite-metrics-v1.md).
+It collects traffic, latency, CPU, memory, optional application health, and
+optional host metrics. Metrics and history stay on your server, without
+continuously sending application metrics to a third-party monitoring SaaS.
 
 StatLite is built for [resource-constrained servers](docs/low-resource-monitoring.md).
 Low memory, CPU, disk, and operational overhead are treated as product
@@ -138,6 +133,10 @@ when the application needs to add the `/statlite/metrics` endpoint. See
 > remotely.
 
 ## Supported metric sources
+
+When a target has no health signal, the dashboard reports whether StatLite is
+successfully receiving its metrics without treating reachability as application
+health.
 
 - **Spring Boot:** Collects authoritative health when Actuator health is
   available and automatically selects a compatible Micrometer Prometheus
