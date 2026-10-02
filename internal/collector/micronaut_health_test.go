@@ -189,6 +189,18 @@ func TestMicronautHealthCapabilityLifecycle(t *testing.T) {
 		optional bool
 		steps    []step
 	}{
+		{"restart after metrics outage", true, []step{
+			{start: 1770000000, code: 200, body: `{"status":"UP"}`, app: "UP", probes: 1},
+			{metricsFail: true, code: 200, body: `{"status":"UP"}`, app: "UP", probes: 2},
+			{start: 1770000060, code: 404, probes: 3},
+			{start: 1770000060, code: 404, probes: 3},
+		}},
+		{"health loss after metrics outage without restart", true, []step{
+			{start: 1770000000, code: 200, body: `{"status":"UP"}`, app: "UP", probes: 1},
+			{metricsFail: true, code: 200, body: `{"status":"UP"}`, app: "UP", probes: 2},
+			{start: 1770000000, code: 404, warning: "health_fetch_failed", probes: 3},
+			{start: 1770000000, code: 404, warning: "health_fetch_failed", probes: 4},
+		}},
 		{"absent until restart", true, []step{
 			{start: 1770000000, code: 404, probes: 1},
 			{start: 1770000000, code: 200, body: `{"status":"UP"}`, probes: 1},

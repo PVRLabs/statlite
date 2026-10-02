@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -315,15 +316,15 @@ http_server_requests_seconds_count{method="GET",status="200",uri="/",exception="
 }
 
 func TestMicronautInspectionDeadlineStopsFallback(t *testing.T) {
-	requests := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { requests++; <-r.Context().Done() }))
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { requests.Add(1); <-r.Context().Done() }))
 	defer server.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
 	defer cancel()
 	_, err := Inspect(ctx, TargetMicronaut, server.URL+"/context")
 	assertFailureKind(t, err, FailureIncomplete)
-	if requests != 1 {
-		t.Fatalf("requests=%d", requests)
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("requests=%d", got)
 	}
 }
 

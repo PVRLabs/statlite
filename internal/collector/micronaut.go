@@ -135,7 +135,9 @@ func (c *MicronautCollector) markHealthAbsent(processStartTime *time.Time) {
 	c.healthStateMu.Lock()
 	defer c.healthStateMu.Unlock()
 	c.healthCapability = micronautHealthAbsent
-	c.healthProcessStartTime = cloneTime(processStartTime)
+	if processStartTime != nil {
+		c.healthProcessStartTime = cloneTime(processStartTime)
+	}
 }
 
 func (c *MicronautCollector) health404IsOptional() bool {
@@ -148,7 +150,10 @@ func (c *MicronautCollector) markHealthAvailable(processStartTime *time.Time) {
 	c.healthStateMu.Lock()
 	defer c.healthStateMu.Unlock()
 	c.healthCapability = micronautHealthAvailable
-	c.healthProcessStartTime = cloneTime(processStartTime)
+	// A failed or partial metrics scrape must not erase the restart baseline.
+	if processStartTime != nil {
+		c.healthProcessStartTime = cloneTime(processStartTime)
+	}
 }
 
 func (c *MicronautCollector) evaluate(ctx context.Context) (*micronautEvaluation, error) {
