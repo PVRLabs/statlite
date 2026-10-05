@@ -4,6 +4,19 @@ This file summarizes the main user-facing changes in each StatLite release.
 GitHub release notes use the matching version section, with commit history as
 a fallback when a section is missing.
 
+## v0.6.0 (2026-10-05)
+
+- Added first-class Micronaut monitoring with an explicit `micronaut` target,
+  Micrometer Prometheus metrics, optional management health, and typed
+  compatibility inspection. Certified Micronaut 5.2.11 as the primary runtime
+  and retained Micronaut 4.9.9 support.
+- Added a runnable Micronaut example and a public integration journey covering
+  metrics, health, inspection, and restart boundaries.
+- Preserved Micronaut health capability and restart detection through partial
+  metrics failures, with independent application and database health reporting.
+- Added canonical Spring, Quarkus, and Micronaut target references, a Python
+  integration landing page, and clearer deployment and Metrics v1 guidance.
+
 ## v0.5.1 (2026-09-30)
 
 - Improved 7-day and 30-day dashboard chart performance with bounded sampling.
