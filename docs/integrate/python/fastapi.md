@@ -242,17 +242,34 @@ use it. Unsupported host fields are omitted.
 
 ## Configure StatLite
 
-Save this as `statlite.yaml`:
+Application integration is still required. The YAML tells StatLite where to
+poll; it does not add the middleware or endpoint to FastAPI.
+
+`server.listen`, `storage.sqlite_path`, and `polling.interval` are required.
+Save this complete file as `statlite.yaml`:
 
 ```yaml
+server:
+  listen: "127.0.0.1:9090"
+
+storage:
+  sqlite_path: "./statlite.sqlite"
+
+polling:
+  interval: "30s"
+
 targets:
   - name: "python-fastapi-app"
     type: "statlite-metrics"
     url: "http://127.0.0.1:8000/statlite/metrics"
 ```
 
-Application integration is still required. The YAML tells StatLite where to
-poll; it does not add the middleware or endpoint to FastAPI.
+After the endpoint is running, this writes a file of the same shape when
+`./statlite.yaml` does not already exist:
+
+```bash
+statlite inspect 'http://127.0.0.1:8000/statlite/metrics' --create-config ./statlite.yaml
+```
 
 ## Run and verify the integration
 
@@ -282,9 +299,11 @@ the 404 and 4xx counters, and one 5xx. Verify discovery separately:
 
 ```bash
 statlite inspect 'http://127.0.0.1:8000/statlite/metrics'
-statlite --config statlite.yaml
+statlite
 ```
 
+When `./statlite.yaml` is not saved yet, add `--create-config ./statlite.yaml`
+to that inspect command. It writes the file only when the path is absent.
 Open <http://127.0.0.1:9090>. Use a 30-second or longer polling interval in
 production. See the [runnable demo](../../../examples/python-fastapi-demo/)
 for maintained application, configuration, and test files.

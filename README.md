@@ -47,7 +47,10 @@ docker run --rm \
 ```
 
 Open <http://127.0.0.1:9090>. StatLite monitors itself by default, so the
-dashboard starts with live data.
+dashboard starts with live data. To monitor your own application from Docker,
+mount a config as described in
+[Monitor an application](docs/docker.md#monitor-an-application). In that
+container, `127.0.0.1` is StatLite.
 
 See the [Docker guide](docs/docker.md) for persistent storage, container
 networking, local builds, and access guidance.
@@ -55,7 +58,9 @@ networking, local builds, and access guidance.
 StatLite provides predefined application and host metrics with built-in charts.
 It does not provide PromQL, unrestricted custom metrics, custom dashboard
 building, distributed tracing, centralized logs, or built-in alert delivery.
-See [monitoring options for small applications and VPS
+The [one-shot API checks](examples/api-automation/) can run from cron or a
+systemd timer when you want a notification; you choose the threshold and where
+the message goes. See [monitoring options for small applications and VPS
 deployments](docs/monitoring-options.md) for the practical tradeoffs.
 
 ## Install
@@ -77,7 +82,41 @@ locations, source builds, and server-wide Linux setup.
 
 ## Configure an application
 
-To monitor a Spring Boot application, create a minimal `statlite.yaml`:
+Spring Boot, Quarkus, and Micronaut need no application code changes. With
+the application already running, write a config and start StatLite:
+
+```bash
+statlite inspect 'http://localhost:8080' --create-config ./statlite.yaml
+statlite
+```
+
+Open <http://127.0.0.1:9090>. `--create-config` writes `./statlite.yaml` only
+when that path does not already exist. To append one target to an existing
+file, use `--add-to-config` as described in
+[Configuration](docs/configuration.md#discover-a-target-with-inspect).
+
+For Quarkus or Micronaut, select the type:
+
+```bash
+statlite inspect --type quarkus 'http://localhost:9000' --create-config ./statlite.yaml
+statlite inspect --type micronaut 'http://localhost:8080' --create-config ./statlite.yaml
+```
+
+Run one of those commands. Each writes `./statlite.yaml` only when that path
+is absent.
+
+Express, Django, FastAPI, Go `net/http`, and Gin need a small endpoint in the
+application first. Follow the [integration guides](docs/integrate/), then run
+`inspect --create-config` against that application's `/statlite/metrics` URL.
+
+Inspection is bounded and read-only unless you pass `--create-config` or
+`--add-to-config`. Micronaut requires `--type micronaut`; inspection validates
+its supported contract without proving framework identity. For untyped
+discovery, start with a base HTTP or HTTPS URL without a query string or
+fragment.
+
+A Spring Boot file written by hand has this shape. `server.listen`,
+`storage.sqlite_path`, and `polling.interval` are required:
 
 ```yaml
 server:
@@ -95,38 +134,13 @@ targets:
     url: "http://localhost:8080/actuator"
 ```
 
-For a new setup, save the configuration as `statlite.yaml`. If you already
-have a configuration, copy only the target entry into its `targets` list. Then
-run:
-
-```bash
-statlite
-```
-
-Alternatively, inspect a running application's base URL to generate the
-configuration:
-
-```bash
-statlite inspect 'http://localhost:8080'
-```
-
-For other supported frameworks, select the type explicitly when needed:
-
-```bash
-statlite inspect --type quarkus 'http://localhost:9000'
-statlite inspect --type micronaut 'http://localhost:8080'
-```
-
-Inspection checks conventional supported endpoints and is bounded and
-read-only. Micronaut requires `--type micronaut`; inspection validates its
-supported contract without proving framework identity. For untyped discovery, start with
-a base HTTP or HTTPS URL without a query string or fragment.
+If you already have a configuration, copy only the target entry into its
+`targets` list. Then run `statlite` from the directory that contains
+`statlite.yaml`.
 
 See [Configuration](docs/configuration.md) for exact endpoint forms, discovery
 limits, authentication limitations, all settings, and manual target
-configuration. See the [StatLite Metrics integration guides](docs/integrate/)
-when the application needs to add the `/statlite/metrics` endpoint. See
-[`examples/`](examples/) for complete configurations.
+configuration. See [`examples/`](examples/) for complete configurations.
 
 > [!IMPORTANT]
 > StatLite has no built-in dashboard or API authentication. Review the
