@@ -33,6 +33,10 @@ a fallback when a section is missing.
 
 ## Unreleased
 
+- Added a [Javalin integration recipe](docs/integrate/java/javalin.md) for an
+  application-owned `statlite-metrics/v1` endpoint using Javalin's Micrometer
+  instrumentation.
+
 ## v0.5.0 (2026-09-25)
 
 - Added a read-only external API v1 for target status, recent events, and bounded

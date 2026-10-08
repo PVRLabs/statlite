@@ -129,3 +129,7 @@ interface that could support a reliable StatLite integration, [open an issue](ht
 or [start a GitHub Discussion](https://github.com/PVRLabs/statlite/discussions/new/choose).
 We are happy to evaluate the contract and work with maintainers and users on a
 focused integration.
+
+Additional Java recipe: [Javalin](java/javalin.md). Application-owned
+`statlite-metrics/v1` integration using Javalin Micrometer, with a runnable
+example in PVRLabs/experiments. This recipe is outside integration CI.
