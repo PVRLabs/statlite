@@ -15,9 +15,11 @@ and endpoint. StatLite consumes the generic v1 contract. There is no native
 
 ## Dependencies
 
+Use Java 17 or higher, as required by [Javalin 7](https://javalin.io/documentation).
 No StatLite SDK. Add the Micrometer plugin at the same version as Javalin.
 That plugin brings the Micrometer API this helper uses. Do not add a second
-Micrometer pin for StatLite.
+Micrometer pin for StatLite. Include Jackson Databind for the default JSON
+mapper used by `ctx.json`:
 
 ```xml
 <dependency>
@@ -30,16 +32,6 @@ Micrometer pin for StatLite.
     <artifactId>javalin-micrometer</artifactId>
     <version>7.2.3</version>
 </dependency>
-```
-
-`ctx.json` uses the JSON mapper the application already configured. Do not
-call `config.jsonMapper` from this integration. That setting applies to every
-route, so replacing it can change serialization outside `/statlite/metrics`.
-
-If the application has no JSON mapper yet, add Jackson Databind at the version
-Javalin 7.2.3 uses, and only then install Javalin's Jackson mapper:
-
-```xml
 <dependency>
     <groupId>com.fasterxml.jackson.core</groupId>
     <artifactId>jackson-databind</artifactId>
@@ -47,14 +39,16 @@ Javalin 7.2.3 uses, and only then install Javalin's Jackson mapper:
 </dependency>
 ```
 
-```java
-import io.javalin.json.JavalinJackson;
+[Javalin uses Jackson as its default JSON mapper](https://javalin.io/documentation#configuring-the-json-mapper).
+With Jackson Databind on the classpath, no `config.jsonMapper` call is needed.
+Without it or another configured JSON mapper, `ctx.json` fails and
+`GET /statlite/metrics` returns HTTP 500.
 
-config.jsonMapper(new JavalinJackson());
-```
-
-Skip that fallback when a mapper is already configured. An existing SLF4J
-provider is enough. This integration does not add one.
+If your application already configures a JSON mapper, keep it and its
+required dependencies; you do not need to add Jackson for this endpoint.
+The mapper setting applies to every route, so replacing it can change
+serialization outside `/statlite/metrics`. An existing SLF4J provider is
+enough. This integration does not add one.
 
 Use a cumulative `SimpleMeterRegistry`, as in the example. No Prometheus
 dependency or server is required. Bind `JvmMemoryMetrics` and `ProcessorMetrics`
@@ -245,6 +239,12 @@ targets:
 
 ## Verify collection
 
+The snippets above use example ports `8080` for Javalin and `9090` for
+StatLite. For an existing application, keep its host and port and update the
+target URL and verification commands to match. The runnable experiment uses
+`18087` for Javalin and `19087` for StatLite; use those ports when following
+the experiment, including <http://127.0.0.1:19087> for its dashboard.
+
 Start the application and check the endpoint:
 
 ```sh
@@ -258,7 +258,10 @@ application `status`, `started_at`, and cumulative HTTP counters under `metrics`
 Before traffic, the HTTP counters are zero. Generate requests to your normal
 routes and confirm the counters rise; repeated metrics polls must not raise them.
 Open <http://127.0.0.1:9090> to view the dashboard. The runnable example includes
-`probe.py` to generate and check successful, slow, 404, and 500 traffic.
+`probe.py` to generate and check successful, slow, 404, and 500 traffic. Run
+that probe with the example's `statlite.yaml`, which uses a `2s` polling
+interval. Its 15-second timeout is too short for the `30s` interval shown
+above: StatLite polls once at startup, then waits for the configured interval.
 
 `requests_total` and `request_duration_seconds_total` sum the
 `http.server.requests` timers after route exclusions. HTTP error counters use

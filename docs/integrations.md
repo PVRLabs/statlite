@@ -75,8 +75,9 @@ heap size.
 For applications without a first-class framework target, use the [StatLite
 Metrics integration path](integrate/) when the application can own the fixed
 `/statlite/metrics` endpoint and its cumulative state. The guides cover
-FastAPI, Express, Django, Go `net/http`, and Gin; application integration is
-still required.
+FastAPI, Express, Django, Go `net/http`, and Gin.
+The [Javalin recipe](integrate/java/javalin.md) is outside integration CI.
+Application integration is still required.
 
 StatLite does not currently provide a generic Prometheus target, arbitrary
 metric storage, Prometheus querying, remote write, or a Prometheus-compatible
