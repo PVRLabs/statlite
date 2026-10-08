@@ -14,7 +14,7 @@ on VPSs and small servers. One Go binary polls multiple applications, stores
 metrics locally in SQLite, and provides built-in historical
 charts, without requiring Prometheus or Grafana.
 
-🌐 [Website](https://pvrlabs.xyz/statlite) · 👀 [Interactive demo](https://pvrlabs.xyz/statlite/demo.html) · [简体中文](README.zh-Hans.md)
+🌐 [Website](https://pvrlabs.xyz/statlite) · 👀 [Interactive demo](https://pvrlabs.xyz/statlite/demo.html) · [简体中文](README.zh-Hans.md) · [Tiếng Việt](README.vi.md)
 
 <p align="center">
   <img src="docs/images/dashboard.webp" alt="StatLite dashboard monitoring a Spring Boot payments API">

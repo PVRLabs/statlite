@@ -3,13 +3,14 @@
   StatLite
 </h1>
 
-**StatLite** 是一款轻量级、自托管的指标仪表盘，单个 Go 二进制文件即可运行，使用
-SQLite 存储数据，专为 VPS 和小型服务器上的应用而设计。它可以监控流量、延迟、
-JVM/进程资源、健康状态，以及可选的主机指标，支持 Spring Boot、Quarkus，以及
-通过简单的 StatLite Metrics 接口接入的其他框架和语言。
+**StatLite** 是一款轻量级、自托管的 Spring Boot 监控工具，专为小型 VPS 和资源有限的
+服务器而设计。单个 Go 二进制文件即可与应用一起运行，无需单独的监控服务器，
+也不需要部署 Prometheus/Grafana。StatLite 注重低内存和 CPU 开销，为应用
+留出更多资源。
 
-指标数据留在你自己的服务器上。StatLite 在你的服务器上采集，并把历史记录存在
-SQLite 里，不需要把应用指标持续送到第三方监控 SaaS。
+一个 StatLite 实例会自动采集指标，持续监控多个已配置的应用。在仪表盘上切换
+应用只会改变当前显示的目标，不会停止其他目标的采集。历史指标保存在本地
+SQLite 中，可通过内置仪表盘查看；数据留在你自己的服务器上。
 
 🌐 [官网](https://pvrlabs.xyz/statlite) · 👀 [在线演示](https://pvrlabs.xyz/statlite/demo.html) · [English README](README.md)
 
@@ -28,13 +29,6 @@ docker run --rm \
 
 打开 <http://127.0.0.1:9090>，StatLite 默认会监控自身，因此仪表盘启动后即有
 实时数据。
-
-## 支持的集成
-
-- Spring Boot
-- Quarkus
-- [StatLite Metrics v1](docs/statlite-metrics-v1.md)：适用于其他框架和语言的
-  简单 JSON 接口
 
 ## 完整文档
 
