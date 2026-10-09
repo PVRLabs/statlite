@@ -1,7 +1,10 @@
 # Docker
 
+## Container images
+
 StatLite distributes equivalent release images for `linux/amd64` and
-`linux/arm64` through GHCR and Docker Hub:
+`linux/arm64` through [Docker Hub](https://hub.docker.com/r/pvrlabs/statlite)
+and [GHCR](https://github.com/PVRLabs/statlite/pkgs/container/statlite):
 
 ```text
 ghcr.io/pvrlabs/statlite:latest
@@ -86,7 +89,7 @@ docker run --rm \
   --add-host=host.docker.internal:host-gateway \
   -v "$PWD/statlite.yaml:/etc/statlite/statlite.yaml:ro" \
   -v statlite-data:/data \
-  ghcr.io/pvrlabs/statlite:latest
+  docker.io/pvrlabs/statlite:latest
 ```
 
 You can also add the self-monitoring target to this `targets` list. Its URL

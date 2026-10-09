@@ -40,9 +40,8 @@ Learn how to set up [lightweight Spring Boot monitoring without Prometheus and G
 
 ## Try it
 
-Release images are available from GHCR (`ghcr.io/pvrlabs/statlite`) and Docker
-Hub (`docker.io/pvrlabs/statlite`) for `linux/amd64` and `linux/arm64`. Both
-distribute the same release; GHCR is the authoritative publishing source.
+Release images are available on [Docker Hub](https://hub.docker.com/r/pvrlabs/statlite)
+for `linux/amd64` and `linux/arm64`.
 
 ```bash
 docker run --rm \
