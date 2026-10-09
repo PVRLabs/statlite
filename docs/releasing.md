@@ -2,12 +2,13 @@
 
 StatLite releases use a semi-automated maintainer workflow. The GitHub Actions
 release workflow creates the tag, builds and verifies the release archives,
-publishes the GitHub Release, and publishes multi-platform GHCR images. The
+publishes the GitHub Release, publishes multi-platform GHCR images, and mirrors
+the verified images to Docker Hub. GHCR is the authoritative image source. The
 Homebrew tap update remains a separate manual dispatch after those checks pass.
 
 The maintainer flow is:
 
-`prepare release commit → push and verify CI → dispatch StatLite release → verify GitHub/GHCR → bump main to next -dev → dispatch Homebrew updater → install checks → announcement`
+`prepare release commit → push and verify CI → dispatch StatLite release → verify GitHub/GHCR/Docker Hub → bump main to next -dev → dispatch Homebrew updater → install checks → announcement`
 
 ## What Gets Released
 
@@ -15,6 +16,26 @@ For release `vX.Y.Z`, the release workflow produces archives for Linux and macOS
 on amd64 and arm64, plus SHA-256 checksum files. It publishes GHCR images tagged
 `X.Y.Z` and `latest` from the same multi-platform build. The image embeds the
 release version, which is returned by `statlite --version`.
+
+The reusable `dockerhub-mirror.yml` workflow runs only after the GHCR container
+job passes its manifest, version, and smoke checks. It uses
+`docker buildx imagetools create` to copy the pinned GHCR index to
+`docker.io/pvrlabs/statlite:X.Y.Z`, verifies it, then promotes `latest` if the
+release still matches GHCR `latest`. It performs no additional builds. A mirror
+failure fails the release workflow.
+
+Configure repository variable `DOCKERHUB_USERNAME` as `pvrlabs` and repository
+secret `DOCKERHUB_TOKEN` with push access to `pvrlabs/statlite`. Missing or
+incorrect credentials cause an explicit failure. Mirror jobs have only
+`contents: read` GitHub permissions and are serialized to avoid concurrent
+Docker Hub promotions.
+
+Verification compares each Linux platform's image config and ordered layer
+digests with GHCR, allowing registry manifest serialization to differ. With
+an empty Docker credential store, it inspects each published tag, pulls and
+runs both architectures to check `statlite vX.Y.Z`, and starts the versioned
+image to verify `/healthz` and its version. `latest` receives the same manifest,
+content, anonymous pull, and version checks when requested.
 
 The workflow is started manually from `main` with an explicit `vX.Y.Z` input.
 It checks that the dispatch is from `main`, the version format is valid, the
@@ -98,7 +119,8 @@ existing archive build and release-note generation, checks the expected release
 assets and checksums, publishes the two GHCR tags for `linux/amd64` and
 `linux/arm64`, checks both image manifests and `--version` output, then pulls
 the versioned image and smoke-tests readiness, self-metrics schema, and the
-dashboard response. The smoke-test container is always removed.
+dashboard response. The smoke-test container is always removed. Docker Hub
+mirroring and its anonymous verification then run as a required downstream job.
 
 Release notes use the matching version section from `CHANGELOG.md`, followed by
 the full comparison link. Keep that section focused on user-facing changes.
@@ -108,7 +130,7 @@ When the section is missing, the release script falls back to commit history.
 
 Manually confirm the GitHub Release contains the expected archives and
 checksum files. The successful `release.yml` run is authoritative for both
-GHCR manifests, image versions, startup, and endpoint checks, so the normal
+GHCR and Docker Hub manifests, image versions, startup, and endpoint checks, so the normal
 release flow does not require a local Docker or Buildx setup.
 
 ```bash
@@ -182,6 +204,41 @@ accurate after newer versions are published. The [v0.4.1
 announcement](https://github.com/PVRLabs/statlite/discussions/15) is an example.
 
 ## Recovery
+
+If only the Docker Hub mirror fails, inspect its job logs, repair credentials
+or registry availability as needed, and dispatch the mirror workflow below.
+Do not rerun the full release workflow to recover a mirror. A mirror retry
+copies the same GHCR release and repeats verification without creating tags,
+archives, or a GitHub Release. A separate successful mirror run repairs
+distribution; the original failed release run remains a record of the failure.
+
+### Mirror an existing release
+
+Once the workflow is on `main`, dispatch it for an existing stable GitHub
+Release and GHCR image:
+
+```bash
+gh workflow run dockerhub-mirror.yml --repo PVRLabs/statlite --ref main \
+  -f version=v0.6.0 -f update_latest=false
+gh run list --repo PVRLabs/statlite --workflow dockerhub-mirror.yml --limit 5
+```
+
+Identify the new run and use `gh run watch RUN_ID --repo PVRLabs/statlite
+--exit-status` to confirm success. This publishes and verifies only the versioned
+Docker Hub tag. Development `:dev` images and prereleases are excluded.
+
+To also publish `latest`, explicitly set `update_latest=true`:
+
+```bash
+gh workflow run dockerhub-mirror.yml --repo PVRLabs/statlite --ref main \
+  -f version=v0.6.0 -f update_latest=true
+```
+
+The workflow checks that the selected version's platform content matches GHCR
+`latest` before copying and again before promotion. An older backfill cannot
+replace Docker Hub `latest` while GHCR points to a newer release. For an older
+release, leave `update_latest=false`. Retrying either dispatch is safe; the
+source index is pinned for each run and all verification repeats.
 
 Publication can leave durable results before a later step fails: the tag can
 exist before the archive build finishes, the GitHub Release can exist before

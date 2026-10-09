@@ -424,3 +424,15 @@ jobs:
           esac
 
           echo "container smoke check passed for $image"
+
+  dockerhub:
+    name: mirror and verify Docker Hub images
+    needs: container
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dockerhub-mirror.yml
+    with:
+      version: ${{ inputs.version }}
+      update_latest: true
+    secrets:
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}

@@ -1,17 +1,28 @@
 # Docker
 
-StatLite publishes one multi-platform image for `linux/amd64` and `linux/arm64`:
+StatLite distributes equivalent release images for `linux/amd64` and
+`linux/arm64` through GHCR and Docker Hub:
 
 ```text
 ghcr.io/pvrlabs/statlite:latest
+docker.io/pvrlabs/statlite:latest
 ```
+
+Both registries provide versioned tags without the `v` prefix, such as
+`0.6.0`, and `latest`. GHCR is the authoritative publishing source. After its
+release checks pass, the release workflow copies the existing image to Docker
+Hub without rebuilding and verifies both architectures, release identity,
+anonymous pulls, startup, and `/healthz`.
+
+Docker Hub pull counts measure registry pulls, not unique installations.
+CI, retries, updates, and multiple machines can produce repeated pulls.
 
 ## Run the demo
 
 ```bash
 docker run --rm \
   -p 127.0.0.1:9090:9090 \
-  ghcr.io/pvrlabs/statlite:latest
+  docker.io/pvrlabs/statlite:latest
 ```
 
 Open <http://127.0.0.1:9090>. The image includes a default configuration that
