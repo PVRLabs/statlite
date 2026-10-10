@@ -87,3 +87,11 @@ For a small single-host deployment:
 
 See [Installation](install.md), [systemd deployment](systemd.md), and
 [Configuration](configuration.md) for setup details.
+
+## Share your setup
+
+Using StatLite on a small server? We'd love to hear about your setup! What are
+you monitoring, and what hardware are you running on? [Share your experience
+in Show and Tell](https://github.com/PVRLabs/statlite/discussions/25). We'd also
+be happy to feature real-world deployments on the PVR Labs website, with your
+permission.
