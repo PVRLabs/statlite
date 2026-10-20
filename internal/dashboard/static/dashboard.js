@@ -513,9 +513,17 @@ function renderSeries(series) {
     points.map((point) => point.http_5xx)
   ]);
   updateChart(state.charts.latency, labels, [points.map((point) => point.average_latency_seconds == null ? null : point.average_latency_seconds * 1000)]);
-  updateChart(state.charts.runtime, labels, [
+  const cpuCores = series.cpu_unit === "cores";
+  const runtimeChart = state.charts.runtime;
+  runtimeChart.data.datasets[1].unit = cpuCores ? "cores" : "percent";
+  runtimeChart.options.scales.y1.title.text = cpuCores ? "cores" : "%";
+  const cpuNotes = [];
+  if (series.cpu_unit_assumed) cpuNotes.push("CPU unit assumed from target integration for historical samples.");
+  if (series.cpu_unit_conflict) cpuNotes.push("CPU samples with conflicting units omitted.");
+  document.getElementById("runtime-note").textContent = cpuNotes.join(" ");
+  updateChart(runtimeChart, labels, [
     points.map((point) => point.heap_used_bytes == null ? null : point.heap_used_bytes / 1024 / 1024),
-    points.map((point) => point.process_cpu_usage == null ? null : point.process_cpu_usage * 100)
+    points.map((point) => point.process_cpu_usage == null ? null : point.process_cpu_usage * (cpuCores ? 1 : 100))
   ]);
   updateChart(state.charts.hostRuntime, labels, [
     points.map((point) => bytesToGB(point.host_memory_used_bytes)),
@@ -528,10 +536,10 @@ function renderSeries(series) {
   ]);
 
   const capabilities = detectCapabilities(points);
-  setSectionVisible("metrics-section", capabilities.application || capabilities.process);
+  setSectionVisible("metrics-section", capabilities.application || capabilities.process || Boolean(series.cpu_unit_conflict));
   setSectionVisible("application-heading", capabilities.application);
   setSectionVisible("application-section", capabilities.application);
-  setSectionVisible("process-section", capabilities.process);
+  setSectionVisible("process-section", capabilities.process || Boolean(series.cpu_unit_conflict));
   setSectionVisible("host-section", capabilities.host);
   setSectionVisible("host-runtime-chart-card", capabilities.hostCPU || capabilities.hostMemory);
   setSectionVisible("host-disk-chart-card", capabilities.hostDisk);
@@ -757,6 +765,7 @@ function formatValue(value, unit) {
   if (unit === "ms") return value.toFixed(0) + " ms";
   if (unit === "seconds") return value.toFixed(3) + " s";
   if (unit === "percent") return value.toFixed(1) + "%";
+  if (unit === "cores") return value.toFixed(2) + " cores";
   if (unit === "mb") return value.toFixed(1) + " MB";
   if (unit === "gb") return value.toFixed(1) + " GB";
   return Number.isInteger(value) ? String(value) : value.toFixed(2);

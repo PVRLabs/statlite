@@ -676,7 +676,7 @@ test("stale refresh responses cannot replace the current target", async () => {
 });
 
 function chartStubs() {
-  const chart = (datasets) => ({ data: { labels: [], datasets: Array.from({ length: datasets }, () => ({ data: [] })) }, update() {} });
+  const chart = (datasets) => ({ data: { labels: [], datasets: Array.from({ length: datasets }, () => ({ data: [] })) }, options: { scales: { y1: { title: {} } } }, update() {} });
   return { requests: chart(1), errors: chart(3), latency: chart(1), runtime: chart(2), hostRuntime: chart(3), hostDisk: chart(2) };
 }
 
@@ -741,3 +741,30 @@ function resetDashboardState() {
   dashboard.state.startupRefreshStartedAtByTarget = Object.create(null);
   dashboard.state.renderedSeriesQuery = "";
 }
+
+
+test("CPU chart uses one unit, shows uncertainty, and resets on target changes", () => {
+  const originalDocument = global.document;
+  global.document = dashboardDocument();
+  dashboard.state.charts = chartStubs();
+  try {
+    dashboard.renderSeries({ cpu_unit: "cores", cpu_unit_assumed: true,
+      cpu_unit_conflict: true, points: [{ process_cpu_usage: 2.75 }, { process_cpu_usage: null }] });
+    const chart = dashboard.state.charts.runtime;
+    assert.deepEqual(chart.data.datasets[1].data, [2.75, null]);
+    assert.equal(chart.data.datasets[1].unit, "cores");
+    assert.equal(chart.options.scales.y1.title.text, "cores");
+    assert.equal(dashboard.formatValue(2.75, chart.data.datasets[1].unit), "2.75 cores");
+    assert.match(document.getElementById("runtime-note").textContent, /assumed/);
+    assert.match(document.getElementById("runtime-note").textContent, /conflicting units omitted/);
+    dashboard.renderSeries({ cpu_unit: "ratio", points: [{ process_cpu_usage: 0.25 }] });
+    assert.deepEqual(chart.data.datasets[1].data, [25]);
+    assert.equal(chart.data.datasets[1].unit, "percent");
+    assert.equal(chart.options.scales.y1.title.text, "%");
+    assert.equal(document.getElementById("runtime-note").textContent, "");
+    dashboard.renderSeries({ cpu_unit: "cores", cpu_unit_conflict: true, points: [{ process_cpu_usage: null }] });
+    assert.equal(document.getElementById("metrics-section").hidden, false);
+    assert.equal(document.getElementById("process-section").hidden, false);
+    assert.match(document.getElementById("runtime-note").textContent, /conflicting units omitted/);
+  } finally { global.document = originalDocument; }
+});

@@ -197,6 +197,7 @@ application's environment.
 - [Installation](docs/install.md)
 - [Docker](docs/docker.md)
 - [Configuration](docs/configuration.md)
+- [Metric vocabulary](docs/metrics.md)
 - [External API v1](docs/api.md)
 - [Deprecations and compatibility](docs/deprecations.md)
 - [Supported integrations](docs/integrations.md)

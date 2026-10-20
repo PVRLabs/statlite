@@ -18,9 +18,12 @@ type Snapshot struct {
 }
 
 type Series struct {
-	Start  time.Time     `json:"start"`
-	End    time.Time     `json:"end"`
-	Points []SeriesPoint `json:"points"`
+	CPUUnit         string        `json:"cpu_unit,omitempty"`
+	CPUUnitAssumed  bool          `json:"cpu_unit_assumed,omitempty"`
+	CPUUnitConflict bool          `json:"cpu_unit_conflict,omitempty"`
+	Start           time.Time     `json:"start"`
+	End             time.Time     `json:"end"`
+	Points          []SeriesPoint `json:"points"`
 	// FirstPollID identifies the first native point even when chart sampling
 	// omits it. Retention must not confuse the first endpoint with this poll.
 	FirstPollID int64 `json:"-"`
@@ -40,6 +43,8 @@ type HostDiskCurrent struct {
 }
 
 type SeriesPoint struct {
+	// cpuUnit is retained for dashboard filtering before aggregation.
+	cpuUnit string
 	// publicCoverage supports public grouping and is never serialized.
 	publicCoverage        publicCounterCoverage
 	PollID                int64     `json:"poll_id,omitempty"`

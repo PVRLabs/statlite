@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/pvrlabs/statlite/internal/config"
 	"github.com/pvrlabs/statlite/internal/monitor"
 	"github.com/pvrlabs/statlite/internal/storage"
 )
@@ -133,6 +134,11 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("target %q: %v", target.Metadata.Name, err), http.StatusInternalServerError)
 		return
 	}
+	cpuUnit := "ratio"
+	if target.Metadata.Type == config.TargetTypeStatliteMetrics {
+		cpuUnit = "cores"
+	}
+	storage.ConfigureDashboardCPU(series, cpuUnit)
 	if clamped {
 		clearCutoffCounterBaseline(series, cutoff)
 	}

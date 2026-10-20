@@ -130,7 +130,8 @@ SELECT
   p.app_run_id,
   ms.metric_key,
   ms.metric_kind,
-  ms.value
+  ms.value,
+  ms.unit
 FROM polls p
 JOIN targets t ON t.id = p.target_id
 JOIN metric_samples ms ON ms.poll_id = p.id
@@ -173,7 +174,8 @@ ORDER BY p.started_at ASC, p.id ASC, ms.metric_key ASC
 		var startedAtText, metricKey, metricKind string
 		var appRunID sql.NullInt64
 		var value float64
-		if err := rows.Scan(&pollID, &startedAtText, &appRunID, &metricKey, &metricKind, &value); err != nil {
+		var unit sql.NullString
+		if err := rows.Scan(&pollID, &startedAtText, &appRunID, &metricKey, &metricKind, &value, &unit); err != nil {
 			return nil, fmt.Errorf("scan series sample: %w", err)
 		}
 		startedAt, err := parseStoredTime(startedAtText)
@@ -191,7 +193,7 @@ ORDER BY p.started_at ASC, p.id ASC, ms.metric_key ASC
 				current.appRunID = &appRunID.Int64
 			}
 		}
-		current.samples[metricKey] = sampleValue{kind: collector.MetricKind(metricKind), value: value}
+		current.samples[metricKey] = sampleValue{kind: collector.MetricKind(metricKind), value: value, unit: unit.String}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate series samples: %w", err)
@@ -276,6 +278,7 @@ type pollSamples struct {
 }
 
 type sampleValue struct {
+	unit  string
 	kind  collector.MetricKind
 	value float64
 }
@@ -310,6 +313,7 @@ func buildSeriesPoint(poll *pollSamples, previous map[string]counterValue, start
 	}
 	point.HeapUsedBytes = runtimeMemoryValue(poll)
 	point.ProcessCPUUsage = gaugeValue(poll, "process_cpu_usage")
+	point.cpuUnit = poll.samples["process_cpu_usage"].unit
 	point.HostCPUUsage = gaugeValue(poll, "host_cpu_usage")
 	point.HostMemoryUsedBytes = gaugeValue(poll, "host_memory_used_bytes")
 	point.HostMemoryTotalBytes = gaugeValue(poll, "host_memory_total_bytes")

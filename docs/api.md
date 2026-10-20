@@ -160,7 +160,7 @@ The complete point fields are:
 | `http_5xx_rate` | `http_5xx / requests` when requests are positive and every contributing request interval has a usable paired 5xx delta. This is a fraction from 0 to 1 when available. |
 | `avg_latency_ms` | Arithmetic mean request latency in milliseconds, weighted by requests whose request and duration counter baselines match. |
 | `latency_requests` | Number of requests contributing to `avg_latency_ms`; it may be lower than `requests`. |
-| `process_cpu_cores` | Mean of available process CPU gauge samples, in CPU cores. It may exceed 1. |
+| `process_cpu_cores` | Legacy field: mean of available process CPU samples without unit conversion. StatLite Metrics v1 sources report logical CPU equivalents, possibly above 1; JVM adapters report ratios in `[0, 1]` despite this field name. Mixed historical units are not separated. Existing values are preserved for API v1 compatibility. |
 | `runtime_memory_bytes` | Mean of available runtime-managed memory samples in bytes. Its meaning depends on the integration/runtime; it is not whole-process RSS or a cross-runtime comparable value. |
 | `host_cpu_usage` | Mean of available host CPU usage fractions in `[0, 1]`. |
 | `host_memory_usage` | Mean of per-poll host memory usage fractions in `[0, 1]`, derived from valid used/total pairs. |

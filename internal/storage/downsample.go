@@ -23,6 +23,9 @@ func AggregateSeries(series *Series, bucketDuration time.Duration) *Series {
 	}
 
 	out := &Series{
+		CPUUnit:         series.CPUUnit,
+		CPUUnitAssumed:  series.CPUUnitAssumed,
+		CPUUnitConflict: series.CPUUnitConflict,
 		Start:           series.Start,
 		End:             series.End,
 		Points:          make([]SeriesPoint, 0, len(series.Points)),

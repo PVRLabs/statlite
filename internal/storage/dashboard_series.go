@@ -183,3 +183,28 @@ ORDER BY p.started_at ASC, p.id ASC
 	slices.Sort(ids)
 	return ids, nil
 }
+
+// ConfigureDashboardCPU selects one unit for a chart before aggregation.
+// Only dashboard callers use it: raw samples and public API values stay intact.
+// Missing historical units use the configured integration's unit with a notice.
+func ConfigureDashboardCPU(series *Series, unit string) {
+	if series == nil {
+		return
+	}
+	series.CPUUnit = unit
+	filter := func(point *SeriesPoint) {
+		if point == nil || point.ProcessCPUUsage == nil {
+			return
+		}
+		if point.cpuUnit == "" {
+			series.CPUUnitAssumed = true
+		} else if point.cpuUnit != unit {
+			point.ProcessCPUUsage = nil
+			series.CPUUnitConflict = true
+		}
+	}
+	for i := range series.Points {
+		filter(&series.Points[i])
+	}
+	filter(series.LatestPoint)
+}
