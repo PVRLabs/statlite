@@ -17,7 +17,6 @@ as the authoritative history for each poll.
 
 Internal dashboard/debug routes can expose normalized samples. They are not
 part of the supported external API contract, but existing names are retained.
-The rename candidates below do not change any current names or wire formats.
 
 ## Current normalized samples
 
@@ -188,22 +187,3 @@ minute slots with its documented coverage rules. Neither operation creates
 missing observations. A long-gap counter delta belongs to the end poll's slot;
 it is not distributed over unobserved time. See [API v1](api.md) for exact field,
 coverage, and freshness semantics.
-
-## Rename candidates and possible future vocabulary
-
-These are documentation candidates, not implemented changes or promised
-additions. Current names remain in use. A future rename requires a compatible
-transition covering stored history, raw samples, events, inspect output,
-series, and concrete consumers. A name already used by an API is not evidence
-that collectors emit a normalized sample under that name.
-
-| Current name and surface | Candidate | Reason | Compatibility requirement |
-| --- | --- | --- | --- |
-| Normalized `process_cpu_usage` with unit `cores` | `process_cpu_cores` | Distinguish logical CPU consumption from a capacity ratio. | Preserve v1 wire semantics and existing sample consumers/history; do not change legacy API values. API v1 already has a field with this name and source-dependent legacy semantics. |
-| JVM normalized `jvm_heap_used_bytes` | `runtime_heap_used_bytes` | Share a runtime-memory concept where the source meaning is documented. | Preserve JVM sample consumers, inspect capabilities, event keys, and historical fallback; the common name must not imply RSS or cross-runtime equivalence. |
-
-Where a source supplies a meaningful normalized CPU ratio, a unit-explicit ratio
-model is a preferred future direction. Cores remain useful when total capacity
-is unknown. Broader runtime-memory names may also merit consideration when
-runtime allocation tracking is not equivalent to heap usage. No new fields,
-measurements, conversions, protocol versions, or renames are introduced here.

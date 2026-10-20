@@ -5,6 +5,10 @@ explicitly certified setups where no framework-owned contract exists.
 Prometheus and OpenMetrics are wire formats used by some adapters; StatLite is
 not a generic Prometheus scraper or metrics database.
 
+Integrations map into StatLite's curated [metric vocabulary](metrics.md) and omit
+incompatible measurements. See the
+[product boundary](product.md#metric-vocabulary).
+
 ## Support matrix
 
 | Integration | Status | Metrics source(s) | Endpoint or configuration | Notes |

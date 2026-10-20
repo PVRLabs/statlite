@@ -45,10 +45,7 @@ defaults should favor a small steady-state footprint; faster local-demo
 settings must be clearly labeled. Monitoring should not materially change the
 workload being observed.
 
-StatLite should also keep its total normalized metric vocabulary small. New
-integrations should reuse existing concepts wherever possible and should not
-add or retain metrics merely because an upstream ecosystem exposes them. Every
-normalized metric must have a concrete dashboard, health, diagnostic, or
+Every normalized metric must have a concrete dashboard, health, diagnostic, or
 internal operational purpose. The core product favors low overhead, simple
 semantics, and actionable defaults over comprehensive observability. Analytical
 capabilities such as latency distributions and percentiles, high-cardinality
@@ -81,6 +78,12 @@ prioritizing an integration by themselves. This is a prioritization guide, not
 a requirement that every target expose every HTTP concept. Deliberate strategic
 or runtime-focused targets can be exceptions when their constrained-environment
 value is clear; any future target still requires a separate product decision.
+
+### Metric vocabulary
+
+Integrations map source measurements into StatLite's small, curated,
+framework-independent [metric vocabulary](metrics.md) when their operational
+meaning and units are compatible. Incompatible measurements are omitted.
 
 ## Supported integration boundaries
 

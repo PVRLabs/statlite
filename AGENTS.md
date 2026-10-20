@@ -30,6 +30,11 @@ when a general-purpose observability stack is unnecessary. See `README.md` and
 Follow `docs/product.md` for product scope; expand scope only when explicitly
 requested.
 
+When adding or extending an integration, follow the
+[metric vocabulary boundary](docs/product.md#metric-vocabulary) and review
+[existing metrics](docs/metrics.md). Reuse metrics only when their operational
+meaning and units are compatible; omit incompatible measurements.
+
 ## Data Model Guardrails
 
 Preserve the poll and storage model documented in `docs/product.md`:
