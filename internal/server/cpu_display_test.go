@@ -88,6 +88,14 @@ func TestDashboardCPUUnitsPreservePublicAndRawSamples(t *testing.T) {
 						if len(series.Points) != 4 {
 							t.Fatalf("raw points=%d", len(series.Points))
 						}
+						matchingIndex, conflictingIndex, matchingValue := 0, 1, .25
+						if expectedUnit == "cores" {
+							matchingIndex, conflictingIndex, matchingValue = 1, 0, 2.75
+						}
+						assertPublicMetricValue(t, "matching CPU", series.Points[matchingIndex].ProcessCPUUsage, matchingValue)
+						if series.Points[conflictingIndex].ProcessCPUUsage != nil {
+							t.Fatalf("%s raw=%v conflicting CPU leaked into chart", window, raw)
+						}
 						assertPublicMetricValue(t, "assumed CPU", series.Points[2].ProcessCPUUsage, 1)
 						if series.Points[3].ProcessCPUUsage != nil {
 							t.Fatal("unknown explicit unit accepted")

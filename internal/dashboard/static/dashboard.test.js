@@ -745,26 +745,45 @@ function resetDashboardState() {
 
 test("CPU chart uses one unit, shows uncertainty, and resets on target changes", () => {
   const originalDocument = global.document;
+  const originalChart = global.Chart;
   global.document = dashboardDocument();
-  dashboard.state.charts = chartStubs();
+  global.Chart = class {
+    constructor(_canvas, config) { this.data = config.data; this.options = config.options; }
+    update() {}
+  };
   try {
+    dashboard.buildCharts();
     dashboard.renderSeries({ cpu_unit: "cores", cpu_unit_assumed: true,
       cpu_unit_conflict: true, points: [{ process_cpu_usage: 2.75 }, { process_cpu_usage: null }] });
     const chart = dashboard.state.charts.runtime;
     assert.deepEqual(chart.data.datasets[1].data, [2.75, null]);
     assert.equal(chart.data.datasets[1].unit, "cores");
     assert.equal(chart.options.scales.y1.title.text, "cores");
-    assert.equal(dashboard.formatValue(2.75, chart.data.datasets[1].unit), "2.75 cores");
-    assert.match(document.getElementById("runtime-note").textContent, /assumed/);
+    const cpuTooltip = () => chart.options.plugins.tooltip.callbacks.label({
+      dataset: chart.data.datasets[1], parsed: { y: chart.data.datasets[1].data[0] }
+    });
+    assert.equal(cpuTooltip(), "Process CPU: 2.75 cores");
+    assert.match(document.getElementById("runtime-note").textContent, /without units use the current target integration's unit/);
+    assert.match(document.getElementById("runtime-note").textContent, /may be inaccurate if the integration changed/);
     assert.match(document.getElementById("runtime-note").textContent, /conflicting units omitted/);
     dashboard.renderSeries({ cpu_unit: "ratio", points: [{ process_cpu_usage: 0.25 }] });
     assert.deepEqual(chart.data.datasets[1].data, [25]);
     assert.equal(chart.data.datasets[1].unit, "percent");
     assert.equal(chart.options.scales.y1.title.text, "%");
+    assert.equal(cpuTooltip(), "Process CPU: 25.0%");
     assert.equal(document.getElementById("runtime-note").textContent, "");
     dashboard.renderSeries({ cpu_unit: "cores", cpu_unit_conflict: true, points: [{ process_cpu_usage: null }] });
     assert.equal(document.getElementById("metrics-section").hidden, false);
     assert.equal(document.getElementById("process-section").hidden, false);
     assert.match(document.getElementById("runtime-note").textContent, /conflicting units omitted/);
-  } finally { global.document = originalDocument; }
+    dashboard.renderSeries({ cpu_unit: "cores", points: [{ process_cpu_usage: 2.75 }] });
+    assert.deepEqual(chart.data.datasets[1].data, [2.75]);
+    assert.equal(chart.data.datasets[1].unit, "cores");
+    assert.equal(chart.options.scales.y1.title.text, "cores");
+    assert.equal(cpuTooltip(), "Process CPU: 2.75 cores");
+    assert.equal(document.getElementById("runtime-note").textContent, "");
+  } finally {
+    global.document = originalDocument;
+    global.Chart = originalChart;
+  }
 });

@@ -518,7 +518,7 @@ function renderSeries(series) {
   runtimeChart.data.datasets[1].unit = cpuCores ? "cores" : "percent";
   runtimeChart.options.scales.y1.title.text = cpuCores ? "cores" : "%";
   const cpuNotes = [];
-  if (series.cpu_unit_assumed) cpuNotes.push("CPU unit assumed from target integration for historical samples.");
+  if (series.cpu_unit_assumed) cpuNotes.push("Historical CPU samples without units use the current target integration's unit; older samples may be inaccurate if the integration changed.");
   if (series.cpu_unit_conflict) cpuNotes.push("CPU samples with conflicting units omitted.");
   document.getElementById("runtime-note").textContent = cpuNotes.join(" ");
   updateChart(runtimeChart, labels, [
