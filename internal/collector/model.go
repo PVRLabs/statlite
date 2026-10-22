@@ -22,15 +22,17 @@ const (
 )
 
 type CollectionResult struct {
-	TargetName       string           `json:"target_name"`
-	MetricsSource    string           `json:"-"`
-	PollStartedAt    time.Time        `json:"poll_started_at"`
-	PollFinishedAt   time.Time        `json:"poll_finished_at"`
-	HealthStatus     string           `json:"health_status,omitempty"`
-	DBHealthStatus   string           `json:"db_health_status,omitempty"`
-	ProcessStartTime *time.Time       `json:"process_start_time,omitempty"`
-	Samples          []MetricSample   `json:"samples"`
-	Events           []CollectorEvent `json:"events"`
+	// CounterContinuityBreak requests a fresh anonymous counter baseline, not an application restart.
+	CounterContinuityBreak bool             `json:"-"`
+	TargetName             string           `json:"target_name"`
+	MetricsSource          string           `json:"-"`
+	PollStartedAt          time.Time        `json:"poll_started_at"`
+	PollFinishedAt         time.Time        `json:"poll_finished_at"`
+	HealthStatus           string           `json:"health_status,omitempty"`
+	DBHealthStatus         string           `json:"db_health_status,omitempty"`
+	ProcessStartTime       *time.Time       `json:"process_start_time,omitempty"`
+	Samples                []MetricSample   `json:"samples"`
+	Events                 []CollectorEvent `json:"events"`
 }
 
 type MetricSample struct {

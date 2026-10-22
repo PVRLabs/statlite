@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 
 const (
 	// When adding a target type, also update targetTypeHelp in the dashboard.
+	TargetTypeCaddy           = "caddy"
 	TargetTypeSpring          = "spring"
 	TargetTypeQuarkus         = "quarkus"
 	TargetTypeMicronaut       = "micronaut"
@@ -53,10 +55,12 @@ type TargetConfig struct {
 	Name                   string      `yaml:"name"`
 	ActuatorBaseURL        string      `yaml:"actuator_base_url"`
 	URL                    string      `yaml:"url"`
+	Host                   string      `yaml:"host,omitempty"`
 	HealthURL              string      `yaml:"health_url,omitempty"`
 	MetricsSource          string      `yaml:"metrics_source,omitempty"`
 	CollectHostMetrics     bool        `yaml:"collect_host_metrics,omitempty"`
 	Auth                   *AuthConfig `yaml:"auth,omitempty"`
+	hostSet                bool
 	actuatorURLSet         bool
 	metricsSourceSet       bool
 	collectHostSet         bool
@@ -196,6 +200,8 @@ func (t *TargetConfig) UnmarshalYAML(value *yaml.Node) error {
 			t.metricsSourceSet = true
 		case "collect_host_metrics":
 			t.collectHostSet = true
+		case "host":
+			t.hostSet = true
 		case "health_url":
 			t.healthURLSet = true
 		}
@@ -240,6 +246,7 @@ func (c *Config) validateTargets() error {
 	if len(c.Targets) == 0 {
 		return fmt.Errorf("at least one target is required")
 	}
+	seenCaddySelections := make(map[string]string)
 	seenTargetNames := make(map[string]int, len(c.Targets))
 	for i := range c.Targets {
 		target := &c.Targets[i]
@@ -258,7 +265,19 @@ func (c *Config) validateTargets() error {
 			targetType = TargetTypeSpring
 			target.Type = targetType
 		}
+		if targetType != TargetTypeCaddy && (target.Host != "" || target.hostSet) {
+			return targetError(target, "host", "is supported only for type caddy")
+		}
 		switch targetType {
+		case TargetTypeCaddy:
+			if err := validateCaddyTarget(target); err != nil {
+				return err
+			}
+			selection := caddySelectionKey(target)
+			if previous, ok := seenCaddySelections[selection]; ok {
+				return targetError(target, "host", fmt.Sprintf("duplicates Caddy endpoint and host selection of target %q", previous))
+			}
+			seenCaddySelections[selection] = target.Name
 		case TargetTypeSpring:
 			if err := validateSpringTarget(target); err != nil {
 				return err
@@ -276,11 +295,11 @@ func (c *Config) validateTargets() error {
 				return err
 			}
 		default:
-			return targetError(target, "type", fmt.Sprintf("unsupported value %q (supported: spring, quarkus, micronaut, statlite-metrics)", targetType))
+			return targetError(target, "type", fmt.Sprintf("unsupported value %q (supported: spring, quarkus, micronaut, statlite-metrics, caddy)", targetType))
 		}
 		if target.Auth != nil {
-			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus && targetType != TargetTypeMicronaut {
-				return targetError(target, "auth", "is supported only for type spring, quarkus, and micronaut")
+			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus && targetType != TargetTypeMicronaut && targetType != TargetTypeCaddy {
+				return targetError(target, "auth", "is supported only for type spring, quarkus, micronaut, and caddy")
 			}
 			if target.Auth.Type != "basic" {
 				return targetError(target, "auth.type", fmt.Sprintf("unsupported value %q (only basic is supported)", target.Auth.Type))
@@ -508,4 +527,56 @@ func DefaultMicronautHealthURL(metricsURL string) (string, error) {
 	u.RawQuery = ""
 	u.ForceQuery = false
 	return u.String(), nil
+}
+
+func validateCaddyTarget(target *TargetConfig) error {
+	if target.URL == "" {
+		return targetError(target, "url", "is required for type caddy")
+	}
+	if err := validateTargetURL(target.URL, true, false); err != nil {
+		return targetURLValidationError(target, "url", err)
+	}
+	if target.ActuatorBaseURL != "" || target.actuatorURLSet {
+		return targetError(target, "actuator_base_url", "is supported only for type spring")
+	}
+	if target.MetricsSource != "" || target.metricsSourceSet {
+		return targetError(target, "metrics_source", "is supported only for type spring")
+	}
+	// An exact ordinary DNS hostname, optionally with its literal Host port.
+	// Preserve case and spelling because selection matches the exported label.
+	host := target.Host
+	parsed, err := url.Parse("https://" + host)
+	if err != nil || host == "" || len(host) > 253 || strings.ContainsAny(host, " /\\?#@*\t\r\n") || parsed.Host != host || parsed.Hostname() == "" {
+		return targetError(target, "host", "must be an exact hostname, optionally with a port, without a scheme, wildcard, or path")
+	}
+	if strings.Contains(host, ":") {
+		port, err := strconv.Atoi(parsed.Port())
+		if err != nil || port < 1 || port > 65535 {
+			return targetError(target, "host", "port must be between 1 and 65535")
+		}
+	}
+	for _, label := range strings.Split(parsed.Hostname(), ".") {
+		if label == "" || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return targetError(target, "host", "must contain valid DNS labels")
+		}
+		for _, ch := range label {
+			if !(ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '-') {
+				return targetError(target, "host", "must contain valid DNS labels")
+			}
+		}
+	}
+	return nil
+}
+
+func caddySelectionKey(target *TargetConfig) string {
+	u, _ := url.Parse(target.URL)
+	u.Scheme = strings.ToLower(u.Scheme)
+	u.Host = strings.ToLower(u.Host)
+	if u.Scheme == "http" && u.Port() == "80" || u.Scheme == "https" && u.Port() == "443" {
+		u.Host = strings.TrimSuffix(u.Host, ":"+u.Port())
+	}
+	if u.Path == "" {
+		u.Path = "/"
+	}
+	return u.String() + "\x00" + target.Host
 }

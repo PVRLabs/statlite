@@ -898,8 +898,8 @@ targets:
 			if err == nil {
 				t.Fatal("Load() error = nil, want error")
 			}
-			if !strings.Contains(err.Error(), "auth: is supported only for type spring, quarkus, and micronaut") {
-				t.Fatalf("Load() error = %q, want spring-only auth error", err)
+			if !strings.Contains(err.Error(), "auth: is supported only for type spring, quarkus, micronaut, and caddy") {
+				t.Fatalf("Load() error = %q, want unsupported target auth error", err)
 			}
 		})
 	}

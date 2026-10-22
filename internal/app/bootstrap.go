@@ -48,6 +48,12 @@ func newCollector(target config.TargetConfig, timeout time.Duration) (monitor.Co
 		return newStatliteMetricsCollector(target, timeout)
 	case config.TargetTypeMicronaut:
 		return newMicronautCollector(target, timeout)
+	case config.TargetTypeCaddy:
+		client, err := prometheus.NewClient(timeout, prometheus.DefaultLimits, prometheusAuthConfig(target.Auth))
+		if err != nil {
+			return nil, fmt.Errorf("caddy metrics client: %w", err)
+		}
+		return collector.NewCaddyCollector(target.Name, target.URL, target.Host, client), nil
 	case config.TargetTypeQuarkus:
 		return newQuarkusCollector(target, timeout)
 	default:

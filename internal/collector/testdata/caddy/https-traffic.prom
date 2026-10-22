@@ -1,0 +1,436 @@
+# HELP caddy_admin_http_requests_total Counter of requests made to the Admin API's HTTP endpoints.
+# TYPE caddy_admin_http_requests_total counter
+caddy_admin_http_requests_total{code="200",handler="admin",method="GET",path="/metrics"} 2
+# HELP caddy_config_last_reload_success_timestamp_seconds Timestamp of the last successful configuration reload.
+# TYPE caddy_config_last_reload_success_timestamp_seconds gauge
+caddy_config_last_reload_success_timestamp_seconds 1.792697139818228e+09
+# HELP caddy_config_last_reload_successful Whether the last configuration reload attempt was successful.
+# TYPE caddy_config_last_reload_successful gauge
+caddy_config_last_reload_successful 1
+# HELP caddy_http_request_duration_seconds Histogram of round-trip request durations.
+# TYPE caddy_http_request_duration_seconds histogram
+caddy_http_request_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.005"} 1
+caddy_http_request_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.01"} 1
+caddy_http_request_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.025"} 1
+caddy_http_request_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.05"} 1
+caddy_http_request_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.1"} 1
+caddy_http_request_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.25"} 1
+caddy_http_request_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.5"} 1
+caddy_http_request_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1"} 1
+caddy_http_request_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="2.5"} 1
+caddy_http_request_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="5"} 1
+caddy_http_request_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="10"} 1
+caddy_http_request_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_request_duration_seconds_sum{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1"} 0.001152743
+caddy_http_request_duration_seconds_count{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+caddy_http_request_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="0.005"} 1
+caddy_http_request_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="0.01"} 1
+caddy_http_request_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="0.025"} 1
+caddy_http_request_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="0.05"} 1
+caddy_http_request_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="0.1"} 1
+caddy_http_request_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="0.25"} 1
+caddy_http_request_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="0.5"} 1
+caddy_http_request_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="1"} 1
+caddy_http_request_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="2.5"} 1
+caddy_http_request_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="5"} 1
+caddy_http_request_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="10"} 1
+caddy_http_request_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="+Inf"} 1
+caddy_http_request_duration_seconds_sum{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects"} 4.6443e-05
+caddy_http_request_duration_seconds_count{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects"} 1
+caddy_http_request_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.005"} 1
+caddy_http_request_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.01"} 1
+caddy_http_request_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.025"} 1
+caddy_http_request_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.05"} 1
+caddy_http_request_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.1"} 1
+caddy_http_request_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.25"} 1
+caddy_http_request_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.5"} 1
+caddy_http_request_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1"} 1
+caddy_http_request_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="2.5"} 1
+caddy_http_request_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="5"} 1
+caddy_http_request_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="10"} 1
+caddy_http_request_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_request_duration_seconds_sum{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1"} 0.000476381
+caddy_http_request_duration_seconds_count{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+caddy_http_request_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.005"} 1
+caddy_http_request_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.01"} 1
+caddy_http_request_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.025"} 1
+caddy_http_request_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.05"} 1
+caddy_http_request_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.1"} 1
+caddy_http_request_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.25"} 1
+caddy_http_request_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.5"} 1
+caddy_http_request_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1"} 1
+caddy_http_request_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="2.5"} 1
+caddy_http_request_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="5"} 1
+caddy_http_request_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="10"} 1
+caddy_http_request_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_request_duration_seconds_sum{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1"} 0.000528795
+caddy_http_request_duration_seconds_count{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+caddy_http_request_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.005"} 1
+caddy_http_request_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.01"} 1
+caddy_http_request_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.025"} 1
+caddy_http_request_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.05"} 1
+caddy_http_request_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.1"} 1
+caddy_http_request_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.25"} 1
+caddy_http_request_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.5"} 1
+caddy_http_request_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1"} 1
+caddy_http_request_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="2.5"} 1
+caddy_http_request_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="5"} 1
+caddy_http_request_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="10"} 1
+caddy_http_request_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_request_duration_seconds_sum{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1"} 0.000490554
+caddy_http_request_duration_seconds_count{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+caddy_http_request_duration_seconds_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.005"} 1
+caddy_http_request_duration_seconds_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.01"} 1
+caddy_http_request_duration_seconds_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.025"} 1
+caddy_http_request_duration_seconds_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.05"} 1
+caddy_http_request_duration_seconds_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.1"} 1
+caddy_http_request_duration_seconds_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.25"} 1
+caddy_http_request_duration_seconds_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.5"} 1
+caddy_http_request_duration_seconds_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1"} 1
+caddy_http_request_duration_seconds_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="2.5"} 1
+caddy_http_request_duration_seconds_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="5"} 1
+caddy_http_request_duration_seconds_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="10"} 1
+caddy_http_request_duration_seconds_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_request_duration_seconds_sum{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1"} 0.000228142
+caddy_http_request_duration_seconds_count{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+# HELP caddy_http_request_errors_total Number of requests resulting in middleware errors.
+# TYPE caddy_http_request_errors_total counter
+caddy_http_request_errors_total{handler="subroute",host="alpha.test",server="srv1"} 1
+# HELP caddy_http_request_size_bytes Total size of the request. Includes body
+# TYPE caddy_http_request_size_bytes histogram
+caddy_http_request_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="256"} 1
+caddy_http_request_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1024"} 1
+caddy_http_request_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4096"} 1
+caddy_http_request_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="16384"} 1
+caddy_http_request_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="65536"} 1
+caddy_http_request_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="262144"} 1
+caddy_http_request_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1.048576e+06"} 1
+caddy_http_request_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4.194304e+06"} 1
+caddy_http_request_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_request_size_bytes_sum{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1"} 90
+caddy_http_request_size_bytes_count{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+caddy_http_request_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="256"} 1
+caddy_http_request_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="1024"} 1
+caddy_http_request_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="4096"} 1
+caddy_http_request_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="16384"} 1
+caddy_http_request_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="65536"} 1
+caddy_http_request_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="262144"} 1
+caddy_http_request_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="1.048576e+06"} 1
+caddy_http_request_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="4.194304e+06"} 1
+caddy_http_request_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="+Inf"} 1
+caddy_http_request_size_bytes_sum{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects"} 96
+caddy_http_request_size_bytes_count{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects"} 1
+caddy_http_request_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="256"} 1
+caddy_http_request_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1024"} 1
+caddy_http_request_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4096"} 1
+caddy_http_request_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="16384"} 1
+caddy_http_request_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="65536"} 1
+caddy_http_request_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="262144"} 1
+caddy_http_request_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1.048576e+06"} 1
+caddy_http_request_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4.194304e+06"} 1
+caddy_http_request_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_request_size_bytes_sum{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1"} 91
+caddy_http_request_size_bytes_count{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+caddy_http_request_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="256"} 1
+caddy_http_request_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1024"} 1
+caddy_http_request_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4096"} 1
+caddy_http_request_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="16384"} 1
+caddy_http_request_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="65536"} 1
+caddy_http_request_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="262144"} 1
+caddy_http_request_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1.048576e+06"} 1
+caddy_http_request_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4.194304e+06"} 1
+caddy_http_request_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_request_size_bytes_sum{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1"} 95
+caddy_http_request_size_bytes_count{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+caddy_http_request_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="256"} 1
+caddy_http_request_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1024"} 1
+caddy_http_request_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4096"} 1
+caddy_http_request_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="16384"} 1
+caddy_http_request_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="65536"} 1
+caddy_http_request_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="262144"} 1
+caddy_http_request_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1.048576e+06"} 1
+caddy_http_request_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4.194304e+06"} 1
+caddy_http_request_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_request_size_bytes_sum{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1"} 92
+caddy_http_request_size_bytes_count{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+caddy_http_request_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="256"} 1
+caddy_http_request_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1024"} 1
+caddy_http_request_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4096"} 1
+caddy_http_request_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="16384"} 1
+caddy_http_request_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="65536"} 1
+caddy_http_request_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="262144"} 1
+caddy_http_request_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1.048576e+06"} 1
+caddy_http_request_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4.194304e+06"} 1
+caddy_http_request_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_request_size_bytes_sum{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1"} 95
+caddy_http_request_size_bytes_count{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+# HELP caddy_http_requests_in_flight Number of requests currently handled by this server.
+# TYPE caddy_http_requests_in_flight gauge
+caddy_http_requests_in_flight{handler="static_response",host="alpha.test",server="remaining_auto_https_redirects"} 0
+caddy_http_requests_in_flight{handler="subroute",host="alpha.test",server="srv1"} 0
+# HELP caddy_http_requests_total Counter of HTTP(S) requests made.
+# TYPE caddy_http_requests_total counter
+caddy_http_requests_total{handler="static_response",host="alpha.test",server="remaining_auto_https_redirects"} 1
+caddy_http_requests_total{handler="subroute",host="alpha.test",server="srv1"} 5
+# HELP caddy_http_response_duration_seconds Histogram of times to first byte in response bodies.
+# TYPE caddy_http_response_duration_seconds histogram
+caddy_http_response_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.005"} 1
+caddy_http_response_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.01"} 1
+caddy_http_response_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.025"} 1
+caddy_http_response_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.05"} 1
+caddy_http_response_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.1"} 1
+caddy_http_response_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.25"} 1
+caddy_http_response_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.5"} 1
+caddy_http_response_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1"} 1
+caddy_http_response_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="2.5"} 1
+caddy_http_response_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="5"} 1
+caddy_http_response_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="10"} 1
+caddy_http_response_duration_seconds_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_response_duration_seconds_sum{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1"} 0.001086897
+caddy_http_response_duration_seconds_count{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+caddy_http_response_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="0.005"} 1
+caddy_http_response_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="0.01"} 1
+caddy_http_response_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="0.025"} 1
+caddy_http_response_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="0.05"} 1
+caddy_http_response_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="0.1"} 1
+caddy_http_response_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="0.25"} 1
+caddy_http_response_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="0.5"} 1
+caddy_http_response_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="1"} 1
+caddy_http_response_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="2.5"} 1
+caddy_http_response_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="5"} 1
+caddy_http_response_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="10"} 1
+caddy_http_response_duration_seconds_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="+Inf"} 1
+caddy_http_response_duration_seconds_sum{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects"} 2.4236e-05
+caddy_http_response_duration_seconds_count{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects"} 1
+caddy_http_response_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.005"} 1
+caddy_http_response_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.01"} 1
+caddy_http_response_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.025"} 1
+caddy_http_response_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.05"} 1
+caddy_http_response_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.1"} 1
+caddy_http_response_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.25"} 1
+caddy_http_response_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.5"} 1
+caddy_http_response_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1"} 1
+caddy_http_response_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="2.5"} 1
+caddy_http_response_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="5"} 1
+caddy_http_response_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="10"} 1
+caddy_http_response_duration_seconds_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_response_duration_seconds_sum{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1"} 0.000455959
+caddy_http_response_duration_seconds_count{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+caddy_http_response_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.005"} 1
+caddy_http_response_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.01"} 1
+caddy_http_response_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.025"} 1
+caddy_http_response_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.05"} 1
+caddy_http_response_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.1"} 1
+caddy_http_response_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.25"} 1
+caddy_http_response_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.5"} 1
+caddy_http_response_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1"} 1
+caddy_http_response_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="2.5"} 1
+caddy_http_response_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="5"} 1
+caddy_http_response_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="10"} 1
+caddy_http_response_duration_seconds_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_response_duration_seconds_sum{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1"} 0.000496178
+caddy_http_response_duration_seconds_count{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+caddy_http_response_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.005"} 1
+caddy_http_response_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.01"} 1
+caddy_http_response_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.025"} 1
+caddy_http_response_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.05"} 1
+caddy_http_response_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.1"} 1
+caddy_http_response_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.25"} 1
+caddy_http_response_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="0.5"} 1
+caddy_http_response_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1"} 1
+caddy_http_response_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="2.5"} 1
+caddy_http_response_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="5"} 1
+caddy_http_response_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="10"} 1
+caddy_http_response_duration_seconds_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_response_duration_seconds_sum{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1"} 0.000466552
+caddy_http_response_duration_seconds_count{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+# HELP caddy_http_response_size_bytes Size of the returned response.
+# TYPE caddy_http_response_size_bytes histogram
+caddy_http_response_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="256"} 1
+caddy_http_response_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1024"} 1
+caddy_http_response_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4096"} 1
+caddy_http_response_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="16384"} 1
+caddy_http_response_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="65536"} 1
+caddy_http_response_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="262144"} 1
+caddy_http_response_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1.048576e+06"} 1
+caddy_http_response_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4.194304e+06"} 1
+caddy_http_response_size_bytes_bucket{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_response_size_bytes_sum{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1"} 13
+caddy_http_response_size_bytes_count{code="200",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+caddy_http_response_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="256"} 1
+caddy_http_response_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="1024"} 1
+caddy_http_response_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="4096"} 1
+caddy_http_response_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="16384"} 1
+caddy_http_response_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="65536"} 1
+caddy_http_response_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="262144"} 1
+caddy_http_response_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="1.048576e+06"} 1
+caddy_http_response_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="4.194304e+06"} 1
+caddy_http_response_size_bytes_bucket{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects",le="+Inf"} 1
+caddy_http_response_size_bytes_sum{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects"} 0
+caddy_http_response_size_bytes_count{code="308",handler="static_response",host="alpha.test",method="GET",server="remaining_auto_https_redirects"} 1
+caddy_http_response_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="256"} 1
+caddy_http_response_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1024"} 1
+caddy_http_response_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4096"} 1
+caddy_http_response_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="16384"} 1
+caddy_http_response_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="65536"} 1
+caddy_http_response_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="262144"} 1
+caddy_http_response_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1.048576e+06"} 1
+caddy_http_response_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4.194304e+06"} 1
+caddy_http_response_size_bytes_bucket{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_response_size_bytes_sum{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1"} 13
+caddy_http_response_size_bytes_count{code="400",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+caddy_http_response_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="256"} 1
+caddy_http_response_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1024"} 1
+caddy_http_response_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4096"} 1
+caddy_http_response_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="16384"} 1
+caddy_http_response_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="65536"} 1
+caddy_http_response_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="262144"} 1
+caddy_http_response_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1.048576e+06"} 1
+caddy_http_response_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4.194304e+06"} 1
+caddy_http_response_size_bytes_bucket{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_response_size_bytes_sum{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1"} 13
+caddy_http_response_size_bytes_count{code="404",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+caddy_http_response_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="256"} 1
+caddy_http_response_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1024"} 1
+caddy_http_response_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4096"} 1
+caddy_http_response_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="16384"} 1
+caddy_http_response_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="65536"} 1
+caddy_http_response_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="262144"} 1
+caddy_http_response_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1.048576e+06"} 1
+caddy_http_response_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4.194304e+06"} 1
+caddy_http_response_size_bytes_bucket{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_response_size_bytes_sum{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1"} 13
+caddy_http_response_size_bytes_count{code="500",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+caddy_http_response_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="256"} 1
+caddy_http_response_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1024"} 1
+caddy_http_response_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4096"} 1
+caddy_http_response_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="16384"} 1
+caddy_http_response_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="65536"} 1
+caddy_http_response_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="262144"} 1
+caddy_http_response_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="1.048576e+06"} 1
+caddy_http_response_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="4.194304e+06"} 1
+caddy_http_response_size_bytes_bucket{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1",le="+Inf"} 1
+caddy_http_response_size_bytes_sum{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1"} 0
+caddy_http_response_size_bytes_count{code="502",handler="subroute",host="alpha.test",method="GET",server="srv1"} 1
+# HELP caddy_reverse_proxy_upstreams_healthy Health status of reverse proxy upstreams.
+# TYPE caddy_reverse_proxy_upstreams_healthy gauge
+caddy_reverse_proxy_upstreams_healthy{upstream="127.0.0.1:44356"} 1
+# HELP go_build_info Build information about the main Go module.
+# TYPE go_build_info gauge
+go_build_info{checksum="",path="caddy",version="(devel)"} 1
+# HELP go_gc_duration_seconds A summary of the wall-time pause (stop-the-world) duration in garbage collection cycles.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 7.4606e-05
+go_gc_duration_seconds{quantile="0.25"} 7.709e-05
+go_gc_duration_seconds{quantile="0.5"} 0.000148283
+go_gc_duration_seconds{quantile="0.75"} 0.001022253
+go_gc_duration_seconds{quantile="1"} 0.011890826
+go_gc_duration_seconds_sum 0.013213058
+go_gc_duration_seconds_count 5
+# HELP go_gc_gogc_percent Heap size target percentage configured by the user, otherwise 100. This value is set by the GOGC environment variable, and the runtime/debug.SetGCPercent function. Sourced from /gc/gogc:percent.
+# TYPE go_gc_gogc_percent gauge
+go_gc_gogc_percent 100
+# HELP go_gc_gomemlimit_bytes Go runtime memory limit configured by the user, otherwise math.MaxInt64. This value is set by the GOMEMLIMIT environment variable, and the runtime/debug.SetMemoryLimit function. Sourced from /gc/gomemlimit:bytes.
+# TYPE go_gc_gomemlimit_bytes gauge
+go_gc_gomemlimit_bytes 3.0923764531e+10
+# HELP go_goroutines Number of goroutines that currently exist.
+# TYPE go_goroutines gauge
+go_goroutines 23
+# HELP go_info Information about the Go environment.
+# TYPE go_info gauge
+go_info{version="go1.26.3"} 1
+# HELP go_memstats_alloc_bytes Number of bytes allocated in heap and currently in use. Equals to /memory/classes/heap/objects:bytes.
+# TYPE go_memstats_alloc_bytes gauge
+go_memstats_alloc_bytes 4.329288e+06
+# HELP go_memstats_alloc_bytes_total Total number of bytes allocated in heap until now, even if released already. Equals to /gc/heap/allocs:bytes.
+# TYPE go_memstats_alloc_bytes_total counter
+go_memstats_alloc_bytes_total 1.0663184e+07
+# HELP go_memstats_buck_hash_sys_bytes Number of bytes used by the profiling bucket hash table. Equals to /memory/classes/profiling/buckets:bytes.
+# TYPE go_memstats_buck_hash_sys_bytes gauge
+go_memstats_buck_hash_sys_bytes 1.457264e+06
+# HELP go_memstats_frees_total Total number of heap objects frees. Equals to /gc/heap/frees:objects + /gc/heap/tiny/allocs:objects.
+# TYPE go_memstats_frees_total counter
+go_memstats_frees_total 90344
+# HELP go_memstats_gc_sys_bytes Number of bytes used for garbage collection system metadata. Equals to /memory/classes/metadata/other:bytes.
+# TYPE go_memstats_gc_sys_bytes gauge
+go_memstats_gc_sys_bytes 3.776752e+06
+# HELP go_memstats_heap_alloc_bytes Number of heap bytes allocated and currently in use, same as go_memstats_alloc_bytes. Equals to /memory/classes/heap/objects:bytes.
+# TYPE go_memstats_heap_alloc_bytes gauge
+go_memstats_heap_alloc_bytes 4.329288e+06
+# HELP go_memstats_heap_idle_bytes Number of heap bytes waiting to be used. Equals to /memory/classes/heap/released:bytes + /memory/classes/heap/free:bytes.
+# TYPE go_memstats_heap_idle_bytes gauge
+go_memstats_heap_idle_bytes 4.292608e+06
+# HELP go_memstats_heap_inuse_bytes Number of heap bytes that are in use. Equals to /memory/classes/heap/objects:bytes + /memory/classes/heap/unused:bytes
+# TYPE go_memstats_heap_inuse_bytes gauge
+go_memstats_heap_inuse_bytes 7.274496e+06
+# HELP go_memstats_heap_objects Number of currently allocated objects. Equals to /gc/heap/objects:objects.
+# TYPE go_memstats_heap_objects gauge
+go_memstats_heap_objects 23365
+# HELP go_memstats_heap_released_bytes Number of heap bytes released to OS. Equals to /memory/classes/heap/released:bytes.
+# TYPE go_memstats_heap_released_bytes gauge
+go_memstats_heap_released_bytes 3.653632e+06
+# HELP go_memstats_heap_sys_bytes Number of heap bytes obtained from system. Equals to /memory/classes/heap/objects:bytes + /memory/classes/heap/unused:bytes + /memory/classes/heap/released:bytes + /memory/classes/heap/free:bytes.
+# TYPE go_memstats_heap_sys_bytes gauge
+go_memstats_heap_sys_bytes 1.1567104e+07
+# HELP go_memstats_last_gc_time_seconds Number of seconds since 1970 of last garbage collection.
+# TYPE go_memstats_last_gc_time_seconds gauge
+go_memstats_last_gc_time_seconds 1.792697139859616e+09
+# HELP go_memstats_mallocs_total Total number of heap objects allocated, both live and gc-ed. Semantically a counter version for go_memstats_heap_objects gauge. Equals to /gc/heap/allocs:objects + /gc/heap/tiny/allocs:objects.
+# TYPE go_memstats_mallocs_total counter
+go_memstats_mallocs_total 113709
+# HELP go_memstats_mcache_inuse_bytes Number of bytes in use by mcache structures. Equals to /memory/classes/metadata/mcache/inuse:bytes.
+# TYPE go_memstats_mcache_inuse_bytes gauge
+go_memstats_mcache_inuse_bytes 36736
+# HELP go_memstats_mcache_sys_bytes Number of bytes used for mcache structures obtained from system. Equals to /memory/classes/metadata/mcache/inuse:bytes + /memory/classes/metadata/mcache/free:bytes.
+# TYPE go_memstats_mcache_sys_bytes gauge
+go_memstats_mcache_sys_bytes 48216
+# HELP go_memstats_mspan_inuse_bytes Number of bytes in use by mspan structures. Equals to /memory/classes/metadata/mspan/inuse:bytes.
+# TYPE go_memstats_mspan_inuse_bytes gauge
+go_memstats_mspan_inuse_bytes 163200
+# HELP go_memstats_mspan_sys_bytes Number of bytes used for mspan structures obtained from system. Equals to /memory/classes/metadata/mspan/inuse:bytes + /memory/classes/metadata/mspan/free:bytes.
+# TYPE go_memstats_mspan_sys_bytes gauge
+go_memstats_mspan_sys_bytes 179520
+# HELP go_memstats_next_gc_bytes Number of heap bytes when next garbage collection will take place. Equals to /gc/heap/goal:bytes.
+# TYPE go_memstats_next_gc_bytes gauge
+go_memstats_next_gc_bytes 8.87057e+06
+# HELP go_memstats_other_sys_bytes Number of bytes used for other system allocations. Equals to /memory/classes/other:bytes.
+# TYPE go_memstats_other_sys_bytes gauge
+go_memstats_other_sys_bytes 1.761808e+06
+# HELP go_memstats_stack_inuse_bytes Number of bytes obtained from system for stack allocator in non-CGO environments. Equals to /memory/classes/heap/stacks:bytes.
+# TYPE go_memstats_stack_inuse_bytes gauge
+go_memstats_stack_inuse_bytes 1.015808e+06
+# HELP go_memstats_stack_sys_bytes Number of bytes obtained from system for stack allocator. Equals to /memory/classes/heap/stacks:bytes + /memory/classes/os-stacks:bytes.
+# TYPE go_memstats_stack_sys_bytes gauge
+go_memstats_stack_sys_bytes 1.015808e+06
+# HELP go_memstats_sys_bytes Number of bytes obtained from system. Equals to /memory/classes/total:byte.
+# TYPE go_memstats_sys_bytes gauge
+go_memstats_sys_bytes 1.9806472e+07
+# HELP go_sched_gomaxprocs_threads The current runtime.GOMAXPROCS setting, or the number of operating system threads that can execute user-level Go code simultaneously. Sourced from /sched/gomaxprocs:threads.
+# TYPE go_sched_gomaxprocs_threads gauge
+go_sched_gomaxprocs_threads 16
+# HELP go_threads Number of OS threads created.
+# TYPE go_threads gauge
+go_threads 14
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 0.103927
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 122880
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 13
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.792697139e+09
+# HELP process_virtual_memory_max_bytes Maximum amount of virtual memory available in bytes.
+# TYPE process_virtual_memory_max_bytes gauge
+process_virtual_memory_max_bytes 9.223372036854776e+18
+# HELP promhttp_metric_handler_requests_in_flight Current number of scrapes being served.
+# TYPE promhttp_metric_handler_requests_in_flight gauge
+promhttp_metric_handler_requests_in_flight 1
+# HELP promhttp_metric_handler_requests_total Total number of scrapes by HTTP status code.
+# TYPE promhttp_metric_handler_requests_total counter
+promhttp_metric_handler_requests_total{code="200"} 2
+promhttp_metric_handler_requests_total{code="500"} 0
+promhttp_metric_handler_requests_total{code="503"} 0
