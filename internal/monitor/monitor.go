@@ -167,6 +167,8 @@ func (m *Monitor) IntegrationType() string {
 		return config.TargetTypeQuarkus
 	case *collector.StatliteMetricsCollector:
 		return config.TargetTypeStatliteMetrics
+	case *collector.CaddyCollector:
+		return config.TargetTypeCaddy
 	default:
 		return ""
 	}
@@ -397,6 +399,20 @@ func (m *Monitor) loadSuccessfulHistory(ctx context.Context) (*storage.Snapshot,
 }
 
 func (m *Monitor) detectAppRun(ctx context.Context, result *collector.CollectionResult) (int64, bool, string, error) {
+	if result.MetricsSource == collector.CaddyMetricsSource {
+		// Caddy runs are counter boundaries, never application lifecycle signals.
+		// Loaded history alone cannot establish continuity for this monitor, and
+		// any failed attempt (including persistence) invalidates its baseline.
+		result.ProcessStartTime = nil
+		status := m.Status()
+		if status.LastSuccessfulPollAt == nil || status.ConsecutivePollFailures > 0 ||
+			result.CounterContinuityBreak || m.previous == nil || m.previous.AppRunID == nil {
+			id, err := m.store.EnsureAppRun(ctx, result.TargetName, nil, result.PollStartedAt)
+			return id, false, "", err
+		}
+		return *m.previous.AppRunID, false, "", m.touchAppRun(ctx, *m.previous.AppRunID, result.PollStartedAt)
+	}
+
 	if m.previous == nil || m.previous.AppRunID == nil {
 		id, err := m.store.EnsureAppRun(ctx, result.TargetName, result.ProcessStartTime, result.PollStartedAt)
 		return id, false, "", err
