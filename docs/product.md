@@ -89,7 +89,7 @@ meaning and units are compatible. Incompatible measurements are omitted.
 
 ### Currently supported targets
 
-StatLite has four supported target types:
+StatLite has five supported target types:
 
 * `spring`: Spring Boot Actuator and a fixed set of Micrometer metrics. This
   is the default target type when `type` is omitted.
@@ -104,7 +104,13 @@ StatLite has four supported target types:
   exposition endpoint, with independent optional management health and visible
   JDBC aggregate health. It uses the existing normalized concepts.
 
+* `caddy`: Caddy 2.11.4 built-in per-host HTTP duration counters for an explicit
+  named HTTPS site and one direct reverse proxy. It observes HTTP at the proxy
+  and provides no application health, resource, or lifecycle signals. See the
+  [Caddy target guide](targets/caddy.md) for the exact supported shape.
+
 Spring, Quarkus, Micronaut, and StatLite Metrics are application integrations.
+Caddy observes application HTTP traffic at the perimeter.
 None of these boundaries is an arbitrary metrics API.
 
 ### Framework-first integration model
@@ -407,6 +413,7 @@ aggregation, or a stable endpoint and separate StatLite target for each
 process.
 
 The `feature/go-targets` branch remains useful as a research/base branch for
-future bounded Prometheus/OpenMetrics targets such as Caddy. Reusing its
+bounded Prometheus/OpenMetrics adapters. Native Caddy support has its own
+exact-host contract. Reusing its
 plumbing does not make a Go target, Gin target, or generic Prometheus target
 planned or supported.

@@ -187,3 +187,13 @@ minute slots with its documented coverage rules. Neither operation creates
 missing observations. A long-gap counter delta belongs to the end poll's slot;
 it is not distributed over unobserved time. See [API v1](api.md) for exact field,
 coverage, and freshness semantics.
+
+## Caddy HTTP source
+
+[Caddy 2.11.4](targets/caddy.md) maps paired per-host duration count/sum tuples
+for `handler="subroute"` and exactly one server into the five existing HTTP
+counters: requests, 404, 4xx (including 404), 5xx (including proxy-generated 502),
+and total request time in seconds. Average latency is measured at Caddy.
+Application health, start time, and resources are unavailable. Known continuity
+breaks create anonymous baselines with no cross-boundary delta or app restart.
+See the guide for exact mappings, initial missing metrics, and sampling limits.

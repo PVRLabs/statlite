@@ -20,6 +20,7 @@ incompatible measurements. See the
 | Quarkus 3.39.x | Supported | Micrometer Prometheus/OpenMetrics exposition; optional SmallRye Health | Conventional `/q/metrics`; optional `/q/health` | Explicit `quarkus` target; datasource health is normalized when published. |
 | [Micronaut 5.2.11 (tested setup)](targets/micronaut.md#tested-versions) | Supported | Micrometer 1.17.1 Prometheus exposition; optional management health | Exact `/prometheus`; optional `/health` | Primary tested setup; explicit `micronaut` target; JDBC health requires visible aggregate details. |
 | [Micronaut 4.9.9 (tested setup)](targets/micronaut.md#tested-versions) | Supported | Micrometer 1.15.0 Prometheus exposition; optional management health | Exact `/prometheus`; optional `/health` | Retained regression setup used by the public demo and CI; JDBC health requires visible aggregate details. |
+| [Caddy 2.11.4](targets/caddy.md) | Supported | Built-in per-host HTTP duration counters | Exact metrics URL plus required host | Named HTTPS site with one direct reverse proxy; HTTP charts only, no application health or resources. |
 | StatLite Metrics v1 | Supported | Fixed `statlite-metrics/v1` response | `/statlite/metrics` | Fixed producer contract for StatLite and compatible applications. See the [direct integration guides](integrate/). |
 
 Support means that the integration has an owned endpoint and source contract,
@@ -74,6 +75,14 @@ Spring Boot, Quarkus, and Micronaut memory is JVM heap used. It is runtime-manag
 application memory, not process RSS, container memory, or a configured maximum
 heap size.
 
+## Caddy
+
+Use [Caddy HTTP monitoring](targets/caddy.md) for one exact host behind a named
+HTTPS site and direct reverse proxy. Requests, errors, and average response time
+are observed at Caddy, independent of backend language. Collection UP does not
+guarantee upstream health. See the guide for both loopback admin and private
+Docker read-only endpoint recipes and the tested version.
+
 ## Scope boundaries
 
 For applications without a first-class framework target, use the [StatLite
@@ -88,7 +97,7 @@ metric storage, Prometheus querying, remote write, or a Prometheus-compatible
 time-series database. Supported integrations expose only the normalized
 concepts that StatLite can use for its dashboard, health, and diagnostics.
 
-Future first-class Caddy, Go, Gin, Node, Python, and other framework adapters
+Future first-class Go, Gin, Node, Python, and other framework adapters
 must omit
 health when their certified integration contract has no explicit authoritative
 health signal. Metrics collection alone establishes reporting availability.

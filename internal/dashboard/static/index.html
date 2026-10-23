@@ -285,6 +285,12 @@ main {
   text-transform: none;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
 }
+#target-type-note:not([hidden]) {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
 .tooltip.right {
   left: auto;
   right: 0;
@@ -538,8 +544,8 @@ pre {
     <span id="target-endpoint" class="target-endpoint">...</span>
     <span class="target-type-wrap">
       <span id="target-type" class="target-type">...</span>
-      <button type="button" class="help" aria-label="Target type help" aria-expanded="false">i</button>
-      <span id="target-type-tooltip" class="tooltip right" role="tooltip">Monitored through this collector type.</span>
+      <button type="button" class="help" aria-label="Target type help" aria-describedby="target-type-tooltip" aria-expanded="false">i</button>
+      <span id="target-type-tooltip" class="tooltip right" role="tooltip"><span id="target-type-help">Monitored through this collector type.</span><span id="target-type-note" hidden></span></span>
     </span>
   </section>
 

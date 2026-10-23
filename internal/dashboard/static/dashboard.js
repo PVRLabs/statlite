@@ -305,7 +305,7 @@ function renderSummary(summary) {
   const targets = summary.targets || [];
   renderTargetContext(targets, selected);
   renderFooterSummary(targets);
-  renderApplicationStatus(targetPresentation({ latest, status: monitor }));
+  renderApplicationStatus(targetPresentation({ latest, status: monitor, metadata: selected }));
   renderDatabaseHealth(result.db_health_status);
   setText("process-start", formatDateTime(result.process_start_time));
   renderRestart(summary);
@@ -354,7 +354,13 @@ function targetPresentation(target) {
     tone = "warn";
   }
 
-  const statusDescription = currentFailure
+  const caddy = String(((target || {}).metadata || {}).type || "").toLowerCase() === "caddy";
+  const collectionExplanation = caddy
+    ? "UP means StatLite can collect Caddy metrics. It does not guarantee that the upstream application is healthy."
+    : "";
+  const statusDescription = caddy
+    ? "Collection status: " + label + ". " + collectionExplanation
+    : currentFailure
     ? "App status: DOWN because StatLite cannot currently collect from the application" + (rawHealth ? "; last reported application health: " + rawHealth : "")
     : rawHealth
       ? "App status: " + label + " based on application-reported health" + (healthDetail ? " (" + healthDetail + ")" : "")
@@ -364,6 +370,7 @@ function targetPresentation(target) {
   return {
     label,
     tone,
+    collectionExplanation,
     accessibleLabel: statusDescription + "; reporting status: " + reportingState,
     selectorSuffix: presentationSymbol(tone) + " " + label + (healthDetail && label === "Unhealthy" ? " (" + healthDetail + ")" : ""),
     reportingState,
@@ -386,7 +393,9 @@ function renderApplicationStatus(presentation) {
   status.setAttribute("aria-label", presentation.accessibleLabel);
 
   const tooltip = document.getElementById("app-status-tooltip");
-  if (presentation.reportingState === "Unavailable") {
+  if (presentation.collectionExplanation) {
+    tooltip.textContent = presentation.collectionExplanation;
+  } else if (presentation.reportingState === "Unavailable") {
     tooltip.textContent = "StatLite cannot currently collect from the application." +
       (presentation.authoritativeHealth ? " Last reported application health: " + presentation.rawHealth + "." : "");
   } else if (!presentation.authoritativeHealth) {
@@ -450,6 +459,10 @@ function renderPollStatus(monitor) {
 }
 
 function renderRestart(summary) {
+  if ((summary.selected_target || {}).type === "caddy") {
+    setText("restart-detected", "Unavailable");
+    return;
+  }
   switch (summary.latest_restart_status) {
     case "found":
       setText("restart-detected", formatDateTime(summary.latest_restart));
@@ -485,7 +498,10 @@ function renderTargetContext(targets, selected) {
   document.getElementById("target-endpoint").textContent = endpoint;
   document.getElementById("target-endpoint").title = endpoint;
   document.getElementById("target-type").textContent = selected.type || "target";
-  document.getElementById("target-type-tooltip").textContent = targetTypeHelp(selected.type);
+  document.getElementById("target-type-help").textContent = targetTypeHelp(selected.type);
+  const targetTypeNote = document.getElementById("target-type-note");
+  targetTypeNote.hidden = String(selected.type || "").toLowerCase() !== "caddy";
+  targetTypeNote.textContent = targetTypeNote.hidden ? "" : "For deeper application metrics, you can configure a direct StatLite integration.";
   document.getElementById("runtime-tooltip").textContent = runtimeHelp();
   select.classList.toggle("hidden", !multiple);
 
@@ -711,6 +727,8 @@ function targetTypeHelp(value) {
   switch (String(value || "").toLowerCase()) {
   case "spring":
     return "Monitors a Spring Boot application through Actuator health and metrics endpoints.";
+  case "caddy":
+    return "Monitors HTTP requests for one exact host through Caddy. Response time is measured at Caddy; application health and resources are unavailable.";
   case "quarkus":
     return "Monitors a Quarkus application through its metrics endpoint; SmallRye Health is used when available.";
   case "micronaut":
@@ -805,6 +823,6 @@ function initDashboard() {
   refreshWhenVisible();
 }
 
-const dashboardTestHooks = { buildCharts, detectCapabilities, foldRepeatedEvents, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, openEventGroupKeys, refresh, refreshWhenVisible, renderApplicationStatus, renderDatabaseHealth, renderError, renderFooterSummary, renderPollStatus, renderRangeSelection, renderSeries, renderTargetContext, runtimeHelp, shouldRenderSeries, state, targetPresentation, targetTypeHelp, updateChart, validDiskPoint };
+const dashboardTestHooks = { buildCharts, detectCapabilities, foldRepeatedEvents, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, openEventGroupKeys, refresh, refreshWhenVisible, renderApplicationStatus, renderDatabaseHealth, renderError, renderFooterSummary, renderPollStatus, renderRangeSelection, renderSeries, renderSummary, renderTargetContext, runtimeHelp, shouldRenderSeries, state, targetPresentation, targetTypeHelp, updateChart, validDiskPoint };
 if (typeof module !== "undefined" && module.exports) module.exports = dashboardTestHooks;
 if (typeof document !== "undefined") initDashboard();

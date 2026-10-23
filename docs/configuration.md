@@ -190,8 +190,24 @@ targets with a compatible stored baseline use the configured interval normally.
 At least one target is required. Names must be unique.
 
 Target URLs must use `http://` or `https://`, include a host, and omit
-fragments; Quarkus, Micronaut, and StatLite Metrics URLs may include queries, and
+fragments; Caddy, Quarkus, Micronaut, and StatLite Metrics URLs may include queries, and
 canonical target URLs do not support embedded credentials.
+
+### Caddy HTTP metrics
+
+```yaml
+targets:
+  - name: app-via-caddy
+    type: caddy
+    url: http://127.0.0.1:2019/metrics
+    host: app.example.com
+```
+
+`url` is the exact metrics endpoint and `host` is required, matching the Caddy
+host label exactly. See the [Caddy onboarding guide](targets/caddy.md) for
+`per_host`, HTTPS setup, private Docker endpoints, diagnostics, and limitations.
+Optional Basic Auth is supported; health and host-resource options are not.
+Caddy targets require manual configuration.
 
 ### Spring Boot Actuator
 

@@ -787,3 +787,64 @@ test("CPU chart uses one unit, shows uncertainty, and resets on target changes",
     global.Chart = originalChart;
   }
 });
+
+
+test("Caddy explains collection status and keeps 502 traffic UP without app lifecycle or resource data", () => {
+  const originalDocument = global.document;
+  const document = dashboardDocument();
+  global.document = document;
+  dashboard.state.charts = chartStubs();
+  const metadata = { name: "edge", type: "caddy", endpoint: "http://caddy:9180/metrics" };
+  const latest = { status: "ok", result: { samples: [
+    { key: "http_5xx_total", kind: "counter", value: 1 }
+  ] } };
+  const explanation = "UP means StatLite can collect Caddy metrics. It does not guarantee that the upstream application is healthy.";
+  try {
+    dashboard.renderSummary({ selected_target: metadata, targets: [{ metadata, latest }], latest, latest_restart_status: "none" });
+    assert.match(dashboard.targetTypeHelp("caddy"), /one exact host.*measured at Caddy.*health and resources are unavailable/);
+    assert.match(document.getElementById("app-status").innerHTML, />UP</);
+    assert.equal(document.getElementById("app-status-tooltip").textContent, explanation);
+    for (const id of ["app-status", "target-status"]) {
+      assert.ok(document.getElementById(id).attributes["aria-label"].includes(explanation));
+    }
+    assert.equal(document.getElementById("process-start").textContent, "Unknown");
+    assert.equal(document.getElementById("restart-detected").textContent, "Unavailable");
+    assert.match(document.getElementById("db-health").innerHTML, /Not reported/);
+    dashboard.renderSeries({ points: [{ requests: 5, http_404: 1, http_4xx: 2, http_5xx: 2, average_latency_seconds: 0.1 }] });
+    assert.equal(document.getElementById("application-section").hidden, false);
+    assert.equal(document.getElementById("process-section").hidden, true);
+    assert.equal(document.getElementById("host-section").hidden, true);
+    assert.deepEqual(dashboard.state.charts.requests.data.datasets[0].data, [5]);
+    assert.deepEqual(dashboard.state.charts.latency.data.datasets[0].data, [100]);
+    for (const status of ["error", ""]) {
+      const presentation = dashboard.targetPresentation({ metadata, latest: { status } });
+      dashboard.renderApplicationStatus(presentation);
+      assert.equal(presentation.label, status ? "DOWN" : "Not reporting");
+      assert.equal(document.getElementById("app-status-tooltip").textContent, explanation);
+    }
+  } finally {
+    global.document = originalDocument;
+  }
+});
+
+
+test("Caddy target hint preserves primary help and adds a secondary note only for Caddy", () => {
+  const originalDocument = global.document;
+  const document = dashboardDocument();
+  global.document = document;
+  try {
+    dashboard.renderTargetContext([], { type: "caddy" });
+    assert.equal(document.getElementById("target-type-help").textContent,
+      "Monitors HTTP requests for one exact host through Caddy. Response time is measured at Caddy; application health and resources are unavailable.");
+    assert.equal(document.getElementById("target-type-note").textContent,
+      "For deeper application metrics, you can configure a direct StatLite integration.");
+    assert.equal(document.getElementById("target-type-note").hidden, false);
+
+    dashboard.renderTargetContext([], { type: "spring" });
+    assert.equal(document.getElementById("target-type-help").textContent, dashboard.targetTypeHelp("spring"));
+    assert.equal(document.getElementById("target-type-note").hidden, true);
+    assert.equal(document.getElementById("target-type-note").textContent, "");
+  } finally {
+    global.document = originalDocument;
+  }
+});
