@@ -6,6 +6,22 @@ a fallback when a section is missing.
 
 ## Unreleased
 
+## v0.7.0 (2026-10-23)
+
+- Added first-class Caddy HTTP monitoring for one exact hostname per target,
+  using native `per_host` metrics from Caddy 2.11.4. Existing charts show
+  requests, HTTP errors, and average response time without application
+  instrumentation. Collection success does not establish upstream application
+  health; application runtime and dependency health remain unavailable.
+- Added Caddy setup guidance for same-server and private Docker deployments,
+  plus a public integration smoke journey covering traffic and host isolation.
+- Preserve Caddy counter continuity through stored history, with gaps at
+  detected resets and source changes rather than misleading traffic spikes.
+- Display JVM CPU utilization as a percentage and Metrics v1 process CPU in
+  cores. Explain assumed units for historical samples and omit samples with
+  conflicting units. Handle host CPU counter boundaries safely.
+- Clarify first-time setup and publish the metric reference and units.
+
 ## v0.6.1 (2026-10-16)
 
 - Show process runtime charts for targets without HTTP metrics.
