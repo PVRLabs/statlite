@@ -21,19 +21,7 @@ func (s *HostSampler) cpuUsage() (*float64, error) {
 		return nil, err
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if !s.haveCPU {
-		s.lastTotal, s.lastIdle, s.haveCPU = total, idle, true
-		return nil, nil
-	}
-	totalDelta, idleDelta := total-s.lastTotal, idle-s.lastIdle
-	s.lastTotal, s.lastIdle = total, idle
-	if totalDelta == 0 || idleDelta > totalDelta {
-		return nil, fmt.Errorf("invalid CPU interval")
-	}
-	usage := float64(totalDelta-idleDelta) / float64(totalDelta)
-	return &usage, nil
+	return s.cpuUsageFromCounters(total, idle)
 }
 
 func parseCPUStat(line string) (uint64, uint64, error) {

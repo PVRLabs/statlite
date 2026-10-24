@@ -12,9 +12,19 @@ func TestDarwinHostSampling(t *testing.T) {
 	if usage, err := sampler.cpuUsage(); err != nil || usage != nil {
 		t.Fatalf("first cpuUsage() = %v, %v; want nil, nil", usage, err)
 	}
-	time.Sleep(20 * time.Millisecond)
-	if usage, err := sampler.cpuUsage(); err != nil || usage == nil {
-		t.Fatalf("second cpuUsage() = %v, %v; want a usage value and nil error", usage, err)
+	deadline := time.Now().Add(time.Second)
+	for {
+		usage, err := sampler.cpuUsage()
+		if err != nil {
+			t.Fatalf("cpuUsage() error = %v", err)
+		}
+		if usage != nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("cpuUsage() did not produce a value within one second")
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 	used, total, err := hostMemory()
 	if err != nil {
