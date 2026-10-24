@@ -34,6 +34,7 @@ jobs:
           - case: spring
           - case: micronaut
           - case: quarkus
+          - case: caddy
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -181,3 +182,9 @@ jobs:
         env:
           STATLITE_BIN: ${{ runner.temp }}/statlite
         run: ./scripts/ci/integration-micronaut.sh
+
+      - name: Run Caddy integration journey
+        if: matrix.case == 'caddy'
+        env:
+          STATLITE_BIN: ${{ runner.temp }}/statlite
+        run: ./scripts/ci/integration-caddy.sh

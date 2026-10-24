@@ -8,7 +8,8 @@ site, and one direct `reverse_proxy`.
 
 ## Same VPS
 
-Enable metrics in your Caddyfile:
+Caddy allows one global options block. If your Caddyfile already has one, add
+`metrics { per_host }` inside it. A new file can start with:
 
 ```caddyfile
 {
@@ -23,8 +24,20 @@ app.example.com {
 ```
 
 Use an ordinary HTTPS hostname with DNS and normal HTTP/HTTPS ports configured
-for Caddy. Keep the default writable admin listener on loopback. Add this to
-your [StatLite configuration](../configuration.md):
+for Caddy. Keep the default writable admin listener on loopback. Send one
+request, for example `curl https://app.example.com/`, then copy `host` from the
+metrics scrape before writing the StatLite target. `app.example.com` is correct
+only when the emitted label is exactly that value:
+
+```bash
+curl -fsS http://127.0.0.1:2019/metrics | grep caddy_http_request_duration_seconds_count
+```
+
+`host` matches that label exactly, including case and any literal port. A
+nonstandard port in the request's Host header changes the label. Do not put a
+scheme or path in `host`.
+
+Add the copied value to your [StatLite configuration](../configuration.md):
 
 ```yaml
 targets:
@@ -34,17 +47,16 @@ targets:
     host: app.example.com
 ```
 
-Keep production polling at 30 seconds or longer. Generate a real request, for
-example `curl https://app.example.com/`, and wait for two usable polls. The first
-poll establishes a baseline; subsequent traffic produces request deltas. Idle
+Keep production polling at 30 seconds or longer. Until a request has been
+observed, the dashboard shows a failed collection and Recent events lists
+`caddy_http_not_observed`, which is not zero traffic. Wait for two usable polls.
+The first establishes a baseline; later traffic produces request deltas. Idle
 intervals after a baseline show zero requests and unavailable average latency.
 
-`host` matches the emitted host label exactly, including case and any literal
-port. A nonstandard port in the request's Host header changes the label; use the
-actual emitted value. Do not put a scheme or path in `host`. Configure one target
-per host. Different hosts may share the same metrics endpoint, with independent
-polls; duplicate endpoint/host selections are rejected. Endpoint aliases are
-not discovered. Existing optional Basic Auth applies to the metrics request.
+Configure one target per host. Different hosts may share the same metrics
+endpoint, with independent polls; duplicate endpoint/host selections are
+rejected. Endpoint aliases are not discovered. Existing optional Basic Auth
+applies to the metrics request.
 Caddy targets do not accept health, Spring source, or host-resource fields.
 Configure these targets manually; Caddy discovery, typed inspection, and config
 writers are not supported.
@@ -52,7 +64,8 @@ writers are not supported.
 ## Private Docker network
 
 Use a dedicated read-only metrics listener instead of opening the writable admin
-listener for scraping:
+listener for scraping. Merge `metrics { per_host }` into the existing global
+options block, as in the same-VPS setup. A new file can use:
 
 ```caddyfile
 {
