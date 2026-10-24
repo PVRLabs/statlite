@@ -1,10 +1,10 @@
 # Install StatLite
 
-This document covers install and build paths for the public OSS binary.
+This document covers installation, container, and build options for StatLite.
 
-Installers and package managers install only the `statlite` binary. They do not
-create config files, initialize SQLite storage, install systemd units, create
-users, or start services.
+Curl and Homebrew install only the StatLite binary. They do not create
+configuration files or start services. Docker provides a ready-to-run
+self-monitoring demo.
 
 For a server-wide Linux systemd installation, including service user,
 configuration, data-directory, and unit provisioning, see [systemd.md](systemd.md).
@@ -53,6 +53,17 @@ brew install pvrlabs/tap/statlite
 
 The formula installs the binary from GitHub Releases. StatLite remains
 installable without Homebrew.
+
+## Docker
+
+Run the self-monitoring demo:
+
+```bash
+docker run --rm -p 127.0.0.1:9090:9090 docker.io/pvrlabs/statlite:latest
+```
+
+Open <http://127.0.0.1:9090>. See [Docker](docker.md) for application
+configuration, persistent storage, and available image tags.
 
 ## Build From Source
 
