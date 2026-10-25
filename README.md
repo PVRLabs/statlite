@@ -72,9 +72,7 @@ dashboard starts with live data.
 
 ## Docker
 
-Alternatively, run StatLite with Docker. Release images are available on
-[Docker Hub](https://hub.docker.com/r/pvrlabs/statlite) for `linux/amd64` and
-`linux/arm64`.
+Run StatLite using the official Docker image (`linux/amd64` and `linux/arm64`):
 
 ```bash
 docker run --rm \
@@ -82,50 +80,28 @@ docker run --rm \
   docker.io/pvrlabs/statlite:latest
 ```
 
-Open <http://127.0.0.1:9090>. To monitor your own application from Docker,
-mount a config as described in
-[Monitor an application](docs/docker.md#monitor-an-application). In that
-container, `127.0.0.1` is StatLite.
+Open <http://127.0.0.1:9090>.
 
-See the [Docker guide](docs/docker.md) for persistent storage, container
-networking, local builds, and access guidance.
+See the [Docker guide](docs/docker.md) for monitoring applications, persistent
+storage, and networking.
 
 ## Configure an application
 
-Spring Boot, Quarkus, and Micronaut need no application code changes. With
-the application already running, choose one inspection command for your framework:
+For a running Spring Boot application:
 
 ```bash
-# Spring Boot
 statlite inspect 'http://localhost:8080' --create-config ./statlite.yaml
-
-# Quarkus
-statlite inspect --type quarkus 'http://localhost:9000' --create-config ./statlite.yaml
-
-# Micronaut (--type micronaut is required)
-statlite inspect --type micronaut 'http://localhost:8080' --create-config ./statlite.yaml
-```
-
-`--create-config` creates `statlite.yaml` in the current directory. If the file
-already exists, the command fails without overwriting it. To add a target to an
-existing configuration, use
-[`--add-to-config`](docs/configuration.md#discover-a-target-with-inspect).
-
-Then start StatLite:
-
-```bash
 statlite
 ```
 
-Open <http://127.0.0.1:9090> to view the application.
+Open <http://127.0.0.1:9090> to view the dashboard.
 
-Express, Django, FastAPI, Go `net/http`, and Gin need a small endpoint in the
-application first. Follow the [integration guides](docs/integrate/), then run
-`inspect --create-config` against that application's `/statlite/metrics` URL.
+`--create-config` fails without overwriting an existing file. To add a target,
+see [`--add-to-config`](docs/configuration.md#discover-a-target-with-inspect).
 
-See [Configuration](docs/configuration.md) for adding targets to an existing
-config, manual YAML setup, authentication, and inspection limits. See
-[`examples/`](examples/) for complete configurations.
+For other frameworks, existing configurations, and manual setup, see
+[Configuration](docs/configuration.md) and
+[Supported integrations](docs/integrations.md).
 
 > [!IMPORTANT]
 > StatLite has no built-in dashboard or API authentication. Review the
