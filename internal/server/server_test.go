@@ -536,6 +536,8 @@ func TestStatliteMetricsEmitsCanonicalProfileAndExcludesScrape(t *testing.T) {
 	}}
 	statlite := NewWithManagerRetentionCutoffAndFilesystem("127.0.0.1:0", nil, 0, nil, "/data/statlite.sqlite")
 	statlite.hostSampler = sampler
+	// Make uptime independent of whether the clock advances before the scrape.
+	statlite.startedAt = time.Now().UTC().Add(-time.Minute)
 
 	normal := httptest.NewRecorder()
 	statlite.httpServer.Handler.ServeHTTP(normal, httptest.NewRequest(http.MethodGet, "/healthz", nil))
@@ -566,7 +568,7 @@ func TestStatliteMetricsEmitsCanonicalProfileAndExcludesScrape(t *testing.T) {
 	if response.Metrics.RequestDurationSecondsTotal != 0.025 || response.Metrics.RequestDurationSecondsMax != 0.025 {
 		t.Fatalf("request durations = total %v max %v, want 0.025 seconds", response.Metrics.RequestDurationSecondsTotal, response.Metrics.RequestDurationSecondsMax)
 	}
-	if response.Metrics.RuntimeHeapUsedBytes == 0 || response.Metrics.UptimeSeconds <= 0 || response.Metrics.ProcessCPUUsage < 0 {
+	if response.Metrics.RuntimeHeapUsedBytes == 0 || response.Metrics.UptimeSeconds < 60 || response.Metrics.ProcessCPUUsage < 0 {
 		t.Fatalf("runtime metrics = %#v, want available non-negative values", response.Metrics)
 	}
 	if response.Metrics.HostCPUUsage == nil || *response.Metrics.HostCPUUsage != cpu ||
