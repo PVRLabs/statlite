@@ -114,38 +114,27 @@ instrumentation.
 
 ## Supported metric sources
 
-When a target has no health signal, the dashboard reports whether StatLite is
-successfully receiving its metrics without treating reachability as application
-health.
+StatLite collects application health, traffic, latency, CPU, and memory metrics,
+depending on the integration.
 
-- **[Spring Boot](docs/targets/spring.md):** Collects authoritative health
-  when Actuator health is available and automatically selects a compatible Micrometer Prometheus
-  endpoint or Actuator JSON for request, JVM, process, and optional host
-  metrics. Independently usable metrics remain reportable if health retrieval
-  fails.
-- **[Quarkus Micrometer](docs/targets/quarkus.md):** Collects bounded request,
-  latency, CPU, heap, process, and restart concepts from an exact Prometheus/OpenMetrics endpoint. SmallRye
-  Health is an optional capability when the application publishes it.
-- **[Micronaut Micrometer](docs/targets/micronaut.md):** Collects the existing request,
-  duration, CPU, heap, process, and restart concepts from an exact configured Prometheus endpoint,
-  conventionally `/prometheus`. Management health is optional; database health
-  requires visible JDBC aggregate status.
-  See the [certified setup](docs/targets/micronaut.md).
-- **[StatLite Metrics v1](docs/statlite-metrics-v1.md):** A small, fixed JSON
-  endpoint that applications in any language or framework can implement. See
-  the [direct integration guides](docs/integrate/) for FastAPI, Express,
-  Django, Go `net/http`, and Gin. Those guides provide complete, copyable
-  application-owned helpers with no StatLite SDK/package or additional
-  third-party monitoring runtime dependency. Your own StatLite instance polls
-  the endpoint; the supplied helpers make no outbound requests and send no
-  telemetry to PVR Labs. They expose aggregate operational metrics, so restrict
-  endpoint access as described in each guide.
-- **StatLite self-monitoring:** StatLite can report its own health, traffic,
-  process, and host metrics.
+- **[Spring Boot](docs/targets/spring.md):** Actuator health, request metrics,
+  JVM heap, process CPU, and optional host metrics. Supports Micrometer
+  Prometheus and Actuator JSON.
+- **[Quarkus](docs/targets/quarkus.md):** Request, latency, CPU, JVM heap, and
+  process metrics through Micrometer Prometheus/OpenMetrics. Optional SmallRye
+  Health.
+- **[Micronaut](docs/targets/micronaut.md):** Request, latency, CPU, JVM heap,
+  and process metrics through Micrometer Prometheus. Optional management health.
+- **[StatLite Metrics v1](docs/statlite-metrics-v1.md):** A small JSON endpoint
+  for applications in any language. [Integration guides](docs/integrate/) cover
+  FastAPI, Express, Django, Go `net/http`, and Gin.
+- **StatLite self-monitoring:** Built-in application, process, and host metrics.
 
-Use a `statlite-self` target for host metrics where StatLite runs. Spring
-targets can optionally collect host CPU and disk metrics for a remote
-application's environment.
+StatLite and its integration helpers send no telemetry to external collection
+services. StatLite polls your configured endpoints, and metrics remain under
+your control.
+
+See [Supported integrations](docs/integrations.md) for details.
 
 ## Documentation
 
