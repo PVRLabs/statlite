@@ -14,6 +14,8 @@ Prometheus/Grafana replacement.
 
 Create `statlite.yaml` in the directory where you run StatLite:
 
+`server.listen`, `storage.sqlite_path`, and `polling.interval` are required.
+
 ```yaml
 server:
   listen: "127.0.0.1:9090"
@@ -33,6 +35,10 @@ targets:
 Run `statlite`, then open <http://127.0.0.1:9090>. This configuration monitors
 one Spring Boot application, stores its history in a local SQLite database, and
 polls it every 30 seconds.
+
+If you already have a configuration, copy only the target entry into its
+`targets` list. Run `statlite` from the directory containing `statlite.yaml`,
+or select the file with `--config` as shown below.
 
 The sections below explain target discovery, alternate configuration paths,
 authentication, retention, polling, and other options.
@@ -56,7 +62,8 @@ and `examples/spring-actuator-demo/` for a standalone Spring Boot demo app.
 
 ## Discover a target with `inspect`
 
-Start with an application's base URL:
+Start with an application's base HTTP or HTTPS URL without a query string or
+fragment:
 
 ```bash
 statlite inspect 'http://localhost:8080'
@@ -86,6 +93,8 @@ See the [Micronaut target reference](targets/micronaut.md#target-inspection)
 for endpoint resolution, compatibility, and inspection limits. Inspection
 checks metrics and does not request health; configure authenticated targets
 manually with the shared Basic Auth block.
+Compatibility with the supported metrics contract does not prove Micronaut
+framework identity.
 
 On success, plain `inspect` prints the recognized capabilities, a minimal
 configuration, and commands to create or add it. The suggested target gets a

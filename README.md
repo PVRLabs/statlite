@@ -4,10 +4,10 @@
 </h1>
 
 [![GitHub release](https://img.shields.io/github/v/release/PVRLabs/statlite)](https://github.com/PVRLabs/statlite/releases)
-[![Go powered](https://img.shields.io/github/go-mod/go-version/PVRLabs/statlite?label=Go%20powered&logo=go&logoColor=white)](go.mod)
-[![Frameworks: Spring Boot · Quarkus · Micronaut](https://img.shields.io/badge/Frameworks-Spring%20Boot%20%C2%B7%20Quarkus%20%C2%B7%20Micronaut-e7e7e7?labelColor=333)](docs/integrations.md)
 [![CI](https://github.com/PVRLabs/statlite/actions/workflows/test.yml/badge.svg)](https://github.com/PVRLabs/statlite/actions/workflows/test.yml)
 [![License](https://img.shields.io/github/license/PVRLabs/statlite)](LICENSE)
+[![Frameworks: Spring Boot · Quarkus · Micronaut](https://img.shields.io/badge/Frameworks-Spring%20Boot%20%C2%B7%20Quarkus%20%C2%B7%20Micronaut-e7e7e7?labelColor=333)](docs/integrations.md)
+[![Go](https://img.shields.io/github/go-mod/go-version/PVRLabs/statlite?label=Go&logo=go&logoColor=white)](go.mod)
 
 StatLite provides lightweight, self-hosted application monitoring for apps running
 on VPSs and small servers. One Go binary polls multiple applications, stores
@@ -93,64 +93,39 @@ networking, local builds, and access guidance.
 ## Configure an application
 
 Spring Boot, Quarkus, and Micronaut need no application code changes. With
-the application already running, write a config and start StatLite:
+the application already running, choose one inspection command for your framework:
 
 ```bash
+# Spring Boot
 statlite inspect 'http://localhost:8080' --create-config ./statlite.yaml
-statlite
-```
 
-Open <http://127.0.0.1:9090>. `--create-config` writes `./statlite.yaml` only
-when that path does not already exist. To append one target to an existing
-file, use `--add-to-config` as described in
-[Configuration](docs/configuration.md#discover-a-target-with-inspect).
-
-For Quarkus or Micronaut, select the type:
-
-```bash
+# Quarkus
 statlite inspect --type quarkus 'http://localhost:9000' --create-config ./statlite.yaml
+
+# Micronaut (--type micronaut is required)
 statlite inspect --type micronaut 'http://localhost:8080' --create-config ./statlite.yaml
 ```
 
-Run one of those commands. Each writes `./statlite.yaml` only when that path
-is absent.
+`--create-config` creates `statlite.yaml` in the current directory. If the file
+already exists, the command fails without overwriting it. To add a target to an
+existing configuration, use
+[`--add-to-config`](docs/configuration.md#discover-a-target-with-inspect).
+
+Then start StatLite:
+
+```bash
+statlite
+```
+
+Open <http://127.0.0.1:9090> to view the application.
 
 Express, Django, FastAPI, Go `net/http`, and Gin need a small endpoint in the
 application first. Follow the [integration guides](docs/integrate/), then run
 `inspect --create-config` against that application's `/statlite/metrics` URL.
 
-Inspection is bounded and read-only unless you pass `--create-config` or
-`--add-to-config`. Micronaut requires `--type micronaut`; inspection validates
-its supported contract without proving framework identity. For untyped
-discovery, start with a base HTTP or HTTPS URL without a query string or
-fragment.
-
-A Spring Boot file written by hand has this shape. `server.listen`,
-`storage.sqlite_path`, and `polling.interval` are required:
-
-```yaml
-server:
-  listen: "127.0.0.1:9090"
-
-storage:
-  sqlite_path: "./statlite.sqlite"
-
-polling:
-  interval: "30s"
-
-targets:
-  - name: "app"
-    type: "spring"
-    url: "http://localhost:8080/actuator"
-```
-
-If you already have a configuration, copy only the target entry into its
-`targets` list. Then run `statlite` from the directory that contains
-`statlite.yaml`.
-
-See [Configuration](docs/configuration.md) for exact endpoint forms, discovery
-limits, authentication limitations, all settings, and manual target
-configuration. See [`examples/`](examples/) for complete configurations.
+See [Configuration](docs/configuration.md) for adding targets to an existing
+config, manual YAML setup, authentication, and inspection limits. See
+[`examples/`](examples/) for complete configurations.
 
 > [!IMPORTANT]
 > StatLite has no built-in dashboard or API authentication. Review the
@@ -199,21 +174,11 @@ application's environment.
 ## Documentation
 
 - [Installation](docs/install.md)
-- [Docker](docs/docker.md)
 - [Configuration](docs/configuration.md)
-- [Metric vocabulary](docs/metrics.md)
-- [External API v1](docs/api.md)
-- [Deprecations and compatibility](docs/deprecations.md)
 - [Supported integrations](docs/integrations.md)
-- [Public integration testing](docs/integration-testing.md)
-- [StatLite Metrics integration guides](docs/integrate/)
-- [Monitoring on resource-constrained servers](docs/low-resource-monitoring.md)
-- [StatLite Metrics v1](docs/statlite-metrics-v1.md)
-- [systemd deployment](docs/systemd.md)
-- [Product and architecture](docs/product.md)
-- [Storage and schema direction](docs/storage.md)
-- [Spring Boot guide](https://pvrlabs.xyz/articles/lightweight-spring-boot-monitoring.html)
-- [Examples](examples/)
+- [Application integration guides](docs/integrate/)
+- [External API v1](docs/api.md)
+- [Documentation index](docs/README.md)
 
 ## License
 
