@@ -4,7 +4,9 @@
 </h1>
 
 [![GitHub release](https://img.shields.io/github/v/release/PVRLabs/statlite)](https://github.com/PVRLabs/statlite/releases)
-[![Go powered](https://img.shields.io/github/go-mod/go-version/PVRLabs/statlite?label=Go%20powered&logo=go&logoColor=white)](go.mod)
+[![Go](https://img.shields.io/github/go-mod/go-version/PVRLabs/statlite?label=Go&logo=go&logoColor=white)](go.mod)
+[![Docker Hub](https://img.shields.io/badge/Docker%20Hub-pvrlabs%2Fstatlite-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/pvrlabs/statlite)
+[![Homebrew](https://img.shields.io/badge/Homebrew-pvrlabs%2Ftap%2Fstatlite-FBB040?logo=homebrew&logoColor=white)](https://github.com/PVRLabs/homebrew-tap#install)
 [![Frameworks: Spring Boot · Quarkus · Micronaut](https://img.shields.io/badge/Frameworks-Spring%20Boot%20%C2%B7%20Quarkus%20%C2%B7%20Micronaut-e7e7e7?labelColor=333)](docs/integrations.md)
 [![CI](https://github.com/PVRLabs/statlite/actions/workflows/test.yml/badge.svg)](https://github.com/PVRLabs/statlite/actions/workflows/test.yml)
 [![License](https://img.shields.io/github/license/PVRLabs/statlite)](LICENSE)
