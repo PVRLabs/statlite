@@ -1,5 +1,6 @@
 # Built binaries (Quick Start and local builds)
 /statlite
+/statlite.exe
 /dist/
 /release/
 
@@ -23,3 +24,4 @@ examples/node-express-demo/node_modules/
 examples/python-django-demo/**/__pycache__/
 test/api-automation-e2e/__pycache__/
 badger-codemap-statlite.html
+test/windows-smoke/__pycache__/

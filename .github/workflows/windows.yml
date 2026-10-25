@@ -1,0 +1,67 @@
+name: Windows
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - feature/windows
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    # Native Windows coverage; Windows 10 desktop validation remains manual.
+    runs-on: windows-2022
+    timeout-minutes: 20
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14.6"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run native Go tests
+        run: go test -timeout 5m ./...
+      - name: Run storage integration test
+        run: go test -timeout 5m -tags=integration ./test/integration/storage
+      - name: Run Go static analysis
+        run: go vet ./...
+      - name: Run dashboard unit tests
+        run: node --test internal/dashboard/static/dashboard.test.js
+      - name: Build Windows executable
+        run: go build -trimpath -o dist/statlite.exe ./cmd/statlite
+      - name: Package Spring Boot demo
+        run: mvn -B -q -f examples/spring-actuator-demo/pom.xml -DskipTests package
+      - name: Check startup, Spring collection, shutdown and persisted history
+        run: >-
+          python test/windows-smoke/run.py
+          --binary dist/statlite.exe
+          --spring-jar examples/spring-actuator-demo/target/spring-actuator-demo-0.0.1-SNAPSHOT.jar
+          --results dist/windows-smoke
+      - name: Retain executable and smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-amd64-trial
+          path: |
+            dist/statlite.exe
+            dist/windows-smoke/**/*.json
+            dist/windows-smoke/**/*.log
+          if-no-files-found: ignore
+          retention-days: 14

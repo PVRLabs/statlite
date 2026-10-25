@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -105,7 +106,7 @@ func TestConflictingTargetFailsBeforeNoPollServiceStarts(t *testing.T) {
 	config := `server:
   listen: "` + address + `"
 storage:
-  sqlite_path: "` + dbPath + `"
+  sqlite_path: "` + filepath.ToSlash(dbPath) + `"
 polling:
   interval: "30s"
 targets:
@@ -171,7 +172,7 @@ func TestPrintVersion(t *testing.T) {
 func TestStartupMessage(t *testing.T) {
 	databasePath := filepath.Join(t.TempDir(), "statlite.sqlite")
 	got := startupMessage("0.0.0.0:9090", 3, databasePath)
-	want := `StatLite starting: version=` + version.Version + ` listen=0.0.0.0:9090 targets=3 database="` + databasePath + `"`
+	want := fmt.Sprintf("StatLite starting: version=%s listen=0.0.0.0:9090 targets=3 database=%q", version.Version, databasePath)
 	if got != want {
 		t.Fatalf("startupMessage() = %q, want %q", got, want)
 	}
