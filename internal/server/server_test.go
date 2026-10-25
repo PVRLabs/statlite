@@ -543,6 +543,11 @@ func TestStatliteMetricsEmitsCanonicalProfileAndExcludesScrape(t *testing.T) {
 		t.Fatalf("healthz status = %d, want 200", normal.Code)
 	}
 
+	// Use a known duration to check serialization without depending on the
+	// platform clock resolving the very short readiness request above.
+	statlite.durationTotalNS.Store(uint64(25 * time.Millisecond))
+	statlite.durationMaxNS.Store(uint64(25 * time.Millisecond))
+
 	first := httptest.NewRecorder()
 	statlite.httpServer.Handler.ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/statlite/metrics", nil))
 	if first.Code != http.StatusOK {
@@ -558,8 +563,8 @@ func TestStatliteMetricsEmitsCanonicalProfileAndExcludesScrape(t *testing.T) {
 	if response.Metrics.RequestsTotal != 1 {
 		t.Fatalf("requests_total = %d, want 1", response.Metrics.RequestsTotal)
 	}
-	if response.Metrics.RequestDurationSecondsTotal <= 0 || response.Metrics.RequestDurationSecondsMax <= 0 {
-		t.Fatalf("request durations = total %v max %v, want positive", response.Metrics.RequestDurationSecondsTotal, response.Metrics.RequestDurationSecondsMax)
+	if response.Metrics.RequestDurationSecondsTotal != 0.025 || response.Metrics.RequestDurationSecondsMax != 0.025 {
+		t.Fatalf("request durations = total %v max %v, want 0.025 seconds", response.Metrics.RequestDurationSecondsTotal, response.Metrics.RequestDurationSecondsMax)
 	}
 	if response.Metrics.RuntimeHeapUsedBytes == 0 || response.Metrics.UptimeSeconds <= 0 || response.Metrics.ProcessCPUUsage < 0 {
 		t.Fatalf("runtime metrics = %#v, want available non-negative values", response.Metrics)
@@ -581,6 +586,10 @@ func TestStatliteMetricsEmitsCanonicalProfileAndExcludesScrape(t *testing.T) {
 	}
 	if secondResponse.Metrics.RequestsTotal != response.Metrics.RequestsTotal {
 		t.Fatalf("metrics scrape changed requests_total from %d to %d", response.Metrics.RequestsTotal, secondResponse.Metrics.RequestsTotal)
+	}
+	if secondResponse.Metrics.RequestDurationSecondsTotal != response.Metrics.RequestDurationSecondsTotal ||
+		secondResponse.Metrics.RequestDurationSecondsMax != response.Metrics.RequestDurationSecondsMax {
+		t.Fatalf("metrics scrape changed request durations: first %#v second %#v", response.Metrics, secondResponse.Metrics)
 	}
 	if sampler.calls != 1 {
 		t.Fatalf("host sampler calls = %d, want one cached resource sample", sampler.calls)
