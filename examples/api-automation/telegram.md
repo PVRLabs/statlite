@@ -216,10 +216,11 @@ RECOVERY: my-app health on my VPS (pvrlabs-prod-01)
 Application health is UP.
 ```
 
-![Telegram chat showing a StatLite collection-failure alert followed by recovery with application health UP, labelled my-app health on my VPS (pvrlabs-prod-01).](img/telegram-alert-recovery.webp)
+<img src="img/telegram-alert-recovery.webp" width="420" alt="Telegram chat showing a StatLite collection-failure alert followed by recovery with application health UP, labelled my-app health on my VPS (pvrlabs-prod-01).">
 
 Example collection-failure alert followed by recovery, captured during a
-controlled test. The server label is illustrative. Create your own bot;
+controlled test. Screenshot cropped for space. The server label is
+illustrative. Create your own bot;
 StatLite Example Bot is the bot used for this example.
 
 ## 6. Enable automatic checks
