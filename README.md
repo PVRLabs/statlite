@@ -96,9 +96,6 @@ statlite
 
 Open <http://127.0.0.1:9090> to view the dashboard.
 
-`--create-config` fails without overwriting an existing file. To add a target,
-see [`--add-to-config`](docs/configuration.md#discover-a-target-with-inspect).
-
 For other frameworks, existing configurations, and manual setup, see
 [Configuration](docs/configuration.md) and
 [Supported integrations](docs/integrations.md).
