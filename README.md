@@ -67,8 +67,8 @@ Start StatLite:
 statlite
 ```
 
-Open <http://127.0.0.1:9090>. StatLite monitors itself by default, so the
-dashboard starts with live data.
+Open <http://127.0.0.1:9090>. StatLite [monitors itself by default](docs/configuration.md#statlite-self-monitoring),
+so the dashboard starts with live data.
 
 ## Docker
 
@@ -125,7 +125,6 @@ depending on the integration.
 - **[StatLite Metrics v1](docs/statlite-metrics-v1.md):** A small JSON endpoint
   for applications in any language. [Integration guides](docs/integrate/) cover
   FastAPI, Express, Django, Go `net/http`, and Gin.
-- **StatLite self-monitoring:** Built-in application, process, and host metrics.
 
 StatLite and its integration helpers send no telemetry to external collection
 services. StatLite polls your configured endpoints, and metrics remain under
