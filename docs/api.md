@@ -11,7 +11,11 @@ contract. Callers own their thresholds, schedules, deduplication, and
 notification delivery. This API does not implement alert rules or delivery.
 
 For runnable one-shot checks with caller-owned thresholds, see the
-[automation cookbook](../examples/api-automation/).
+[automation cookbook](../examples/api-automation/). For example, the
+[Telegram health alert recipe](../examples/api-automation/telegram.md) uses
+`/api/v1/status` to send alerts and recovery messages on known health
+transitions, with scheduling, state tracking, and delivery handled by a shell
+wrapper.
 
 ## Access and target selection
 

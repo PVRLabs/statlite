@@ -24,6 +24,7 @@
 
 - [Metric vocabulary](metrics.md)
 - [External API v1](api.md)
+- [Telegram application health alerts](../examples/api-automation/telegram.md)
 - [Deprecations and compatibility](deprecations.md)
 - [Monitoring on resource-constrained servers](low-resource-monitoring.md)
 - [Monitoring options and tradeoffs](monitoring-options.md)

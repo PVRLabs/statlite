@@ -157,3 +157,15 @@ else
   esac
 fi
 ```
+
+For a complete scheduled health notification example, use the
+[Telegram alert recipe](telegram.md), which adds transition state and delivery
+with a small wrapper around these checks.
+
+To verify the notifier on Linux without sending messages:
+
+```sh
+python3 examples/api-automation/test-notify-telegram.py
+```
+
+The focused test uses real `jq` and `flock` with a fake Telegram transport.
