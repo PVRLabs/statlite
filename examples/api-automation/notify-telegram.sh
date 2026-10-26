@@ -27,10 +27,10 @@ if [ -e "$STATE_FILE" ]; then
   previous=$(cat "$STATE_FILE") || fail 'could not read state'
   case $previous in healthy|unhealthy) ;; *) fail 'invalid state file' ;; esac
 fi
-# Check output is intentionally not forwarded to Telegram or logs. Checks may
-# contain sensitive diagnostics. Use a caller-supplied, non-secret label.
+# Check stdout is a short, user-facing summary. Keep diagnostics and secrets
+# on stderr, which is never forwarded. Use trusted checks with this contract.
 result=0
-"$@" >/dev/null 2>&1 || result=$?
+summary=$("$@" 2>/dev/null) || result=$?
 case $result in
   0) current=healthy ;;
   1) current=unhealthy ;;
@@ -47,7 +47,11 @@ if [ "$current" = unhealthy ] || [ -n "$previous" ]; then
   # JSON is supplied in a private file; the token URL uses curl config,
   # never argv. Suppress curl diagnostics because they can include the URL.
   payload=$(printf '%s' "$prefix: ${CHECK_NAME:-application health}" |
-    jq -Rs '{chat_id: env.TELEGRAM_CHAT_ID, text: .[0:4000]}') || fail 'could not construct Telegram payload'
+    jq -Rs --arg summary "$summary" '
+      ($summary | (split("\n")[0] // "") | sub("^(OK|ALERT|RECOVERY): *"; "") |
+       gsub("[\u0000-\u001f\u007f]"; " ") | .[0:1000]) as $detail |
+      {chat_id: env.TELEGRAM_CHAT_ID,
+       text: ((. + if $detail == "" then "" else "\n" + $detail end)[0:4000])}') || fail 'could not construct Telegram payload'
   response=$(mktemp "${STATE_FILE}.response.XXXXXX") || fail 'could not create response temporary file'
   trap 'rm -f "$temporary" "$response"' EXIT
   printf '%s' "$payload" >"$temporary" || fail 'could not write Telegram payload'

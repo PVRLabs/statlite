@@ -13,6 +13,35 @@ HELPER = Path(__file__).with_name("notify-telegram.sh")
 
 
 class Notifications(unittest.TestCase):
+    def test_health_summary_omits_unreported_dependencies(self):
+        # Exercise the real check and jq with only the status HTTP request faked.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            curl = root / "curl"
+            curl.write_text('#!/bin/sh\nprintf "%s" "$STATUS_JSON"\n')
+            curl.chmod(0o755)
+            now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            status = dict(target="my-app", collection_status="ok", last_poll_at=now,
+                          health_observed_at=now, application_health="UP",
+                          dependency_health=None)
+            cases = [
+                ("DOWN", None, 1, "ALERT: Application health is DOWN."),
+                ("UP", None, 0, "OK: Application health is UP."),
+                ("UP", "DOWN", 1, "ALERT: Application health is UP; Dependency health is DOWN."),
+                ("UP", "UP", 0, "OK: Application health is UP; Dependency health is UP."),
+                (None, "DOWN", 1, "ALERT: Dependency health is DOWN."),
+                (None, None, 2, "UNKNOWN: application health is unreported"),
+            ]
+            for app, dependency, code, summary in cases:
+                with self.subTest(app=app, dependency=dependency):
+                    status.update(application_health=app, dependency_health=dependency)
+                    env = dict(os.environ, PATH=f"{root}:{os.environ['PATH']}",
+                               TARGET="my-app", STATUS_JSON=json.dumps(status))
+                    result = subprocess.run(["sh", str(HELPER.with_name("check-status.sh"))],
+                                            env=env, capture_output=True, text=True)
+                    self.assertEqual(result.returncode, code, result.stderr)
+                    self.assertEqual(result.stdout.strip(), summary)
+
     def test_transitions_and_delivery(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -95,6 +124,31 @@ pathlib.Path(args[args.index("--output") + 1]).write_text(
             self.assertEqual(state.stat().st_mode & 0o777, 0o600)
             self.assertEqual(list(root.glob("*.tmp.*")), [])
             self.assertEqual(list(root.glob("*.response.*")), [])
+
+            # Only the first stdout line becomes user-facing detail; stderr stays local.
+            detailed = subprocess.run(
+                ["sh", str(HELPER), "sh", "-c",
+                 "printf 'ALERT: application=DOWN\\nprivate second line\\n'; "
+                 "echo 'private diagnostic' >&2; exit 1"],
+                env=env, capture_output=True, text=True)
+            self.assertEqual(detailed.returncode, 0, detailed.stderr)
+            self.assertEqual(messages()[-2:],
+                             ["ALERT: application health", "application=DOWN"])
+            self.assertNotIn("private", log.read_text())
+            recovered = subprocess.run(
+                ["sh", str(HELPER), "sh", "-c", "echo 'OK: application=UP'"],
+                env=env, capture_output=True, text=True)
+            self.assertEqual(recovered.returncode, 0, recovered.stderr)
+            self.assertEqual(messages()[-2:],
+                             ["RECOVERY: application health", "application=UP"])
+            bounded = subprocess.run(
+                ["sh", str(HELPER), "python3", "-c",
+                 "print('ALERT: app\\tDOWN ' + 'x' * 1500); raise SystemExit(1)"],
+                env=env, capture_output=True, text=True)
+            self.assertEqual(bounded.returncode, 0, bounded.stderr)
+            self.assertTrue(messages()[-1].startswith("app DOWN "))
+            self.assertEqual(len(messages()[-1]), 1000)
+            run(0)
 
             # Operational failures must never look like an unhealthy check (1).
             for operation in ("mktemp", "response-mktemp", "jq", "mv", "cat"):

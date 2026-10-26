@@ -21,6 +21,10 @@ if ! result=$(printf '%s' "$response" | jq -er \
   # jq date parsing needs whole seconds; the API can include fractional seconds.
   def epoch: sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601;
   def age($time; $now): if $time == null then null else try ($now - ($time | epoch)) catch null end;
+  def health_summary:
+    [if .application_health != null then "Application health is \(.application_health)" else empty end,
+     if .dependency_health != null then "Dependency health is \(.dependency_health)" else empty end] |
+    join("; ") + ".";
   (try ($poll_age | tonumber) catch null) as $max_poll |
   (try ($health_age | tonumber) catch null) as $max_health |
   now as $now |
@@ -41,12 +45,11 @@ if ! result=$(printf '%s' "$response" | jq -er \
   elif (.application_health as $app | .dependency_health as $dep |
         (($app != null and ($bad | index($app)) != null) or
          ($dep != null and ($bad | index($dep)) != null))) then
-    "1:ALERT: reported health application=\(.application_health) dependency=\(.dependency_health)"
+    "1:ALERT: \(health_summary)"
   elif .application_health == null then
     "2:UNKNOWN: application health is unreported"
   else
-    # Keep an unreported dependency visible in an otherwise OK result.
-    "0:OK: collection and configured health checks; application=\(.application_health) dependency=\(.dependency_health // "unreported")"
+    "0:OK: \(health_summary)"
   end' 2>/dev/null); then
   echo "UNKNOWN: invalid status response or check configuration"
   exit 2

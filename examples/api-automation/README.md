@@ -35,7 +35,7 @@ BASE_URL=http://127.0.0.1:9090 TARGET=my-app \
 Possible output, with exit status 0, 1, or 2 respectively:
 
 ```text
-OK: collection and configured health checks; application=UP dependency=UP
+OK: Application health is UP; Dependency health is UP.
 ALERT: latest collection failed (consecutive failures: 2)
 UNKNOWN: application health is unreported
 ```
@@ -100,8 +100,8 @@ application health. Configure `UNHEALTHY_VALUES` as a comma-separated list of
 exact strings your integration uses, for example `DOWN,OUT_OF_SERVICE`. Health
 strings are integration-defined. A configured unhealthy value or a recent
 failed collection triggers an alert. Missing or stale application health
-produces an unknown result. Dependency health is checked when reported; an
-unreported dependency is shown as such and is never described as healthy.
+produces an unknown result. Dependency health is checked and included in the summary when reported.
+An unreported dependency is omitted.
 `MAX_POLL_AGE_SECONDS` and
 `MAX_HEALTH_AGE_SECONDS` control its freshness limits.
 
