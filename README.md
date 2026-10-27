@@ -61,6 +61,9 @@ locations, source builds, and server-wide Linux setup.
 
 ## Try it
 
+**Using Spring Boot?** Follow the [Spring Boot quickstart](docs/quickstart-spring.md)
+to monitor your application locally using Actuator, without Prometheus or Grafana.
+
 Start StatLite:
 
 ```bash
