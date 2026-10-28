@@ -6,12 +6,6 @@ workstation. Run StatLite as a foreground
 console application and open its dashboard in your browser. Linux, WSL and
 Docker are not required.
 
-Windows amd64 is distributed as a preview zip with a complete self-monitoring
-configuration. Native Windows Server 2022 CI has passed startup, Spring
-collection, SQLite persistence and shutdown/restart checks. The user also
-verified startup, self-monitoring, browser use, interactive Ctrl+C and restart
-on Windows 10. These checks do not cover every Windows environment.
-
 ## Get the executable
 
 Download `statlite_<version>_windows_amd64.zip` and its `.sha256` file from
@@ -47,6 +41,8 @@ A C compiler is not required. The application you want to monitor must already
 be running and expose a supported metrics endpoint.
 
 ## Monitor a Spring Boot application
+
+If StatLite is already running, press Ctrl+C before continuing.
 
 For a local Spring Boot application with Actuator metrics exposed on port
 8080, run:
@@ -116,8 +112,3 @@ on Windows Server 2022. It uses the existing Spring Boot demo to verify actual
 Actuator collection, then checks graceful shutdown and history across restarts.
 The CI shutdown check sends Ctrl+Break to the test process group, which Go
 handles through the same interrupt signal as Ctrl+C.
-
-The [passing Windows CI run](https://github.com/PVRLabs/statlite/actions/runs/40163659915)
-used revision `cb1876f`. Manual Windows 10 checks were reported on 2026-10-27;
-the exact binary revision and Windows build were not recorded. Spring collection
-and history preservation were covered by CI, not that manual check.

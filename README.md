@@ -31,11 +31,6 @@ StatLite is built for [resource-constrained servers](docs/low-resource-monitorin
 Low memory, CPU, disk, and operational overhead are treated as product
 constraints.
 
-<p align="center">
-  <img src="docs/images/dashboard-host-resources.webp" alt="StatLite host memory, CPU, and disk charts">
-  <br><sub>Host resources from the StatLite self-monitoring target.</sub>
-</p>
-
 Learn how to set up [lightweight Spring Boot monitoring without Prometheus and Grafana](https://pvrlabs.xyz/articles/lightweight-spring-boot-monitoring.html).
 
 StatLite focuses on predefined application and host metrics with built-in
@@ -50,6 +45,8 @@ Install the latest release on macOS or Linux:
 curl -fsSL https://raw.githubusercontent.com/PVRLabs/statlite/main/install.sh | sh
 ```
 
+Follow any PATH instructions printed by the installer.
+
 Or install with Homebrew:
 
 ```bash
@@ -58,7 +55,7 @@ brew install pvrlabs/tap/statlite
 
 On Windows 10 or later (x64), download the Windows zip from
 [GitHub Releases](https://github.com/PVRLabs/statlite/releases/latest), extract
-it, and run `.\statlite.exe` in PowerShell. The zip includes a ready-to-use
+it, and open PowerShell in the extracted folder. The zip includes a ready-to-use
 self-monitoring configuration. See [Windows](docs/windows.md) for details.
 
 See [Installation](docs/install.md) for supported platforms, custom install
@@ -66,19 +63,21 @@ locations, source builds, and server-wide Linux setup.
 
 ## Try it
 
-**Using Spring Boot?** Follow the [Spring Boot quickstart](docs/quickstart-spring.md)
-to monitor your application locally using Actuator.
-
-Start StatLite:
+On macOS or Linux, curl and Homebrew install only the binary. First save the
+[self-monitoring configuration](docs/configuration.md#statlite-self-monitoring)
+as `statlite.yaml` in your current directory, then run:
 
 ```bash
 statlite
 ```
 
-Open <http://127.0.0.1:9090>. StatLite [monitors itself by default](docs/configuration.md#statlite-self-monitoring),
-so the dashboard starts with live data.
+On Windows, the zip includes `statlite.yaml`. Run `.\statlite.exe` from the
+extracted folder.
 
-## Docker
+Open <http://127.0.0.1:9090>. This configuration monitors StatLite itself;
+allow a few polling intervals for history to appear.
+
+## Try with Docker
 
 Run StatLite using the official Docker image (`linux/amd64` and `linux/arm64`):
 
@@ -88,21 +87,29 @@ docker run --rm \
   docker.io/pvrlabs/statlite:latest
 ```
 
-Open <http://127.0.0.1:9090>.
+Open <http://127.0.0.1:9090>. This monitors StatLite itself; history is discarded
+when the container is removed.
 
 See the [Docker guide](docs/docker.md) for monitoring applications, persistent
 storage, and networking.
 
 ## Configure an application
 
-For a running Spring Boot application:
+If StatLite is already running, press Ctrl+C before continuing.
+
+With the native executable, inspect a running Spring Boot application with
+Actuator health and metrics exposed (see the [Spring Boot quickstart](docs/quickstart-spring.md)):
 
 ```bash
-statlite inspect 'http://localhost:8080' --create-config ./statlite.yaml
-statlite
+statlite inspect 'http://localhost:8080' --create-config ./spring.yaml
+statlite --config ./spring.yaml
 ```
 
-Open <http://127.0.0.1:9090> to view the dashboard.
+On Windows, use `.\statlite.exe` in place of `statlite`. For Docker, follow the
+[application configuration instructions](docs/docker.md#monitor-an-application).
+
+Open <http://127.0.0.1:9090>. Send some requests to your application and allow a
+few polling intervals to see traffic, latency, and JVM memory.
 
 For other frameworks, existing configurations, and manual setup, see
 [Configuration](docs/configuration.md) and

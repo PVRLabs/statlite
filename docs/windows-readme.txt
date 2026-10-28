@@ -29,6 +29,8 @@ Keep the dashboard bound to 127.0.0.1 for local use.
 
 Monitor an application
 ----------------------
+If StatLite is already running, press Ctrl+C before continuing.
+
 For a running Spring Boot application with Actuator exposed on port 8080:
 
   .\statlite.exe inspect http://localhost:8080 --create-config .\spring.yaml
