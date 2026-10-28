@@ -6,9 +6,13 @@ a fallback when a section is missing.
 
 ## Unreleased
 
+## v0.7.1 (2026-10-28)
+
 - Added a Windows 10+ amd64 preview zip with `statlite.exe`, a short Windows
   README and a ready-to-use self-monitoring configuration. Windows runs as a
   console application; local host CPU, memory and disk metrics remain unavailable.
+- Clarify first-run self-monitoring setup for binary installs and keep Windows
+  setup instructions in a dedicated guide.
 - Require native Windows tests and lifecycle checks before release tagging.
 
 ## v0.7.0 (2026-10-23)
