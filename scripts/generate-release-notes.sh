@@ -12,9 +12,9 @@ if ! echo "$NEW_TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
   exit 1
 fi
 
-PREV_TAG=$(git tag --sort=-version:refname | grep -v '\-dev' | awk -v t="$NEW_TAG" 'found{print;exit} $0==t{found=1}')
+PREV_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | awk -v t="$NEW_TAG" 'found{print;exit} $0==t{found=1}')
 if [ -z "$PREV_TAG" ]; then
-  PREV_TAG=$(git tag --sort=-version:refname | grep -v '\-dev' | head -1)
+  PREV_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
 fi
 
 CHANGELOG_SECTION=$(awk -v tag="$NEW_TAG" '
