@@ -41,7 +41,20 @@ Supported installer platforms:
 - Linux `amd64`
 - Linux `arm64`
 
-Windows installer artifacts are not part of the initial release.
+## Windows
+
+For Windows 10 or later on amd64 (x64), download
+`statlite_<version>_windows_amd64.zip` and its `.sha256` file from
+[GitHub Releases](https://github.com/PVRLabs/statlite/releases/latest).
+Extract the zip into a writable folder, open PowerShell there, and run:
+
+```powershell
+.\statlite.exe --config .\statlite.yaml
+```
+
+Open <http://127.0.0.1:9090>. The zip includes `readme.txt` and a complete
+self-monitoring configuration. See [Windows](windows.md) for checksum checking,
+application monitoring, paths, and platform limitations.
 
 ## Homebrew
 

@@ -56,6 +56,11 @@ Or install with Homebrew:
 brew install pvrlabs/tap/statlite
 ```
 
+On Windows 10 or later (x64), download the Windows zip from
+[GitHub Releases](https://github.com/PVRLabs/statlite/releases/latest), extract
+it, and run `.\statlite.exe` in PowerShell. The zip includes a ready-to-use
+self-monitoring configuration. See [Windows](docs/windows.md) for details.
+
 See [Installation](docs/install.md) for supported platforms, custom install
 locations, source builds, and server-wide Linux setup.
 

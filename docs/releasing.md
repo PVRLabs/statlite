@@ -12,8 +12,11 @@ The maintainer flow is:
 
 ## What Gets Released
 
-For release `vX.Y.Z`, the release workflow produces archives for Linux and macOS
-on amd64 and arm64, plus SHA-256 checksum files. It publishes GHCR images tagged
+For release `vX.Y.Z`, the release workflow produces five archives: Linux and macOS
+tarballs on amd64 and arm64, and a Windows amd64 preview zip, each with a SHA-256
+checksum file. The Windows zip includes `statlite.exe`, `readme.txt`, a complete
+self-monitoring `statlite.yaml`, and third-party license notices.
+It publishes Linux GHCR images tagged
 `X.Y.Z` and `latest` from the same multi-platform build. The image embeds the
 release version, which is returned by `statlite --version`.
 
@@ -286,28 +289,19 @@ git tag "$RELEASE_VERSION" "$RELEASE_SHA"
 git push origin "refs/tags/$RELEASE_VERSION"
 ```
 
-Build the same four archives and portable checksums locally:
+Build the same five archives and portable checksums locally (Go and Python 3 required):
 
 ```bash
 mkdir -p dist
-for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64; do
-  GOOS="${target%/*}"
-  GOARCH="${target#*/}"
-  out_dir="dist/statlite_${GOOS}_${GOARCH}"
-  archive="statlite_${PLAIN_VERSION}_${GOOS}_${GOARCH}.tar.gz"
-  mkdir -p "$out_dir"
-  CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" go build -trimpath \
-    -ldflags="-s -w -X github.com/pvrlabs/statlite/internal/version.Version=$RELEASE_VERSION" \
-    -o "$out_dir/statlite" ./cmd/statlite
-  cp internal/dashboard/static/vendor/CHARTJS-LICENSE.md "$out_dir/LICENSE-Chart.js.md"
-  cp internal/dashboard/static/fonts/ORBITRON-LICENSE.txt "$out_dir/LICENSE-Orbitron.txt"
-  tar -czf "dist/$archive" -C "$out_dir" statlite LICENSE-Chart.js.md LICENSE-Orbitron.txt
-  (cd dist && shasum -a 256 "$archive" > "$archive.sha256")
+for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64; do
+  GOOS="${target%/*}" GOARCH="${target#*/}" RELEASE_TAG="$RELEASE_VERSION" \
+    bash scripts/package-release.sh
 done
 bash scripts/generate-release-notes.sh "$RELEASE_VERSION" > dist/release-notes.md
 gh release create "$RELEASE_VERSION" --repo PVRLabs/statlite \
   --verify-tag --title "StatLite $RELEASE_VERSION" \
-  --notes-file dist/release-notes.md dist/*.tar.gz dist/*.tar.gz.sha256
+  --notes-file dist/release-notes.md dist/*.tar.gz dist/*.tar.gz.sha256 \
+  dist/*.zip dist/*.zip.sha256
 ```
 
 For GHCR, authenticate with a token that can publish packages, then publish

@@ -58,9 +58,16 @@ jobs:
       contents: read
     uses: ./.github/workflows/integration-certification.yml
 
+  windows:
+    name: run native Windows checks
+    needs: validate
+    permissions:
+      contents: read
+    uses: ./.github/workflows/windows.yml
+
   tag:
     name: create or verify release tag
-    needs: [validate, integration]
+    needs: [validate, integration, windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -112,6 +119,8 @@ jobs:
             goarch: amd64
           - goos: linux
             goarch: arm64
+          - goos: windows
+            goarch: amd64
     steps:
       - name: Checkout tagged release
         uses: actions/checkout@v4
@@ -142,21 +151,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           RELEASE_TAG: ${{ inputs.version }}
         run: |
-          set -eu
-
-          mkdir -p dist
-
-          binary_name="statlite"
-          out_dir="dist/statlite_${GOOS}_${GOARCH}"
-          archive_name="statlite_${RELEASE_TAG#v}_${GOOS}_${GOARCH}.tar.gz"
-
-          mkdir -p "${out_dir}"
-          go build -trimpath -ldflags="-s -w -X github.com/pvrlabs/statlite/internal/version.Version=${RELEASE_TAG}" -o "${out_dir}/${binary_name}" ./cmd/statlite
-          cp internal/dashboard/static/vendor/CHARTJS-LICENSE.md "${out_dir}/LICENSE-Chart.js.md"
-          cp internal/dashboard/static/fonts/ORBITRON-LICENSE.txt "${out_dir}/LICENSE-Orbitron.txt"
-
-          tar -czf "dist/${archive_name}" -C "${out_dir}" "${binary_name}" "LICENSE-Chart.js.md" "LICENSE-Orbitron.txt"
-          (cd dist && sha256sum "${archive_name}" > "${archive_name}.sha256")
+          bash scripts/package-release.sh
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -165,6 +160,8 @@ jobs:
           path: |
             dist/*.tar.gz
             dist/*.tar.gz.sha256
+            dist/*.zip
+            dist/*.zip.sha256
           if-no-files-found: error
 
   publish:
@@ -183,6 +180,7 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: release-*
           path: release-assets
           merge-multiple: true
 
@@ -201,7 +199,9 @@ jobs:
             "statlite_${plain_version}_linux_amd64.tar.gz" \
             "statlite_${plain_version}_linux_amd64.tar.gz.sha256" \
             "statlite_${plain_version}_linux_arm64.tar.gz" \
-            "statlite_${plain_version}_linux_arm64.tar.gz.sha256" | sort)"
+            "statlite_${plain_version}_linux_arm64.tar.gz.sha256" \
+            "statlite_${plain_version}_windows_amd64.zip" \
+            "statlite_${plain_version}_windows_amd64.zip.sha256" | sort)"
           actual_assets="$(find release-assets -maxdepth 1 -type f -printf '%f\n' | sort)"
 
           if [ "$actual_assets" != "$expected_assets" ]; then
@@ -213,7 +213,7 @@ jobs:
             exit 1
           fi
 
-          for archive in release-assets/*.tar.gz; do
+          for archive in release-assets/*.tar.gz release-assets/*.zip; do
             archive_name="${archive##*/}"
             checksum_file="${archive}.sha256"
             read -r checksum checksum_name < "$checksum_file"
@@ -247,6 +247,8 @@ jobs:
           files: |
             release-assets/*.tar.gz
             release-assets/*.tar.gz.sha256
+            release-assets/*.zip
+            release-assets/*.zip.sha256
 
       - name: Verify published release assets
         env:
@@ -264,7 +266,9 @@ jobs:
             "statlite_${plain_version}_linux_amd64.tar.gz" \
             "statlite_${plain_version}_linux_amd64.tar.gz.sha256" \
             "statlite_${plain_version}_linux_arm64.tar.gz" \
-            "statlite_${plain_version}_linux_arm64.tar.gz.sha256" | sort)"
+            "statlite_${plain_version}_linux_arm64.tar.gz.sha256" \
+            "statlite_${plain_version}_windows_amd64.zip" \
+            "statlite_${plain_version}_windows_amd64.zip.sha256" | sort)"
           actual_assets="$(gh release view "$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | sort)"
 
           if [ "$actual_assets" != "$expected_assets" ]; then

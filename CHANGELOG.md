@@ -6,6 +6,11 @@ a fallback when a section is missing.
 
 ## Unreleased
 
+- Added a Windows 10+ amd64 preview zip with `statlite.exe`, a short Windows
+  README and a ready-to-use self-monitoring configuration. Windows runs as a
+  console application; local host CPU, memory and disk metrics remain unavailable.
+- Require native Windows tests and lifecycle checks before release tagging.
+
 ## v0.7.0 (2026-10-23)
 
 - Added first-class Caddy HTTP monitoring for one exact hostname per target,

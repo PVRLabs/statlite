@@ -360,7 +360,9 @@ StatLite performs one bounded JSON GET per poll; Basic Auth is not part of v1.
 Self-monitoring lets StatLite monitor its own application, process, and local
 resources by polling its `/statlite/metrics` endpoint. The `statlite-self` target
 reports CPU, memory, and filesystem resources visible to the StatLite process,
-including the filesystem containing its SQLite database.
+including the filesystem containing its SQLite database. Local Windows host
+CPU, physical memory, and filesystem metrics are currently unavailable; see
+[Windows limitations](windows.md#available-metrics-and-limits).
 
 ![StatLite host monitoring dashboard](images/host-monitoring.webp)
 

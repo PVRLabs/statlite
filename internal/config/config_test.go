@@ -488,7 +488,10 @@ func TestLoadWarnsAboutLegacyWorkingDirectorySQLitePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			root := t.TempDir()
+			root, err := filepath.EvalSymlinks(t.TempDir())
+			if err != nil {
+				t.Fatalf("resolve temporary directory: %v", err)
+			}
 			workingDir := filepath.Join(root, "work")
 			configDir := filepath.Join(root, "config")
 			if tt.sameDir {
@@ -555,7 +558,7 @@ targets:
 				if len(warnings) != 1 {
 					t.Fatalf("DeprecationWarnings() = %#v, want one migration warning", warnings)
 				}
-				for _, want := range []string{"changed in StatLite v0.4.3", cfg.Storage.SQLitePath, "previous working-directory-relative path", legacyPath, "will continue"} {
+				for _, want := range []string{"changed in StatLite v0.4.3", fmt.Sprintf("%q", cfg.Storage.SQLitePath), "previous working-directory-relative path", fmt.Sprintf("%q", legacyPath), "will continue"} {
 					if !strings.Contains(warnings[0], want) {
 						t.Errorf("warning = %q, missing %q", warnings[0], want)
 					}
