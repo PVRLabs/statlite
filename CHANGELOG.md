@@ -13,6 +13,8 @@ a fallback when a section is missing.
   console application; local host CPU, memory and disk metrics remain unavailable.
 - Clarify first-run self-monitoring setup for binary installs and keep Windows
   setup instructions in a dedicated guide.
+- Added a Telegram health-notification recipe using the external API, with
+  recovery notices and application health details.
 - Require native Windows tests and lifecycle checks before release tagging.
 
 ## v0.7.0 (2026-10-23)
