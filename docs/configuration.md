@@ -357,6 +357,13 @@ StatLite performs one bounded JSON GET per poll; Basic Auth is not part of v1.
 
 ### StatLite self-monitoring
 
+Self-monitoring lets StatLite monitor its own application, process, and local
+resources by polling its `/statlite/metrics` endpoint. The `statlite-self` target
+reports CPU, memory, and filesystem resources visible to the StatLite process,
+including the filesystem containing its SQLite database.
+
+![StatLite host monitoring dashboard](images/host-monitoring.webp)
+
 Save this configuration to `statlite.yaml`:
 
 ```yaml
@@ -390,15 +397,6 @@ into its `targets` list and match the URL to that instance's listening address.
 `type: "statlite-metrics"` polls the fixed `statlite-metrics/v1` JSON profile.
 To monitor another StatLite instance, set the target URL to that instance's
 `/statlite/metrics` endpoint.
-
-Self-monitoring is useful for observing the local execution environment visible
-to StatLite, including CPU, memory, and filesystem space. The `statlite-self`
-target reports the CPU, memory, and filesystem resources visible to the
-StatLite process, including the filesystem containing its SQLite database,
-through `/statlite/metrics`. It is the single target for StatLite's application,
-process, and local-resource charts.
-
-![StatLite host monitoring dashboard](images/host-monitoring.webp)
 
 For a remote application, a central StatLite instance cannot obtain that
 machine's host resources unless the application emits the optional host fields
