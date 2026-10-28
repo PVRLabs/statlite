@@ -53,10 +53,7 @@ Or install with Homebrew:
 brew install pvrlabs/tap/statlite
 ```
 
-On Windows 10 or later (x64), download the Windows zip from
-[GitHub Releases](https://github.com/PVRLabs/statlite/releases/latest), extract
-it, and open PowerShell in the extracted folder. The zip includes a ready-to-use
-self-monitoring configuration. See [Windows](docs/windows.md) for details.
+For Windows, see the [Windows guide](docs/windows.md).
 
 See [Installation](docs/install.md) for supported platforms, custom install
 locations, source builds, and server-wide Linux setup.
@@ -70,9 +67,6 @@ as `statlite.yaml` in your current directory, then run:
 ```bash
 statlite
 ```
-
-On Windows, the zip includes `statlite.yaml`. Run `.\statlite.exe` from the
-extracted folder.
 
 Open <http://127.0.0.1:9090>. This configuration monitors StatLite itself;
 allow a few polling intervals for history to appear.
@@ -104,9 +98,6 @@ Actuator health and metrics exposed (see the [Spring Boot quickstart](docs/quick
 statlite inspect 'http://localhost:8080' --create-config ./spring.yaml
 statlite --config ./spring.yaml
 ```
-
-On Windows, use `.\statlite.exe` in place of `statlite`. For Docker, follow the
-[application configuration instructions](docs/docker.md#monitor-an-application).
 
 Open <http://127.0.0.1:9090>. Send some requests to your application and allow a
 few polling intervals to see traffic, latency, and JVM memory.
@@ -150,6 +141,7 @@ See [Supported integrations](docs/integrations.md) for details.
 ## Documentation
 
 - [Installation](docs/install.md)
+- [Windows guide](docs/windows.md)
 - [Configuration](docs/configuration.md)
 - [Supported integrations](docs/integrations.md)
 - [Application integration guides](docs/integrate/)
