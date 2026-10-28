@@ -355,21 +355,41 @@ Applications using `type: statlite-metrics` expose the fixed
 for the complete response format, field semantics, and implementation guidance.
 StatLite performs one bounded JSON GET per poll; Basic Auth is not part of v1.
 
-Root `statlite.yaml` uses this pattern so Quick Start works with no extra config.
-
 ### StatLite self-monitoring
 
+Save this configuration to `statlite.yaml`:
+
 ```yaml
+server:
+  listen: "127.0.0.1:9090"
+
+storage:
+  sqlite_path: "./statlite-self.sqlite"
+
+polling:
+  interval: "30s"
+
 targets:
   - name: "statlite-self"
     type: "statlite-metrics"
     url: "http://127.0.0.1:9090/statlite/metrics"
 ```
 
-`type: "statlite-metrics"` polls another StatLite (or this process) via
-`/statlite/metrics`, the canonical fixed `statlite-metrics/v1` profile. The
-same profile is also available to supported external application integrations;
-it is not a general metrics protocol.
+Then run:
+
+```bash
+statlite
+```
+
+Open <http://127.0.0.1:9090> to see the `statlite-self` target.
+
+To use a different port, change both `server.listen` and the target `url`.
+To add self-monitoring to an existing configuration, copy only the target entry
+into its `targets` list and match the URL to that instance's listening address.
+
+`type: "statlite-metrics"` polls the fixed `statlite-metrics/v1` JSON profile.
+To monitor another StatLite instance, set the target URL to that instance's
+`/statlite/metrics` endpoint.
 
 Self-monitoring is useful for observing the local execution environment visible
 to StatLite, including CPU, memory, and filesystem space. The `statlite-self`
@@ -383,10 +403,6 @@ process, and local-resource charts.
 For a remote application, a central StatLite instance cannot obtain that
 machine's host resources unless the application emits the optional host fields
 in `statlite-metrics/v1` or another StatLite instance runs on the remote host.
-
-`type: "statlite"` is deprecated; use `type: "statlite-metrics"`. See
-[Deprecations and compatibility](deprecations.md#target-type-statlite) for the
-temporary startup migration.
 
 ## Dashboard URL state
 
