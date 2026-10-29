@@ -142,4 +142,5 @@ Published installs should report the current release version. Source builds from
 
 ## Release Notes
 
-For release publishing and artifact details, see [releasing.md](releasing.md).
+See the [changelog](../CHANGELOG.md) and published
+[release notes and artifacts](https://github.com/PVRLabs/statlite/releases).

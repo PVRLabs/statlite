@@ -30,4 +30,5 @@
 - [Monitoring options and tradeoffs](monitoring-options.md)
 - [Product and architecture](product.md)
 - [Storage and schema direction](storage.md)
-- [Release workflow](releasing.md)
+- [Changelog](../CHANGELOG.md)
+- [Release notes and artifacts](https://github.com/PVRLabs/statlite/releases)

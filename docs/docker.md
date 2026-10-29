@@ -150,5 +150,6 @@ docker buildx build \
 docker buildx imagetools inspect ghcr.io/pvrlabs/statlite:dev
 ```
 
-See [Releasing StatLite](releasing.md) for publishing versioned and `:latest`
-images.
+See the [published container images](https://github.com/PVRLabs/statlite/pkgs/container/statlite)
+and [release notes](https://github.com/PVRLabs/statlite/releases) for versioned
+and `:latest` images.
