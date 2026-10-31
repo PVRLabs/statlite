@@ -12,7 +12,8 @@ RSS. This is an observed range, not a maximum-memory guarantee.
 Beyond its Spring Boot, Quarkus, and Micronaut integrations, applications can
 expose the small, fixed [StatLite Metrics v1 profile](statlite-metrics-v1.md) to use the
 same collection, history, and dashboard without adopting a general-purpose
-telemetry pipeline.
+telemetry pipeline. A [Caddy integration](targets/caddy.md) also provides HTTP
+traffic metrics for supported reverse-proxy setups.
 
 > **In short:** StatLite trades observability breadth for a very small complete
 > deployment, local control, and low operational complexity.
@@ -150,6 +151,15 @@ distributed traces, telemetry pipelines, or backend portability matter. Choose
 StatLite when straightforward local application and host monitoring is the
 whole requirement.
 
+## How does Beszel compare?
+
+[Beszel](https://www.beszel.dev/) focuses on server and container monitoring,
+with historical resource usage and alerts. StatLite focuses on application-level
+health, traffic, errors, and latency, alongside host visibility.
+
+**Decision rule:** choose Beszel for host and container monitoring. Choose
+StatLite for application-level monitoring. They can also be used together.
+
 ## Why not a hosted observability platform?
 
 Hosted platforms remove most of the work involved in operating a backend and
@@ -266,12 +276,14 @@ small and focused.
 
 ### Alerts and automation
 
-StatLite does not currently send alerts or pages. Its read-only [external
-API](api.md) exposes collection status, recent collector events, and derived
-metrics so cron jobs and external automation can react to StatLite events.
-Callers own their thresholds, schedules, deduplication, and notification
-delivery. Broader paging and escalation systems remain outside StatLite's
-intended scope.
+StatLite's read-only [external API](api.md) exposes collection status, recent
+collector events, and derived metrics for scheduled checks and external
+automation. The [Telegram alert recipe](../examples/api-automation/telegram.md)
+uses a scheduled script to send alerts and recovery messages for application
+health, and can also wrap the supplied HTTP error and CPU checks. It handles
+state and deduplication outside the StatLite process. Operators configure the
+checks, schedule, and bot; broader paging and escalation remain outside
+StatLite's intended scope.
 
 ## What StatLite deliberately leaves out
 
@@ -304,4 +316,4 @@ If those constraints are advantages, StatLite is likely a good fit. If they are
 not, a broader self-hosted or managed platform will provide more room to grow.
 
 Competitor documentation and product terms change. The external facts on this
-page were last checked against the linked first-party sources on 2026-09-17.
+page were last checked against the linked first-party sources on 2026-10-31.
