@@ -153,7 +153,7 @@ whole requirement.
 
 ## How does Beszel compare?
 
-[Beszel](https://www.beszel.dev/) focuses on server and container monitoring,
+Beszel focuses on server and container monitoring,
 with historical resource usage and alerts. StatLite focuses on application-level
 health, traffic, errors, and latency, alongside host visibility.
 
