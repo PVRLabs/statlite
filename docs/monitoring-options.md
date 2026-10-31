@@ -146,6 +146,11 @@ visualization backend creates a deployment closer to the general-purpose
 Prometheus and Grafana case: the complete footprint includes the Collector,
 backend, and dashboard.
 
+The OpenTelemetry Java agent can introduce significant additional memory overhead
+on small VPS instances. In our [512 MiB Spring Boot experiment](https://github.com/PVRLabs/experiments/tree/main/java/otel),
+the instrumented application required more memory than the baseline to start
+successfully.
+
 **Decision rule:** choose OpenTelemetry when vendor-neutral instrumentation,
 distributed traces, telemetry pipelines, or backend portability matter. Choose
 StatLite when straightforward local application and host monitoring is the
