@@ -73,6 +73,27 @@ experiment](https://github.com/PVRLabs/experiments/tree/main/statlite/spring-boo
 for the complete configuration comparison, methodology, selected sanitized
 measurements, and demo application.
 
+## Memory usage with multiple targets
+
+We also measured StatLite's memory usage while monitoring an increasing number
+of active targets.
+
+| Targets | Median RSS | Peak RSS |
+| ---: | ---: | ---: |
+| 1 | 14.51 MiB | 15.15 MiB |
+| 6 | 16.48 MiB | 17.50 MiB |
+| 12 | 17.55 MiB | 18.19 MiB |
+
+With 12 targets, median RSS increased by approximately 3 MiB (21%) compared
+with a single target.
+
+Measurements used StatLite v0.7.1 on macOS with synthetic HTTP targets,
+30-second polling, and approximately two-minute runs. These are exploratory
+measurements, not long-term production benchmarks.
+
+See the [multi-target memory experiment](https://github.com/PVRLabs/experiments/tree/main/statlite/multi-target-memory)
+for methodology and limitations.
+
 ## Practical guidance
 
 For a small single-host deployment:
