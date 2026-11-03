@@ -87,6 +87,10 @@ when the container is removed.
 See the [Docker guide](docs/docker.md) for monitoring applications, persistent
 storage, and networking.
 
+## One-Click Deploy
+
+[![Deploy on RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploylobe.svg)](https://repocloud.io/details/Statlite/)
+
 ## Configure an application
 
 If StatLite is already running, press Ctrl+C before continuing.
