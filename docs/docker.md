@@ -98,10 +98,10 @@ inside the container.
 
 ## Access and metrics
 
-StatLite has no built-in dashboard or API authentication. The example publishes
-port 9090 only on host loopback so the dashboard is not exposed directly to the
-network. Use appropriate external access controls before publishing it more
-broadly.
+The examples publish port 9090 only on host loopback. Publishing with
+`-p 9090:9090` instead binds all host interfaces by default and can expose
+StatLite directly to the network. For remote access and proxy networking, see
+[Security and Remote Access](security.md#docker-deployments).
 
 Container resource metrics describe the environment visible inside the
 container, not the physical macOS host.

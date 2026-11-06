@@ -136,11 +136,13 @@ deploy it using your normal replacement procedure.
 
 ```yaml
 server:
-  # Localhost by default; use 0.0.0.0 only behind firewall/VPN/proxy auth.
   listen: "127.0.0.1:9090"
 ```
 
-StatLite has no built-in dashboard/API authentication. Keep `listen` on loopback unless access is protected externally. Listening on a non-loopback address is normal inside a container, but ensure the published port is restricted or protected by a firewall, VPN, SSH tunnel, or authenticated reverse proxy.
+Keep `listen` on loopback for local access. For remote access, use a VPN, SSH
+tunnel, or authenticating reverse proxy. Inside a container, listening on a
+non-loopback address is normal; restrict the published host port. See
+[Security and Remote Access](security.md) for the access model and examples.
 
 ## Storage
 

@@ -198,11 +198,10 @@ separate native processes. Update the target address if the management port,
 host, or path changes. Preserve the SQLite database on persistent storage;
 relative database paths resolve beside the configuration file.
 
-Keep Actuator private or authenticated. StatLite has no built-in dashboard
-authentication: retain its loopback listener and use secure access such as an
-SSH tunnel or VPN. See [installation](install.md),
-[storage configuration](configuration.md#storage), and the security guidance
-for [dashboard access](configuration.md#server) and
+Keep Actuator private or authenticated. Retain StatLite's loopback listener and
+use an SSH tunnel, VPN, or authenticating reverse proxy for remote access. See
+[Security and Remote Access](security.md), [installation](install.md),
+[storage configuration](configuration.md#storage), and
 [Actuator authentication](configuration.md#basic-auth).
 
 ## More options

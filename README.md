@@ -106,10 +106,9 @@ For other frameworks, existing configurations, and manual setup, see
 [Configuration](docs/configuration.md) and
 [Supported integrations](docs/integrations.md).
 
-> [!IMPORTANT]
-> StatLite has no built-in dashboard or API authentication. Review the
-> [server and access guidance](docs/configuration.md#server) before exposing it
-> remotely.
+**Security:** The demo and generated configurations bind to localhost. For remote
+access, use a VPN, SSH tunnel, or an authenticating reverse proxy. See
+[Security and Remote Access](docs/security.md).
 
 For applications behind Caddy, configure [native Caddy HTTP monitoring](docs/targets/caddy.md)
 with an exact metrics URL and host. It observes HTTP traffic without application

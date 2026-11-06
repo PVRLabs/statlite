@@ -19,10 +19,9 @@ wrapper.
 
 ## Access and target selection
 
-All endpoints are `GET` requests. Bind StatLite to loopback or protect access
-with deployment-level network controls or a reverse proxy. StatLite does not
-provide API authentication; do not expose the listener to an untrusted
-network.
+All endpoints are `GET` requests. Protect the API with the same access controls
+as the dashboard, including every API path when using an authenticating proxy.
+See [Security and Remote Access](security.md).
 
 Each endpoint accepts an optional `target` query parameter. If exactly one
 target is configured, it is selected when `target` is omitted. With multiple

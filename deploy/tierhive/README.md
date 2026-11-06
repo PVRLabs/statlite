@@ -139,9 +139,9 @@ ssh -o ExitOnForwardFailure=yes -p <mapped-ssh-port> \
   -N -L 9090:127.0.0.1:9090 root@<tierhive-host>
 ```
 
-Then open <http://127.0.0.1:9090> on the local machine. StatLite has no
-built-in dashboard authentication. Keep the loopback listener, or separately
-configure an authenticated proxy if remote access is needed. This exploratory
+Then open <http://127.0.0.1:9090> on the local machine. Keep the loopback
+listener for this tunnel. See [Security and Remote Access](../../docs/security.md)
+for VPN and authenticating proxy alternatives. This exploratory
 recipe does not configure HAProxy, public port publication, or proxy
 authentication. See TierHive's [mapped-port guidance](https://tierhive.com/blog/tierhive-howto/tierhive-vps-ports)
 for the platform-side port details.

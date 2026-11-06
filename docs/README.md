@@ -5,6 +5,7 @@
 - [Installation](install.md)
 - [Configuration](configuration.md)
 - [Docker](docker.md)
+- [Security and Remote Access](security.md)
 - [systemd deployment](systemd.md)
 - [Examples](../examples/)
 - [Spring Boot walkthrough](https://pvrlabs.xyz/articles/lightweight-spring-boot-monitoring.html)

@@ -9,6 +9,10 @@ The script must run as root. It downloads GitHub Release assets directly,
 verifies their SHA-256 checksums, and keeps release logic in this repository so
 a pinned release never fetches mutable installer code from `main`.
 
+Keep the configured listener on loopback and use a VPN, SSH tunnel, or
+authenticating reverse proxy for remote access. See
+[Security and Remote Access](security.md).
+
 ## Install
 
 This example uses `v0.3.0`. Replace it with the latest release tag, or the
