@@ -72,7 +72,7 @@ installable without Homebrew.
 Run the self-monitoring demo:
 
 ```bash
-docker run --rm -p 127.0.0.1:9090:9090 docker.io/pvrlabs/statlite:latest
+docker run --rm -p 127.0.0.1:9090:9090 ghcr.io/pvrlabs/statlite:latest
 ```
 
 Open <http://127.0.0.1:9090>. See [Docker](docker.md) for application

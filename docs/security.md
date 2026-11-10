@@ -109,7 +109,7 @@ can forward traffic to it. Restrict the host publication explicitly:
 ```sh
 docker run --rm \
   -p 127.0.0.1:9090:9090 \
-  docker.io/pvrlabs/statlite:latest
+  ghcr.io/pvrlabs/statlite:latest
 ```
 
 Publishing with `-p 9090:9090` binds all host interfaces by default and may

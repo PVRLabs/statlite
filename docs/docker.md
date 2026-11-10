@@ -2,30 +2,18 @@
 
 ## Container images
 
-StatLite distributes equivalent release images for `linux/amd64` and
-`linux/arm64` through [Docker Hub](https://hub.docker.com/r/pvrlabs/statlite)
-and [GHCR](https://github.com/PVRLabs/statlite/pkgs/container/statlite):
+[GHCR](https://github.com/PVRLabs/statlite/pkgs/container/statlite) provides
+`latest` and versioned images for `linux/amd64` and `linux/arm64`. Versioned
+tags omit the `v` prefix.
 
-```text
-ghcr.io/pvrlabs/statlite:latest
-docker.io/pvrlabs/statlite:latest
-```
-
-Both registries provide versioned tags without the `v` prefix, such as
-`0.6.0`, and `latest`. GHCR is the authoritative publishing source. After its
-release checks pass, the release workflow copies the existing image to Docker
-Hub without rebuilding and verifies both architectures, release identity,
-anonymous pulls, startup, and `/healthz`.
-
-Docker Hub pull counts measure registry pulls, not unique installations.
-CI, retries, updates, and multiple machines can produce repeated pulls.
+Images are also mirrored to [Docker Hub](https://hub.docker.com/r/pvrlabs/statlite).
 
 ## Run the demo
 
 ```bash
 docker run --rm \
   -p 127.0.0.1:9090:9090 \
-  docker.io/pvrlabs/statlite:latest
+  ghcr.io/pvrlabs/statlite:latest
 ```
 
 Open <http://127.0.0.1:9090>. The image includes a default configuration that
@@ -33,12 +21,8 @@ monitors StatLite itself through `statlite-metrics`; no configuration file is
 required.
 
 > [!NOTE]
-> The bundled configuration polls every 30 seconds, a production-sensible
-> default that limits HTTP requests, SQLite writes, and database growth. The
-> first poll runs immediately. When it establishes a new counter baseline,
-> either for a new database or a new application run, StatLite makes one
-> follow-up poll after three seconds so charts can establish their first delta,
-> then returns to the configured interval.
+> The bundled configuration polls every 30 seconds; allow a few polls for
+> charts to populate.
 
 The container stores SQLite data at `/data/statlite.sqlite`. Data is ephemeral
 unless `/data` is mounted to persistent storage. See
@@ -89,7 +73,7 @@ docker run --rm \
   --add-host=host.docker.internal:host-gateway \
   -v "$PWD/statlite.yaml:/etc/statlite/statlite.yaml:ro" \
   -v statlite-data:/data \
-  docker.io/pvrlabs/statlite:latest
+  ghcr.io/pvrlabs/statlite:latest
 ```
 
 You can also add the self-monitoring target to this `targets` list. Its URL

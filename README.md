@@ -78,7 +78,7 @@ Run StatLite using the official Docker image (`linux/amd64` and `linux/arm64`):
 ```bash
 docker run --rm \
   -p 127.0.0.1:9090:9090 \
-  docker.io/pvrlabs/statlite:latest
+  ghcr.io/pvrlabs/statlite:latest
 ```
 
 Open <http://127.0.0.1:9090>. This monitors StatLite itself; history is discarded
