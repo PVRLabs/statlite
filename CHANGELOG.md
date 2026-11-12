@@ -6,6 +6,13 @@ a fallback when a section is missing.
 
 ## Unreleased
 
+## v0.7.2 (2026-11-12)
+
+- Show units in the average latency and disk chart titles.
+- Use GHCR in container installation examples and clarify deployment security,
+  remote access, and memory usage with multiple targets.
+- Update monitoring comparisons and link the OpenTelemetry memory experiment.
+
 ## v0.7.1 (2026-10-28)
 
 - Added a Windows 10+ amd64 preview zip with `statlite.exe`, a short Windows
