@@ -106,9 +106,12 @@ For other frameworks, existing configurations, and manual setup, see
 [Configuration](docs/configuration.md) and
 [Supported integrations](docs/integrations.md).
 
-**Security:** The demo and generated configurations bind to localhost. For remote
-access, use a VPN, SSH tunnel, or an authenticating reverse proxy. See
-[Security and Remote Access](docs/security.md).
+**Security:** The demo and generated configurations bind to localhost, so the
+dashboard is unreachable directly through external network interfaces. To view a
+dashboard running on a VPS, connect through an SSH tunnel and open it in your
+local browser. SSH authenticates the connection, so you can use your existing
+SSH login and keep the dashboard port private. See
+[Security and Remote Access](docs/security.md) for details and alternatives.
 
 For applications behind Caddy, configure [native Caddy HTTP monitoring](docs/targets/caddy.md)
 with an exact metrics URL and host. It observes HTTP traffic without application

@@ -32,6 +32,13 @@ Choose an access boundary that admits only intended users:
 - **Authenticating HTTPS reverse proxy:** keep StatLite private behind the
   proxy and require authentication for every request.
 
+When deployed on a VPS, StatLite runs entirely there. The dashboard and its
+SQLite database stay on the VPS. Binding to `127.0.0.1` keeps the dashboard
+unreachable directly through the VPS's external network interfaces. SSH
+authenticates and encrypts the connection to the VPS, so you can view the
+dashboard in your local browser using your existing SSH client, with no
+additional app or StatLite login required.
+
 For an SSH tunnel, replace `user@server` with your SSH destination:
 
 ```sh
