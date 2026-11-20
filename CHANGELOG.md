@@ -4,7 +4,7 @@ This file summarizes the main user-facing changes in each StatLite release.
 GitHub release notes use the matching version section, with commit history as
 a fallback when a section is missing.
 
-## Unreleased
+## v0.7.3 (2026-11-20)
 
 - Show `Health unknown` for Spring targets when metrics collection succeeds
   but Spring Actuator health cannot be retrieved.
