@@ -214,6 +214,70 @@ main {
   margin-bottom: 18px;
   min-width: 0;
 }
+.attention-strip {
+  margin-bottom: 18px;
+  padding: 2px 6px;
+  min-width: 0;
+  color: var(--amber);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.09);
+}
+.attention-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.attention-row button {
+  min-height: 32px;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+.attention-row button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+}
+#attention-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 0 6px;
+  text-align: left;
+}
+#attention-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attention-chevron {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  opacity: 0.75;
+  transform: translateY(-1px) rotate(45deg);
+}
+#attention-message[aria-expanded="true"] .attention-chevron {
+  transform: translateY(1px) rotate(225deg);
+}
+#attention-dismiss {
+  flex: none;
+  min-width: 32px;
+  font-size: 18px;
+}
+#attention-details {
+  margin: 2px 6px 8px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
 .metric, .chart, .section {
   min-width: 0;
   background: var(--panel);
@@ -556,6 +620,17 @@ pre {
     <div class="metric"><div class="label label-help">Restart <button type="button" class="help" aria-label="Restart detection help" aria-expanded="false">i</button><span class="tooltip" role="tooltip">Detected from process start time or counter resets; detection can lag by one poll.</span></div><div id="restart-detected" class="value small">...</div></div>
     <div class="metric"><div class="label">Poll failures</div><div id="failures" class="value">0</div></div>
     <div class="metric poll-status"><div class="label">Last poll</div><div id="last-poll" class="value small"><span id="poll-status-state" class="poll-status-state">...</span><span id="poll-status-time" class="poll-status-time"></span></div><div id="poll-error" class="poll-status-error" hidden></div><div id="poll-last-success" class="poll-last-success" hidden></div></div>
+  </section>
+
+  <section id="attention-strip" class="attention-strip" aria-label="Attention" hidden>
+    <div class="attention-row">
+      <button id="attention-message" type="button" aria-expanded="false" aria-controls="attention-details">
+        <span aria-hidden="true">⚠</span><span id="attention-summary">Elevated server errors · <strong id="attention-rate"></strong><span id="attention-counts"></span></span>
+        <span class="attention-chevron" aria-hidden="true"></span>
+      </button>
+      <button id="attention-dismiss" type="button" aria-label="Dismiss Attention warning">×</button>
+    </div>
+    <p id="attention-details" hidden></p>
   </section>
 
   <section id="metrics-section" class="capability-section" aria-label="Application and process metrics">

@@ -29,10 +29,12 @@ const (
 )
 
 type Config struct {
-	Server              ServerConfig   `yaml:"server"`
-	Storage             StorageConfig  `yaml:"storage"`
-	Polling             PollingConfig  `yaml:"polling"`
-	Targets             []TargetConfig `yaml:"targets"`
+	Server  ServerConfig   `yaml:"server"`
+	Storage StorageConfig  `yaml:"storage"`
+	Polling PollingConfig  `yaml:"polling"`
+	Targets []TargetConfig `yaml:"targets"`
+
+	Attention           AttentionConfig `yaml:"attention,omitempty"`
 	deprecationWarnings []string
 }
 
@@ -51,15 +53,17 @@ type PollingConfig struct {
 }
 
 type TargetConfig struct {
-	Type                   string      `yaml:"type,omitempty"`
-	Name                   string      `yaml:"name"`
-	ActuatorBaseURL        string      `yaml:"actuator_base_url"`
-	URL                    string      `yaml:"url"`
-	Host                   string      `yaml:"host,omitempty"`
-	HealthURL              string      `yaml:"health_url,omitempty"`
-	MetricsSource          string      `yaml:"metrics_source,omitempty"`
-	CollectHostMetrics     bool        `yaml:"collect_host_metrics,omitempty"`
-	Auth                   *AuthConfig `yaml:"auth,omitempty"`
+	Type               string      `yaml:"type,omitempty"`
+	Name               string      `yaml:"name"`
+	ActuatorBaseURL    string      `yaml:"actuator_base_url"`
+	URL                string      `yaml:"url"`
+	Host               string      `yaml:"host,omitempty"`
+	HealthURL          string      `yaml:"health_url,omitempty"`
+	MetricsSource      string      `yaml:"metrics_source,omitempty"`
+	CollectHostMetrics bool        `yaml:"collect_host_metrics,omitempty"`
+	Auth               *AuthConfig `yaml:"auth,omitempty"`
+
+	Attention              TargetAttentionConfig `yaml:"attention,omitempty"`
 	hostSet                bool
 	actuatorURLSet         bool
 	metricsSourceSet       bool
@@ -259,6 +263,9 @@ func (c *Config) validateTargets() error {
 		}
 		seenTargetNames[name] = i
 		target.Name = name
+		if err := target.Attention.HTTP5xx.validate(); err != nil {
+			return targetError(target, "attention.http_5xx", err.Error())
+		}
 
 		targetType := target.Type
 		if targetType == "" {

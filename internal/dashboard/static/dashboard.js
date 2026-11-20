@@ -8,6 +8,11 @@ const state = {
   refreshController: null,
   refreshTimer: null,
   startupRefreshStartedAtByTarget: Object.create(null),
+  attentionTarget: null,
+  attentionRequest: null,
+  attentionDashboardFailed: false,
+  attentionCheck: null,
+  dismissedAttention: new Map(),
   renderedSeriesQuery: ""
 };
 
@@ -41,7 +46,7 @@ function attachInteractions() {
       state.range = button.dataset.range;
       renderRangeSelection();
       updateURL();
-      refresh();
+      refresh(false);
     });
   });
 
@@ -50,6 +55,13 @@ function attachInteractions() {
     updateURL();
     refresh();
   });
+
+  document.getElementById("attention-message").addEventListener("click", () => {
+    const details = document.getElementById("attention-details");
+    details.hidden = !details.hidden;
+    document.getElementById("attention-message").setAttribute("aria-expanded", String(!details.hidden));
+  });
+  document.getElementById("attention-dismiss").addEventListener("click", dismissAttention);
 
   document.querySelectorAll(".help").forEach((button) => {
     button.addEventListener("click", (event) => {
@@ -192,7 +204,11 @@ function diskOptions() {
   return options;
 }
 
-async function refresh() {
+async function refresh(includeAttention = true) {
+  if (state.attentionTarget !== state.target) {
+    cancelAttentionRequest();
+    hideAttention();
+  }
   if (state.refreshTimer !== null) {
     clearTimeout(state.refreshTimer);
     state.refreshTimer = null;
@@ -219,11 +235,96 @@ async function refresh() {
     renderEvents(events);
     document.getElementById("latest-json").textContent = JSON.stringify(summary.latest || {}, null, 2);
     scheduleNextRefresh(summary, series);
+    const targetChanged = state.attentionTarget !== state.target;
+    if (targetChanged) hideAttention();
+    if (includeAttention || targetChanged || state.attentionDashboardFailed) {
+      state.attentionDashboardFailed = false;
+      state.attentionTarget = state.target;
+      void refreshAttention(state.target);
+    }
   } catch (error) {
     if (refreshID !== state.refreshID) return;
+    state.attentionDashboardFailed = true;
+    hideAttention();
     renderError(error);
     scheduleNextRefresh(null, null);
   }
+}
+
+function cancelAttentionRequest() {
+  const request = state.attentionRequest;
+  state.attentionRequest = null;
+  request?.controller?.abort();
+}
+
+async function refreshAttention(target) {
+  cancelAttentionRequest();
+  const controller = typeof AbortController === "undefined" ? null : new AbortController();
+  const request = { controller };
+  state.attentionRequest = request;
+  const canRender = () => state.attentionRequest === request &&
+    target === state.target && !state.attentionDashboardFailed;
+  try {
+    const query = new URLSearchParams({ target });
+    const result = await fetchJSON("/api/attention?" + query, controller?.signal);
+    if (canRender()) renderAttention(target, result);
+  } catch {
+    if (canRender()) hideAttention();
+  } finally {
+    if (state.attentionRequest === request) state.attentionRequest = null;
+  }
+}
+
+function hideAttention() {
+  state.attentionCheck = null;
+  document.getElementById("attention-strip").hidden = true;
+  document.getElementById("attention-details").hidden = true;
+  document.getElementById("attention-message").setAttribute("aria-expanded", "false");
+}
+
+function dismissAttention() {
+  if (!state.attentionCheck) return;
+  const dismissed = state.dismissedAttention.get(state.attentionTarget) || new Set();
+  dismissed.add(state.attentionCheck);
+  state.dismissedAttention.set(state.attentionTarget, dismissed);
+  hideAttention();
+}
+
+function renderAttention(target, result) {
+  if (!result || !Array.isArray(result.conditions) ||
+      (result.target != null && result.target !== target) ||
+      (result.target == null && (result.conditions.length || result.cleared_checks != null)) ||
+      (result.cleared_checks != null && !Array.isArray(result.cleared_checks))) {
+    hideAttention();
+    return;
+  }
+  const dismissed = state.dismissedAttention.get(target);
+  for (const check of result.cleared_checks || []) dismissed?.delete(check);
+  const condition = result.conditions.find((item) => item?.check === "http_5xx_rate");
+  if (!condition || dismissed?.has(condition.check)) {
+    hideAttention();
+    return;
+  }
+
+  const start = new Date(condition.start);
+  const end = new Date(condition.end);
+  const minutes = (end - start) / 60000;
+  if (![condition.rate, condition.requests, condition.errors, condition.threshold,
+    condition.covered_seconds, minutes].every(Number.isFinite) || minutes <= 0) {
+    hideAttention();
+    return;
+  }
+
+  if (state.attentionCheck !== condition.check) hideAttention();
+  state.attentionCheck = condition.check;
+  const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
+  const percent = new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 2 });
+  const rate = `${percent.format(condition.rate)} 5xx`;
+  const counts = ` (${number.format(condition.errors)} of ${number.format(condition.requests)} requests) over ${number.format(minutes)} min`;
+  setText("attention-rate", rate);
+  setText("attention-counts", counts);
+  setText("attention-details", `Elevated server errors · ${rate}${counts}. Threshold ${percent.format(condition.threshold)}. Counts cover ${number.format(condition.covered_seconds / 60)} of ${number.format(minutes)} min, from paired polls in the window ending ${end.toLocaleString()}.`);
+  document.getElementById("attention-strip").hidden = false;
 }
 
 function nextRefreshDelay(summary, series, now = Date.now()) {
@@ -266,10 +367,11 @@ function hasUsableSeries(summary, series) {
 
 function scheduleNextRefresh(summary, series) {
   if (state.refreshTimer !== null) clearTimeout(state.refreshTimer);
+  const delay = nextRefreshDelay(summary, series);
   state.refreshTimer = setTimeout(() => {
     state.refreshTimer = null;
-    refreshWhenVisible();
-  }, nextRefreshDelay(summary, series));
+    refreshWhenVisible(delay === NORMAL_REFRESH_INTERVAL);
+  }, delay);
 }
 
 function selectedQuery() {
@@ -810,19 +912,19 @@ function initializeFromURL() {
   renderRangeSelection();
 }
 
-function refreshWhenVisible() {
+function refreshWhenVisible(includeAttention = true) {
   if (document.hidden) return;
-  return refresh();
+  return refresh(includeAttention);
 }
 
 function initDashboard() {
   attachInteractions();
   initializeFromURL();
   buildCharts();
-  document.addEventListener("visibilitychange", refreshWhenVisible);
+  document.addEventListener("visibilitychange", () => refreshWhenVisible());
   refreshWhenVisible();
 }
 
-const dashboardTestHooks = { buildCharts, detectCapabilities, foldRepeatedEvents, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, openEventGroupKeys, refresh, refreshWhenVisible, renderApplicationStatus, renderDatabaseHealth, renderError, renderFooterSummary, renderPollStatus, renderRangeSelection, renderSeries, renderSummary, renderTargetContext, runtimeHelp, shouldRenderSeries, state, targetPresentation, targetTypeHelp, updateChart, validDiskPoint };
+const dashboardTestHooks = { buildCharts, detectCapabilities, dismissAttention, foldRepeatedEvents, formatBytes, formatCurrentResource, formatValue, hasUsableSeries, initDashboard, nextRefreshDelay, openEventGroupKeys, refresh, refreshWhenVisible, renderApplicationStatus, renderAttention, renderDatabaseHealth, renderError, renderFooterSummary, renderPollStatus, renderRangeSelection, renderSeries, renderSummary, renderTargetContext, runtimeHelp, shouldRenderSeries, state, targetPresentation, targetTypeHelp, updateChart, validDiskPoint };
 if (typeof module !== "undefined" && module.exports) module.exports = dashboardTestHooks;
 if (typeof document !== "undefined") initDashboard();

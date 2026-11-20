@@ -464,3 +464,11 @@ bypasses dashboard sampling and aggregation, returning the full-resolution serie
 within the effective requested range. Normal retention clamping applies while
 polling is enabled. It can be combined with `--no-poll`; counter/restart semantics
 still apply, but long ranges require more server and browser work.
+
+## Attention
+
+Attention automatically detects elevated HTTP 5xx error rates for supported
+targets. It is enabled by default and requires no additional configuration.
+
+You can override thresholds, disable checks per target, or disable Attention
+globally. See [Attention](attention.md) for details and configuration examples.

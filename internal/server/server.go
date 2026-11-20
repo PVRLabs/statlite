@@ -58,6 +58,8 @@ type Server struct {
 	lastCPUAt         time.Time
 	lastCPUSeconds    float64
 	lastCPUUsage      float64
+
+	attentionDisabled bool
 }
 
 func New(listen string, mon *monitor.Monitor) *Server {
@@ -122,6 +124,7 @@ func NewWithManagerRetentionCutoffAndFilesystem(listen string, manager *monitor.
 	mux.HandleFunc("/api/summary", s.handleSummary)
 	mux.HandleFunc("/api/series", s.handleSeries)
 	mux.HandleFunc("/api/latest", s.handleLatest)
+	mux.HandleFunc("/api/attention", s.handleAttention)
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/monitor/status", s.handleMonitorStatus)
 	mux.HandleFunc("/api/v1/status", s.handlePublicStatus)
@@ -139,6 +142,11 @@ func NewWithManagerRetentionCutoffAndFilesystem(listen string, manager *monitor.
 	}
 
 	return s
+}
+
+// SetAttentionEnabled applies the global setting before serving.
+func (s *Server) SetAttentionEnabled(enabled bool) {
+	s.attentionDisabled = !enabled
 }
 
 // SetRawSeries disables dashboard sampling and aggregation. Call before serving.

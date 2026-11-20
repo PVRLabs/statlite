@@ -240,6 +240,7 @@ func runMonitor(args []string, stdout, stderr io.Writer) int {
 		serverRetentionDays = 0
 	}
 	srv := server.NewWithManagerRetentionCutoffAndFilesystem(cfg.Server.Listen, manager, serverRetentionDays, retentionCutoff.Current, cfg.Storage.SQLitePath)
+	srv.SetAttentionEnabled(cfg.Attention.IsEnabled())
 	srv.SetRawSeries(*rawSeries)
 	if dashboardNow != nil {
 		srv.FreezeDashboardTime(*dashboardNow)

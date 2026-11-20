@@ -287,6 +287,10 @@ func (m *Monitor) DashboardSeries(ctx context.Context, start, end time.Time, buc
 	return m.store.DashboardSeries(ctx, m.targetName, start, end, bucket)
 }
 
+func (m *Monitor) AttentionHTTP5xx(ctx context.Context, start, end time.Time) (storage.HTTPErrorWindow, error) {
+	return m.store.AttentionHTTP5xx(ctx, m.targetName, start, end, m.interval)
+}
+
 func (m *Monitor) BoundedSeries(ctx context.Context, start, end, retentionCutoff time.Time) (*storage.Series, error) {
 	return m.store.BoundedSeries(ctx, m.targetName, start, end, retentionCutoff)
 }

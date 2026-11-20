@@ -675,6 +675,134 @@ test("stale refresh responses cannot replace the current target", async () => {
   }
 });
 
+function attentionWarning(target = "alpha") {
+  return {
+    target,
+    conditions: [{
+      check: "http_5xx_rate", rate: .12, threshold: .10, errors: 12, requests: 100,
+      start: "2026-11-20T12:00:00Z", end: "2026-11-20T12:10:00Z", covered_seconds: 300
+    }]
+  };
+}
+
+test("Attention dismissal survives unknown evidence and rearms only on a confirmed clear", (t) => {
+  const document = dashboardDocument();
+  const originalDocument = global.document;
+  global.document = document;
+  t.after(() => { global.document = originalDocument; });
+  dashboard.state.attentionTarget = "alpha";
+  const strip = document.getElementById("attention-strip");
+  const render = (result) => dashboard.renderAttention("alpha", result);
+
+  render(attentionWarning());
+  assert.equal(strip.hidden, false);
+  assert.equal(document.getElementById("attention-rate").textContent, "12% 5xx");
+  assert.equal(document.getElementById("attention-counts").textContent, " (12 of 100 requests) over 10 min");
+  assert.match(document.getElementById("attention-details").textContent, /5 of 10 min/);
+  dashboard.dismissAttention();
+  assert.equal(strip.hidden, true);
+  for (const response of [{ target: "alpha", conditions: [] }, { conditions: [] }, null]) {
+    render(response);
+    render(attentionWarning());
+    assert.equal(strip.hidden, true);
+  }
+  render({ target: "beta", conditions: [], cleared_checks: ["http_5xx_rate"] });
+  render(attentionWarning());
+  assert.equal(strip.hidden, true);
+  render({ target: "alpha", conditions: [], cleared_checks: ["http_5xx_rate"] });
+  render(attentionWarning());
+  assert.equal(strip.hidden, false);
+});
+
+test("Attention shares the refresh timer and stays independent of dashboard success", async (t) => {
+  const previous = { document: global.document, window: global.window, fetch: global.fetch };
+  const pending = [];
+  const timers = [];
+  const document = dashboardDocument();
+  let failDashboard = false;
+  Object.assign(global, {
+    document,
+    window: { location: { search: "", pathname: "/" }, history: { replaceState() {} } },
+    fetch(path, options) {
+      if (path.startsWith("/api/attention")) {
+        return new Promise((resolve, reject) => pending.push({ path, resolve, reject, signal: options.signal }));
+      }
+      if (failDashboard) return Promise.reject(new Error("dashboard endpoint failed"));
+      const target = new URL(path, "http://test").searchParams.get("target");
+      const payload = path.startsWith("/api/summary") ? {
+        selected_target: { name: target }, targets: [], latest: {},
+        monitor: { last_successful_poll_at: "2026-11-20T12:10:00Z" }
+      } : path.startsWith("/api/series") ? { points: [{ timestamp: "2026-11-20T12:10:00Z", requests: 1 }] } : [];
+      return Promise.resolve({ ok: true, json: async () => payload });
+    }
+  });
+  t.after(() => Object.assign(global, previous));
+  const setTimer = t.mock.method(global, "setTimeout", (callback, delay) => timers.push({ callback, delay }));
+  t.mock.method(global, "clearTimeout", () => {});
+  dashboard.state.charts = chartStubs();
+  dashboard.state.target = "alpha";
+  await dashboard.refresh();
+  assert.equal(timers[0].delay, 30000, document.getElementById("latest-json").textContent);
+  assert.equal(setTimer.mock.callCount(), 1);
+  assert.equal(pending[0].path, "/api/attention?target=alpha");
+
+  // Range changes preserve the pending request and accept its response.
+  dashboard.state.range = "24h";
+  await dashboard.refresh(false);
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].signal.aborted, false);
+  const strip = document.getElementById("attention-strip");
+  const respond = async (request, payload) => {
+    request.resolve({ ok: true, json: async () => payload });
+    await new Promise(setImmediate);
+  };
+  await respond(pending[0], attentionWarning());
+  assert.equal(strip.hidden, false);
+
+  await dashboard.refresh();
+  dashboard.state.target = "beta";
+  await dashboard.refresh(false);
+  assert.equal(pending[1].signal.aborted, true);
+  assert.equal(pending[2].path, "/api/attention?target=beta");
+  pending[2].reject(new Error("optional endpoint failed"));
+  await respond(pending[1], attentionWarning());
+  assert.equal(strip.hidden, true);
+  assert.equal(dashboard.state.target, "beta");
+  assert.equal(timers.length, 4);
+
+  timers.at(-1).callback();
+  await new Promise(setImmediate);
+  assert.equal(pending[3].path, "/api/attention?target=beta");
+  await respond(pending[3], attentionWarning("beta"));
+  assert.equal(strip.hidden, false);
+  assert.equal(timers.length, 5);
+
+  // A failed dashboard refresh hides the current warning and blocks a late result.
+  await dashboard.refresh();
+  const stale = pending.at(-1);
+  failDashboard = true;
+  await dashboard.refresh(false);
+  assert.match(document.getElementById("app-status").innerHTML, /API error/);
+  assert.equal(strip.hidden, true);
+  assert.equal(stale.signal.aborted, false);
+  await respond(stale, attentionWarning("beta"));
+  assert.equal(strip.hidden, true);
+
+  failDashboard = false;
+  await dashboard.refresh(false);
+  assert.notEqual(pending.at(-1), stale);
+  await respond(pending.at(-1), attentionWarning("beta"));
+  assert.equal(strip.hidden, false);
+
+  dashboard.dismissAttention();
+  failDashboard = true;
+  await dashboard.refresh();
+  failDashboard = false;
+  await dashboard.refresh();
+  await respond(pending.at(-1), attentionWarning("beta"));
+  assert.equal(strip.hidden, true);
+});
+
 function chartStubs() {
   const chart = (datasets) => ({ data: { labels: [], datasets: Array.from({ length: datasets }, () => ({ data: [] })) }, options: { scales: { y1: { title: {} } } }, update() {} });
   return { requests: chart(1), errors: chart(3), latency: chart(1), runtime: chart(2), hostRuntime: chart(3), hostDisk: chart(2) };
@@ -706,7 +834,8 @@ function dashboardDocument() {
       toggle(name, active) { this.toggles[name] = active; }
     },
     setAttribute(name, value) { this.attributes[name] = value; },
-    appendChild(child) { this.children.push(child); }
+    appendChild(child) { this.children.push(child); },
+    querySelectorAll() { return []; }
   });
   return {
     getElementById(id) {
@@ -740,6 +869,11 @@ function resetDashboardState() {
   dashboard.state.refreshTimer = null;
   dashboard.state.startupRefreshStartedAtByTarget = Object.create(null);
   dashboard.state.renderedSeriesQuery = "";
+  dashboard.state.attentionTarget = null;
+  dashboard.state.attentionRequest = null;
+  dashboard.state.attentionDashboardFailed = false;
+  dashboard.state.attentionCheck = null;
+  dashboard.state.dismissedAttention.clear();
 }
 
 
