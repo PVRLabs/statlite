@@ -184,15 +184,17 @@ health.
 
 The dashboard's **App status** card gives a compact operational view of the
 latest application signal. `UP` means either that the application reported
-positive health or that StatLite is successfully receiving metrics when no
-explicit health signal is available. `DOWN` means StatLite cannot currently
-collect from the application. The card's hint identifies which signal
-produced the status and shows the last reported health when collection is
-failing.
+positive health or that StatLite is successfully receiving metrics without an
+explicit health signal. A failed Spring Actuator health request with a
+successful metrics collection shows `Health unknown`. `DOWN` means StatLite
+cannot currently collect from the application. The card's hint identifies which
+signal produced the status and shows the last reported health when collection
+is failing.
 
 | Current state | App status display |
 | --- | --- |
 | Successful collection with explicit positive health | `UP` |
+| Successful Spring metrics collection with a failed Actuator health request | `Health unknown` |
 | Successful collection without explicit health | `UP` |
 | Successful collection with explicit negative health | `Unhealthy` with the source status |
 | Current collection failure | `DOWN` |
@@ -265,7 +267,8 @@ remain distinct. Health fields preserve optional source values, poll status
 records whether collection succeeded, and the dashboard derives reporting
 availability from the latest poll and monitor state. For quick scanning, the
 dashboard presents successful reporting as `UP` when explicit application
-health is absent and presents a current collection failure as `DOWN`. The App
+health is absent, or as `Health unknown` if the Spring Actuator health
+request failed. A current collection failure displays as `DOWN`. The App
 status hint identifies the signal source. These labels do not synthesize
 application health: the underlying collection states remain reporting,
 unavailable, or not yet reporting.

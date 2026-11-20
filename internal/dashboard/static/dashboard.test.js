@@ -447,6 +447,59 @@ test("app status card keeps one value line and explains its source in the help t
   }
 });
 
+test("Spring dashboard tracks health failures and recovery independently of poll success", () => {
+  const originalDocument = global.document;
+  const document = dashboardDocument();
+  global.document = document;
+  const warning = { severity: "warning", type: "health_fetch_failed" };
+  const steps = [
+    { health: "UP", events: null, state: "ok", label: "UP", tone: "ok", poll: "Successful" },
+    { health: undefined, events: [warning], state: "ok", label: "Health unknown", tone: "neutral", poll: "Successful" },
+    { health: "UP", events: null, state: "ok", label: "UP", tone: "ok", poll: "Successful" },
+    { health: undefined, events: [warning], state: "error", label: "DOWN", tone: "bad", poll: "Failed" }
+  ];
+  try {
+    for (const { health, events, state, label, tone, poll } of steps) {
+      const metadata = { name: "app", type: "spring" };
+      const target = targetSummary(health, state, state === "error" ? 1 : 0);
+      target.metadata = metadata;
+      target.latest.result.events = events;
+      target.status.last_poll_at = "2026-11-18T16:00:00Z";
+      dashboard.renderSummary({
+        selected_target: metadata,
+        targets: [target],
+        latest: target.latest,
+        monitor: target.status
+      });
+
+      const appStatus = document.getElementById("app-status");
+      assert.equal(appStatus.innerHTML, '<span class="pill ' + tone + '">' + label + '</span>');
+      assert.equal(document.getElementById("target-status").className, "target-status " + tone);
+      assert.equal(document.getElementById("poll-status-state").textContent, poll);
+      assert.equal(document.getElementById("footer-reporting").textContent, poll === "Failed" ? "0" : "1");
+      if (tone === "neutral") {
+        assert.match(appStatus.attributes["aria-label"], /Health unknown.*Actuator health.*Reporting/);
+        assert.match(document.getElementById("app-status-tooltip").textContent, /collected metrics.*Actuator health/);
+        assert.equal(dashboard.targetPresentation(target).selectorSuffix, "⚪ Health unknown");
+      } else if (health === "UP") {
+        assert.equal(document.getElementById("app-status-tooltip").textContent,
+          "UP means the application reported positive health. Collection status: Reporting.");
+        assert.equal(appStatus.attributes["aria-label"],
+          "App status: UP based on application-reported health; reporting status: Reporting");
+      }
+    }
+  } finally {
+    global.document = originalDocument;
+  }
+});
+
+test("an optional health warning preserves metrics-derived UP", () => {
+  const target = targetSummary(undefined, "ok");
+  target.metadata = { type: "quarkus" };
+  target.latest.result.events = [{ severity: "warning", type: "health_fetch_failed" }];
+  assert.equal(dashboard.targetPresentation(target).label, "UP");
+});
+
 test("database health reports an absent signal as Not reported", () => {
   const originalDocument = global.document;
   const document = dashboardDocument();

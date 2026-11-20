@@ -41,9 +41,9 @@ resource-limit failures are retried without changing sources. Once selected,
 the source remains fixed until the target collector is recreated. Health is
 collected independently from the Actuator health endpoint. If health retrieval
 fails but at least one independently usable metric sample is collected, the
-poll remains successful, health stays unavailable, and StatLite records a
-focused warning. If no usable metric sample is collected, the poll fails even
-when health responded.
+dashboard shows `Health unknown` and the last poll remains `Successful`.
+StatLite records a health warning. If no usable metric sample is collected, the
+poll fails even when health responded.
 
 Missing optional metrics are handled gracefully: values may appear as `null` or charts may show gaps instead of failing the whole poll.
 

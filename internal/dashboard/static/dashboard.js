@@ -323,7 +323,8 @@ function renderFooterSummary(targets, now = new Date()) {
 function targetPresentation(target) {
   const latest = (target && target.latest) || {};
   const monitor = (target && target.status) || {};
-  const rawHealth = String(((latest.result || {}).health_status) || "").trim();
+  const result = latest.result || {};
+  const rawHealth = String(result.health_status || "").trim();
   const normalizedHealth = rawHealth.toUpperCase();
   const latestStatus = String(latest.status || "").trim().toLowerCase();
   const currentFailure = latestStatus === "error" || (monitor.consecutive_poll_failures || 0) > 0;
@@ -332,6 +333,9 @@ function targetPresentation(target) {
     : currentFailure
       ? "Unavailable"
       : "Not reporting";
+  const targetType = String(((target || {}).metadata || {}).type || "").toLowerCase();
+  const springHealthUnknown = targetType === "spring" && reportingState === "Reporting" && !rawHealth &&
+    (result.events || []).some((event) => event.type === "health_fetch_failed");
 
   let label = reportingState === "Reporting" ? "UP" : reportingState === "Unavailable" ? "DOWN" : reportingState;
   let tone = reportingState === "Reporting" ? "ok" : reportingState === "Unavailable" ? "bad" : "warn";
@@ -352,25 +356,30 @@ function targetPresentation(target) {
   } else if (rawHealth) {
     label = rawHealth;
     tone = "warn";
+  } else if (springHealthUnknown) {
+    label = "Health unknown";
+    tone = "neutral";
   }
 
-  const caddy = String(((target || {}).metadata || {}).type || "").toLowerCase() === "caddy";
-  const collectionExplanation = caddy
+  const caddy = targetType === "caddy";
+  const statusExplanation = caddy
     ? "UP means StatLite can collect Caddy metrics. It does not guarantee that the upstream application is healthy."
-    : "";
-  const statusDescription = caddy
-    ? "Collection status: " + label + ". " + collectionExplanation
+    : springHealthUnknown
+      ? "StatLite collected metrics but could not retrieve Spring Actuator health."
+      : "";
+  const statusDescription = statusExplanation
+    ? (caddy ? "Collection status: " : "App status: ") + label + ". " + statusExplanation
     : currentFailure
-    ? "App status: DOWN because StatLite cannot currently collect from the application" + (rawHealth ? "; last reported application health: " + rawHealth : "")
-    : rawHealth
-      ? "App status: " + label + " based on application-reported health" + (healthDetail ? " (" + healthDetail + ")" : "")
-      : reportingState === "Reporting"
-        ? "App status: UP based on successful metrics collection; no explicit application health signal is available"
-        : "App status: " + reportingState + "; no explicit application health signal is available";
+      ? "App status: DOWN because StatLite cannot currently collect from the application" + (rawHealth ? "; last reported application health: " + rawHealth : "")
+      : rawHealth
+        ? "App status: " + label + " based on application-reported health" + (healthDetail ? " (" + healthDetail + ")" : "")
+        : reportingState === "Reporting"
+          ? "App status: UP based on successful metrics collection; no explicit application health signal is available"
+          : "App status: " + reportingState + "; no explicit application health signal is available";
   return {
     label,
     tone,
-    collectionExplanation,
+    statusExplanation,
     accessibleLabel: statusDescription + "; reporting status: " + reportingState,
     selectorSuffix: presentationSymbol(tone) + " " + label + (healthDetail && label === "Unhealthy" ? " (" + healthDetail + ")" : ""),
     reportingState,
@@ -393,8 +402,8 @@ function renderApplicationStatus(presentation) {
   status.setAttribute("aria-label", presentation.accessibleLabel);
 
   const tooltip = document.getElementById("app-status-tooltip");
-  if (presentation.collectionExplanation) {
-    tooltip.textContent = presentation.collectionExplanation;
+  if (presentation.statusExplanation) {
+    tooltip.textContent = presentation.statusExplanation;
   } else if (presentation.reportingState === "Unavailable") {
     tooltip.textContent = "StatLite cannot currently collect from the application." +
       (presentation.authoritativeHealth ? " Last reported application health: " + presentation.rawHealth + "." : "");
