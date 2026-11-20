@@ -7,7 +7,7 @@ panic handling, response-writer compatibility, and process-local deployment.
 
 ## Run the demo
 
-The tested baseline is Go 1.27.1. From this directory:
+The tested baseline is Go 1.27.4. From this directory:
 
 ```bash
 go run .

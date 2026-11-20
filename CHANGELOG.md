@@ -6,6 +6,11 @@ a fallback when a section is missing.
 
 ## Unreleased
 
+- Show `Health unknown` for Spring targets when metrics collection succeeds
+  but Spring Actuator health cannot be retrieved.
+- Update Go to 1.27.4, bundled Chart.js to 4.6.1, and the SQLite driver to
+  v1.62.0 (SQLite 3.54.1).
+
 ## v0.7.2 (2026-11-12)
 
 - Show units in the average latency and disk chart titles.

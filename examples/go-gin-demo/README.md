@@ -7,7 +7,7 @@ streaming behavior, and process-local deployment.
 
 ## Run the demo
 
-The tested baseline is Go 1.27.1 with Gin 1.12.0. From this directory:
+The tested baseline is Go 1.27.4 with Gin 1.12.0. From this directory:
 
 ```bash
 go run .

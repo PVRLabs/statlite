@@ -1,6 +1,6 @@
 module github.com/pvrlabs/statlite/examples/go-gin-demo
 
-go 1.27.1
+go 1.27.4
 
 require github.com/gin-gonic/gin v1.12.0
 

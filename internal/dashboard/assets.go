@@ -24,14 +24,14 @@ func ScriptPath() string {
 //go:embed static/statlite-icon.png
 var StatliteIconPNG []byte
 
-//go:embed static/vendor/chart.4.5.0.min.js
+//go:embed static/vendor/chart.4.6.1.min.js
 var ChartJS []byte
 
 //go:embed static/fonts/orbitron-2.001-700.woff2
 var OrbitronFontWoff2 []byte
 
 const (
-	ChartJSPath      = "/static/vendor/chart.4.5.0.min.js"
+	ChartJSPath      = "/static/vendor/chart.4.6.1.min.js"
 	OrbitronFontPath = "/static/fonts/orbitron-2.001-700.woff2"
 )
 

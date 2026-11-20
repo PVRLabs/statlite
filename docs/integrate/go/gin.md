@@ -46,7 +46,7 @@ alternates independent processes or replicas. Counters can decrease and
 `started_at` can alternate, creating misleading deltas or apparent restarts.
 Multi-process and replica deployments are outside this drop-in integration.
 
-The example was exercised with Go 1.27.1 and Gin 1.12.0. This guide claims
+The example was exercised with Go 1.27.4 and Gin 1.12.0. This guide claims
 that tested baseline, not compatibility with every Go or Gin release.
 
 ## Copyable helper

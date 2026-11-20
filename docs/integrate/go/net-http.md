@@ -71,7 +71,7 @@ processes or replicas. Counters can decrease and `started_at` can alternate,
 creating misleading deltas or apparent restarts. Multi-process and replica
 deployments are outside this drop-in integration.
 
-The example was exercised with Go 1.27.1. This guide claims that tested
+The example was exercised with Go 1.27.4. This guide claims that tested
 baseline, not compatibility with every Go release.
 
 ## Copyable helper
