@@ -48,14 +48,11 @@ endpoints.prometheus.sensitive=false
 
 ## Tested versions
 
-Both setups below are supported. The primary tested graph uses platform parent
-5.2.1, Micronaut core 5.2.11,
-Micronaut Micrometer 6.1.0, and Micrometer 1.17.1. The same adapter also passes
-the retained 4.9.9 regression (parent 4.9.2, Micronaut Micrometer 5.12.0,
-Micrometer 1.15.0). The public demo and CI retain the 4.9.9 / Java 21 setup.
-
-Tested with Temurin 25.0.4.1+1-LTS, using Java 25 bytecode for 5.x and Java 17
-for 4.9.9. Compatibility covers only the tested runtime and Micrometer setups. No Prometheus server or Grafana is required.
+The certified setup uses platform parent 5.2.1, Micronaut core 5.2.11,
+Micronaut Micrometer 6.1.0, and Micrometer 1.17.1. Certification runs on
+Temurin 25.0.4.1+1-LTS with Java 25 bytecode.
+The public CI release gate runs the Java 25 demo with the same framework and
+Micrometer versions. No Prometheus server or Grafana is required.
 Removing management from this graph removes both `/prometheus` and `/health`.
 To retain metrics with absent health, keep management installed and set
 `endpoints.health.enabled=false`.
@@ -91,15 +88,12 @@ maximum heap size.
 
 ## HTTP metric behavior
 
-HTTP timers are absent before the first completed request at startup and
-restart, so HTTP samples remain unavailable until meters exist. Once present,
-counters include application and management requests, including scrapes,
-health requests, and inspection probes. Scrape timing differs: the tested 4.9.9
-setup excludes its own unfinished request, while 5.x can record the scrape timer
-before generating the response body. The first scrape can therefore already
-contain real HTTP samples. StatLite stores raw cumulative counters and derives
-nonnegative deltas at query time; process-start changes retain the existing
-restart boundary semantics. Routes, exceptions, arbitrary labels, histogram
+HTTP samples remain unavailable until meters exist. Counters include application
+and management requests, including scrapes, health requests, and inspection
+probes. Micronaut 5 can record the scrape timer before generating the response
+body. The first scrape can therefore contain real HTTP samples. StatLite stores
+raw cumulative counters and derives nonnegative deltas at query time.
+Process-start changes retain the existing restart boundary semantics. Routes, exceptions, arbitrary labels, histogram
 buckets, and percentiles are not stored.
 
 ## Health, JDBC health, and custom endpoints
@@ -130,8 +124,8 @@ and warn without discarding good metrics. Database health requires visible
 `details.jdbc.status` with UP/DOWN. Absent or hidden details leave DB health
 unavailable; invalid optional JDBC details warn while preserving valid app
 health. Nested datasource details are ignored, and overall app health never
-fills in DB health. The primary 5.x JDBC setup uses `micronaut-jdbc-hikari` 7.2.0
-and H2 2.5.250; the retained 4.9.9 regression uses 6.2.1 and H2 2.3.232.
+fills in DB health. The certified JDBC setup uses `micronaut-jdbc-hikari` 7.2.0
+and H2 2.5.250.
 Exposing JDBC details to anonymous clients requires:
 
 ```properties

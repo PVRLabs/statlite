@@ -76,11 +76,19 @@ jobs:
           cache-dependency-path: examples/node-express-demo/package-lock.json
 
       - name: Set up Java
-        if: matrix.case == 'spring' || matrix.case == 'quarkus' || matrix.case == 'micronaut'
+        if: matrix.case == 'spring' || matrix.case == 'quarkus'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
+          cache: maven
+
+      - name: Set up Java for Micronaut
+        if: matrix.case == 'micronaut'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
           cache: maven
 
       - name: Install Express dependencies

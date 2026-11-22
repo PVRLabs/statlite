@@ -4,13 +4,15 @@
   <parent>
     <groupId>io.micronaut.platform</groupId>
     <artifactId>micronaut-parent</artifactId>
-    <version>4.9.2</version>
+    <version>5.2.1</version>
   </parent>
   <groupId>example</groupId>
   <artifactId>micronaut-metrics-demo</artifactId>
   <version>1.0.0</version>
   <properties>
-    <maven.compiler.release>17</maven.compiler.release>
+    <maven.compiler.release>25</maven.compiler.release>
+    <jdk.version>25</jdk.version>
+    <release.version>25</release.version>
     <micronaut.runtime>netty</micronaut.runtime>
     <exec.mainClass>example.Application</exec.mainClass>
   </properties>

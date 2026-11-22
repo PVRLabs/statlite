@@ -1,7 +1,7 @@
 # Public integration testing
 
-StatLite's documented integrations are continuously exercised in public CI
-with real StatLite collections. Most cases start the shipped runnable example
+The public CI matrix exercises the integrations listed below with real StatLite
+collections. Most cases start the shipped runnable example
 for that guide. The Caddy case starts pinned Caddy 2.11.4 and two temporary
 Python servers that match the documented named-site shape.
 
@@ -58,8 +58,7 @@ The shared matrix currently exercises:
   Actuator integration.
 - [Quarkus](../examples/quarkus-metrics-demo/) through the [Quarkus target](targets/quarkus.md)
   Micrometer metrics integration.
-
-- [Micronaut](../examples/micronaut-metrics-demo/) through the
+- [Micronaut 5.2.11](../examples/micronaut-metrics-demo/) through the
   [Micrometer metrics integration](targets/micronaut.md).
 - [Caddy 2.11.4](targets/caddy.md) through the CI fixture in
   [`scripts/ci/integration-caddy.sh`](../scripts/ci/integration-caddy.sh).

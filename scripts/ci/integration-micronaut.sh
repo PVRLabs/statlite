@@ -183,8 +183,8 @@ jq -s -e '
     sample(.[1]; "process_start_time") > 0 and sample(.[1]; "process_uptime") > 0 and
     sample(.[1]; "process_start_time") == sample(.[0]; "process_start_time")
 ' "$WORK_DIR/baseline.json" "$WORK_DIR/traffic.json" >/dev/null || fail "unexpected counter/runtime samples"
-# Management requests also enter HTTP timers; total is deliberately a lower
-# bound because a scrape excludes its own unfinished request.
+# The total delta uses a lower bound because management requests also count.
+# Micronaut 5 can include the current scrape in its own response.
 jq -s -e '.[1].latest.poll_id > .[0].latest.poll_id and
     .[1].latest.poll_id == (.[0].latest.poll_id + 1)' \
     "$WORK_DIR/baseline-summary.json" "$WORK_DIR/traffic-summary.json" >/dev/null || fail "unexpected stored poll boundary"

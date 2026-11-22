@@ -18,8 +18,7 @@ incompatible measurements. See the
 | Spring Boot Actuator | Supported | Actuator JSON | `/actuator` management base URL | Actuator health is the normal Spring health source; application request, JVM, process, and optional host concepts are normalized into StatLite's fixed vocabulary. |
 | Spring Micrometer Prometheus | Supported | Prometheus/OpenMetrics exposition | Configured Prometheus endpoint | This is a Spring source option, not a generic `prometheus` target. |
 | Quarkus 3.39.x | Supported | Micrometer Prometheus/OpenMetrics exposition; optional SmallRye Health | Conventional `/q/metrics`; optional `/q/health` | Explicit `quarkus` target; datasource health is normalized when published. |
-| [Micronaut 5.2.11 (tested setup)](targets/micronaut.md#tested-versions) | Supported | Micrometer 1.17.1 Prometheus exposition; optional management health | Exact `/prometheus`; optional `/health` | Primary tested setup; explicit `micronaut` target; JDBC health requires visible aggregate details. |
-| [Micronaut 4.9.9 (tested setup)](targets/micronaut.md#tested-versions) | Supported | Micrometer 1.15.0 Prometheus exposition; optional management health | Exact `/prometheus`; optional `/health` | Retained regression setup used by the public demo and CI; JDBC health requires visible aggregate details. |
+| [Micronaut 5.2.11 (tested setup)](targets/micronaut.md#tested-versions) | Supported | Micrometer 1.17.1 Prometheus exposition; optional management health | Exact `/prometheus`; optional `/health` | Public CI and private certification; explicit `micronaut` target; JDBC health requires visible aggregate details. |
 | [Caddy 2.11.4](targets/caddy.md) | Supported | Built-in per-host HTTP duration counters | Exact metrics URL plus required host | Named HTTPS site with one direct reverse proxy; HTTP charts only, no application health or resources. |
 | StatLite Metrics v1 | Supported | Fixed `statlite-metrics/v1` response | `/statlite/metrics` | Fixed producer contract for StatLite and compatible applications. See the [direct integration guides](integrate/). |
 
@@ -65,8 +64,8 @@ Quarkus 3.39.1 / Java 21 fixture.
 
 Micronaut is a first-class explicit `type: micronaut` target with an exact
 metrics endpoint, normally `/prometheus`, and optional management health.
-Support covers the named 5.2.11 and 4.9.9 setups and fixed contract, not arbitrary
-Micrometer exposition. Quarkus and Micronaut retain separate label and health
+Certification covers the Micronaut 5.2.11 setup and its documented metrics and
+health contract. Quarkus and Micronaut retain separate label and health
 contracts. See the [Micronaut target reference](targets/micronaut.md) for
 application setup, tested versions, normalization, JDBC health visibility,
 custom endpoints, and typed inspection.

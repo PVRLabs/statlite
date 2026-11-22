@@ -1,13 +1,11 @@
 # Micronaut Micrometer demo
 
 A self-contained public example for StatLite's explicit `micronaut` target.
-Platform parent 4.9.2 pins Micronaut 4.9.9, Micronaut Micrometer 5.12.0,
-and Micrometer 1.15.0. Sources compile to Java 17 bytecode. Public CI builds
-and runs with Eclipse Temurin Java 21 LTS; private certification uses its
-separately pinned Java 25 runtime for the default 5.x certification and the
-retained 4.9.9 regression. This public example keeps the 4.9.9 / Java 21 setup.
+Platform parent 5.2.1 pins Micronaut 5.2.11, Micronaut Micrometer 6.1.0,
+and Micrometer 1.17.1. The demo compiles to Java 25 bytecode and public CI
+runs it on Eclipse Temurin 25.
 
-From this directory, with Java 21 and Maven installed:
+From this directory, with Java 25 and Maven installed:
 
 ```sh
 mvn --batch-mode --no-transfer-progress package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt
@@ -16,7 +14,9 @@ java -cp "target/classes:$(cat target/classpath.txt)" example.Application
 
 The application binds to loopback port 18084. Management exposes ordinary
 `/prometheus` metrics and `/health` aggregate UP health. No datasource is
-configured, so database health is unavailable. HTTP timers appear after traffic.
+configured, so database health is unavailable. Micronaut 5 can record the
+`/prometheus` scrape in its own response, so HTTP counters may be present on
+the first scrape, even before application traffic.
 In another terminal, run `./traffic.sh`: exactly one request each to
 `/probe/ok` (200), `/probe/missing` (404), `/probe/bad` (400), and
 `/probe/error` (500). The missing route exercises the framework's normal 404.
