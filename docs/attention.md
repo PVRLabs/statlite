@@ -1,9 +1,10 @@
 # Attention
 
 An application can report **UP** while many of its requests return HTTP 5xx
-errors. StatLite shows an amber Attention strip below the status cards when
-the error rate is elevated. The strip flags degraded request handling while
-the App status card continues to show the application's reported health.
+errors. Starting in StatLite v0.8.0, an amber Attention strip appears below
+the status cards when the error rate is elevated. The strip flags degraded
+request handling while the App status card continues to show the application's
+reported health.
 
 ![StatLite dashboard with App status UP and an expanded Attention strip showing 20% 5xx, the threshold, and coverage](images/attention.webp)
 
