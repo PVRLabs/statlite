@@ -4,6 +4,14 @@ This file summarizes the main user-facing changes in each StatLite release.
 GitHub release notes use the matching version section, with commit history as
 a fallback when a section is missing.
 
+## Unreleased
+
+- **Dashboard Attention** highlights elevated HTTP 5xx rates even while an
+  application reports UP. The strip shows the error rate, request counts, and
+  evaluation window. Expand it for details or dismiss it for the current page
+  session. Attention is enabled by default for supported targets and can be
+  configured or disabled globally. See the [Attention guide](docs/attention.md).
+
 ## v0.7.3 (2026-11-20)
 
 - Show `Health unknown` for Spring targets when metrics collection succeeds
