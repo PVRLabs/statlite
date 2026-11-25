@@ -7,6 +7,10 @@ on:
         description: Exact release version (for example, v0.4.2)
         required: true
         type: string
+      candidate_commit:
+        description: Full SHA of the certified and approved release commit
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -24,12 +28,18 @@ jobs:
       - name: Validate release inputs and repository state
         env:
           RELEASE_VERSION: ${{ inputs.version }}
+          CANDIDATE_COMMIT: ${{ inputs.candidate_commit }}
           DISPATCH_REF: ${{ github.ref }}
         run: |
           set -eu
 
           if [ "$DISPATCH_REF" != "refs/heads/main" ]; then
             echo "release must be dispatched from main (got $DISPATCH_REF)" >&2
+            exit 1
+          fi
+
+          if [ "$CANDIDATE_COMMIT" != "$GITHUB_SHA" ]; then
+            echo "approved commit $CANDIDATE_COMMIT does not match dispatched commit $GITHUB_SHA" >&2
             exit 1
           fi
 
