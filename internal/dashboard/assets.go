@@ -12,6 +12,9 @@ import (
 //go:embed static/index.html
 var Page string
 
+//go:embed static/attention.html
+var AttentionMarkup string
+
 //go:embed static/dashboard.js
 var Script string
 

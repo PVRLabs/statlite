@@ -29,10 +29,12 @@ const (
 )
 
 type Config struct {
-	Server              ServerConfig   `yaml:"server"`
-	Storage             StorageConfig  `yaml:"storage"`
-	Polling             PollingConfig  `yaml:"polling"`
-	Targets             []TargetConfig `yaml:"targets"`
+	Server  ServerConfig   `yaml:"server"`
+	Storage StorageConfig  `yaml:"storage"`
+	Polling PollingConfig  `yaml:"polling"`
+	Targets []TargetConfig `yaml:"targets"`
+
+	Attention           AttentionConfig `yaml:"attention,omitempty"`
 	deprecationWarnings []string
 }
 
@@ -51,15 +53,16 @@ type PollingConfig struct {
 }
 
 type TargetConfig struct {
-	Type                   string      `yaml:"type,omitempty"`
-	Name                   string      `yaml:"name"`
-	ActuatorBaseURL        string      `yaml:"actuator_base_url"`
-	URL                    string      `yaml:"url"`
-	Host                   string      `yaml:"host,omitempty"`
-	HealthURL              string      `yaml:"health_url,omitempty"`
-	MetricsSource          string      `yaml:"metrics_source,omitempty"`
-	CollectHostMetrics     bool        `yaml:"collect_host_metrics,omitempty"`
-	Auth                   *AuthConfig `yaml:"auth,omitempty"`
+	Type               string      `yaml:"type,omitempty"`
+	Name               string      `yaml:"name"`
+	ActuatorBaseURL    string      `yaml:"actuator_base_url"`
+	URL                string      `yaml:"url"`
+	Host               string      `yaml:"host,omitempty"`
+	HealthURL          string      `yaml:"health_url,omitempty"`
+	MetricsSource      string      `yaml:"metrics_source,omitempty"`
+	CollectHostMetrics bool        `yaml:"collect_host_metrics,omitempty"`
+	Auth               *AuthConfig `yaml:"auth,omitempty"`
+
 	hostSet                bool
 	actuatorURLSet         bool
 	metricsSourceSet       bool
@@ -238,6 +241,9 @@ func (c *Config) validate() error {
 	}
 	if timeout <= 0 {
 		return fmt.Errorf("polling.timeout: must be greater than zero")
+	}
+	if err := c.Attention.validate(); err != nil {
+		return fmt.Errorf("attention: %w", err)
 	}
 	return c.validateTargets()
 }

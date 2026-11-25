@@ -239,7 +239,7 @@ func runMonitor(args []string, stdout, stderr io.Writer) int {
 	if *noPoll {
 		serverRetentionDays = 0
 	}
-	srv := server.NewWithManagerRetentionCutoffAndFilesystem(cfg.Server.Listen, manager, serverRetentionDays, retentionCutoff.Current, cfg.Storage.SQLitePath)
+	srv := server.NewWithManagerRetentionCutoffAndFilesystem(cfg.Server.Listen, manager, serverRetentionDays, retentionCutoff.Current, cfg.Storage.SQLitePath, cfg.Attention)
 	srv.SetRawSeries(*rawSeries)
 	if dashboardNow != nil {
 		srv.FreezeDashboardTime(*dashboardNow)

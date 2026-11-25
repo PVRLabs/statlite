@@ -367,6 +367,13 @@ The dashboard presents a small set of normalized concepts:
 * CPU usage; and
 * recent collector events.
 
+Attention highlights significant application degradation that may occur even
+when application status reports UP. It evaluates existing normalized metrics
+on demand during dashboard refreshes, without background workers or additional
+metric collection. Attention is enabled by default and can be disabled
+globally. See the [Attention guide](attention.md) for thresholds, configuration,
+and detailed behavior.
+
 The supported dashboard ranges are the last hour, last 24 hours, 7 days, and 30 days.
 The dashboard is intentionally simple, local-first, and collector-neutral.
 
