@@ -63,7 +63,6 @@ type TargetConfig struct {
 	CollectHostMetrics bool        `yaml:"collect_host_metrics,omitempty"`
 	Auth               *AuthConfig `yaml:"auth,omitempty"`
 
-	Attention              TargetAttentionConfig `yaml:"attention,omitempty"`
 	hostSet                bool
 	actuatorURLSet         bool
 	metricsSourceSet       bool
@@ -243,6 +242,9 @@ func (c *Config) validate() error {
 	if timeout <= 0 {
 		return fmt.Errorf("polling.timeout: must be greater than zero")
 	}
+	if err := c.Attention.validate(); err != nil {
+		return fmt.Errorf("attention: %w", err)
+	}
 	return c.validateTargets()
 }
 
@@ -263,9 +265,6 @@ func (c *Config) validateTargets() error {
 		}
 		seenTargetNames[name] = i
 		target.Name = name
-		if err := target.Attention.HTTP5xx.validate(); err != nil {
-			return targetError(target, "attention.http_5xx", err.Error())
-		}
 
 		targetType := target.Type
 		if targetType == "" {

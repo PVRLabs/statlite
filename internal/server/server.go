@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pvrlabs/statlite/internal/collector"
+	"github.com/pvrlabs/statlite/internal/config"
 	"github.com/pvrlabs/statlite/internal/dashboard"
 	"github.com/pvrlabs/statlite/internal/monitor"
 )
@@ -59,7 +60,7 @@ type Server struct {
 	lastCPUSeconds    float64
 	lastCPUUsage      float64
 
-	attentionDisabled bool
+	attention config.AttentionConfig
 }
 
 func New(listen string, mon *monitor.Monitor) *Server {
@@ -83,10 +84,10 @@ func NewWithManagerRetention(listen string, manager *monitor.Manager, retentionD
 }
 
 func NewWithManagerRetentionCutoff(listen string, manager *monitor.Manager, retentionDays int, retentionCutoff func() time.Time) *Server {
-	return NewWithManagerRetentionCutoffAndFilesystem(listen, manager, retentionDays, retentionCutoff, "")
+	return NewWithManagerRetentionCutoffAndFilesystem(listen, manager, retentionDays, retentionCutoff, "", config.AttentionConfig{})
 }
 
-func NewWithManagerRetentionCutoffAndFilesystem(listen string, manager *monitor.Manager, retentionDays int, retentionCutoff func() time.Time, filesystemPath string) *Server {
+func NewWithManagerRetentionCutoffAndFilesystem(listen string, manager *monitor.Manager, retentionDays int, retentionCutoff func() time.Time, filesystemPath string, attention config.AttentionConfig) *Server {
 	mux := http.NewServeMux()
 	if retentionDays > 0 && retentionCutoff == nil {
 		retentionCutoff = func() time.Time {
@@ -99,6 +100,7 @@ func NewWithManagerRetentionCutoffAndFilesystem(listen string, manager *monitor.
 		retentionCutoff:  retentionCutoff,
 		startedAt:        time.Now().UTC(),
 		filesystemPath:   filesystemPath,
+		attention:        attention,
 		hostSampler:      collector.NewHostSampler(),
 		resourceInterval: resourceSnapshotInterval,
 		storageHealth:    initialStorageHealth(manager),
@@ -124,7 +126,9 @@ func NewWithManagerRetentionCutoffAndFilesystem(listen string, manager *monitor.
 	mux.HandleFunc("/api/summary", s.handleSummary)
 	mux.HandleFunc("/api/series", s.handleSeries)
 	mux.HandleFunc("/api/latest", s.handleLatest)
-	mux.HandleFunc("/api/attention", s.handleAttention)
+	if attention.IsEnabled() {
+		mux.HandleFunc("/api/attention", s.handleAttention)
+	}
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/monitor/status", s.handleMonitorStatus)
 	mux.HandleFunc("/api/v1/status", s.handlePublicStatus)
@@ -142,11 +146,6 @@ func NewWithManagerRetentionCutoffAndFilesystem(listen string, manager *monitor.
 	}
 
 	return s
-}
-
-// SetAttentionEnabled applies the global setting before serving.
-func (s *Server) SetAttentionEnabled(enabled bool) {
-	s.attentionDisabled = !enabled
 }
 
 // SetRawSeries disables dashboard sampling and aggregation. Call before serving.

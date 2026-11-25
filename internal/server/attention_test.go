@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -19,7 +21,7 @@ func TestAttentionEndpoint(t *testing.T) {
 	for _, tc := range []struct {
 		name             string
 		requests, errors float64
-		stale, disabled  bool
+		stale            bool
 		warning, cleared bool
 	}{
 		{name: "threshold inclusive", requests: 100, errors: 10, warning: true},
@@ -29,34 +31,17 @@ func TestAttentionEndpoint(t *testing.T) {
 		{name: "zero requests"},
 		{name: "low errors", requests: 100, errors: 9, cleared: true},
 		{name: "stale", requests: 100, errors: 10, stale: true},
-		{name: "disabled", disabled: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s, store, now := attentionFixture(t, []string{"alpha", "beta"}, 0, tc.requests, tc.errors)
+			s, _, now := attentionFixture(t, []string{"alpha", "beta"}, 0, tc.requests, tc.errors)
 			if tc.stale {
 				s.FreezeDashboardTime(now.Add(3 * time.Minute))
 			}
-			if tc.disabled {
-				s.SetAttentionEnabled(false)
-				// Closed SQLite proves there is no history dependency on this path.
-				if err := store.Close(); err != nil {
-					t.Fatal(err)
-				}
-			}
 			path := "/api/attention?target=alpha"
-			if tc.disabled {
-				path = "/api/attention?target=unknown"
-			}
 			w := httptest.NewRecorder()
 			s.httpServer.Handler.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
 			if w.Code != 200 {
 				t.Fatalf("status %d: %s", w.Code, w.Body)
-			}
-			if tc.disabled {
-				if w.Body.String() != "{\"conditions\":[]}\n" {
-					t.Fatalf("disabled body: %s", w.Body)
-				}
-				return
 			}
 			var response attentionResponse
 			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
@@ -88,43 +73,78 @@ func TestAttentionEndpoint(t *testing.T) {
 	}
 }
 
-func TestAttentionTargetOverrides(t *testing.T) {
-	s, store, _ := attentionFixture(t, []string{"alpha", "beta"}, 0, 200, 10)
-	alpha, _ := s.manager.ExactTarget("alpha")
-	beta, _ := s.manager.ExactTarget("beta")
-	rate, requests, errors := 5.0, 200, 10
-	alpha.AttentionHTTP5xx = config.HTTP5xxAttentionConfig{
-		Enabled: new(true), ErrorRatePercent: &rate, MinRequests: &requests, MinErrors: &errors,
-	}
-	beta.AttentionHTTP5xx.Enabled = new(false)
-	manager, err := monitor.NewManager([]monitor.ManagedTarget{alpha, beta})
-	if err != nil {
-		t.Fatal(err)
-	}
-	s.manager = manager
-	get := func(target string) *httptest.ResponseRecorder {
+func TestAttentionGlobalThresholds(t *testing.T) {
+	fixture, _, now := attentionFixture(t, []string{"alpha", "beta"}, 1, 200, 10)
+	s := NewWithManagerRetentionCutoffAndFilesystem("127.0.0.1:0", fixture.manager, 0, nil, "", config.AttentionConfig{
+		ErrorRatePercent: new(4.0), MinRequests: new(200), MinErrors: new(10),
+	})
+	s.FreezeDashboardTime(now)
+	for _, target := range []string{"alpha", "beta"} {
 		w := httptest.NewRecorder()
 		s.httpServer.Handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/attention?target="+target, nil))
+		var response attentionResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil || w.Code != 200 ||
+			response.Target != target || len(response.Conditions) != 1 || response.Conditions[0].Threshold != .04 {
+			t.Fatalf("%s response %d: %s", target, w.Code, w.Body)
+		}
+	}
+}
+
+func TestAttentionGlobalDisable(t *testing.T) {
+	enabled, store, now := attentionFixture(t, []string{"alpha"}, 0, 100, 10)
+	disabled := NewWithManagerRetentionCutoffAndFilesystem("127.0.0.1:0", enabled.manager, 0, nil, "", config.AttentionConfig{
+		Enabled: new(false), ErrorRatePercent: new(5.0),
+	})
+	disabled.FreezeDashboardTime(now)
+	get := func(s *Server, path string) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		s.httpServer.Handler.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
 		return w
 	}
-	w := get("alpha")
-	var response attentionResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil || w.Code != 200 ||
-		len(response.Conditions) != 1 || response.Conditions[0].Threshold != .05 {
-		t.Fatalf("override response %d: %s", w.Code, w.Body)
+	for _, tc := range []struct {
+		server    *Server
+		wantStrip bool
+	}{{enabled, true}, {disabled, false}} {
+		w := get(tc.server, "/")
+		if w.Code != 200 || strings.Contains(w.Body.String(), `id="attention-strip"`) != tc.wantStrip ||
+			!strings.Contains(w.Body.String(), `id="metrics-section"`) || strings.Contains(w.Body.String(), "{{dashboard_attention}}") {
+			t.Fatalf("unexpected dashboard response for Attention enabled=%v, status=%d", tc.wantStrip, w.Code)
+		}
 	}
 
-	// Disable at either level must skip the closed history store.
+	summary := func(s *Server) any {
+		t.Helper()
+		w := get(s, "/api/summary?target=alpha")
+		var targetFields struct {
+			Targets             []monitor.TargetSummary `json:"targets"`
+			SelectedTarget      monitor.TargetMetadata  `json:"selected_target"`
+			Monitor             monitor.Status          `json:"monitor"`
+			Latest              json.RawMessage         `json:"latest"`
+			LatestRestart       *time.Time              `json:"latest_restart"`
+			LatestRestartStatus string                  `json:"latest_restart_status"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &targetFields); err != nil || w.Code != 200 {
+			t.Fatalf("summary response %d: %s", w.Code, w.Body)
+		}
+		return targetFields
+	}
+	if on, off := summary(enabled), summary(disabled); !reflect.DeepEqual(on, off) {
+		t.Fatalf("target summary changed with Attention disabled: enabled %+v, disabled %+v", on, off)
+	}
+
+	for _, path := range []string{"/api/series?target=alpha", "/api/events?target=alpha"} {
+		on, off := get(enabled, path), get(disabled, path)
+		if on.Code != 200 || off.Code != 200 || on.Body.String() != off.Body.String() {
+			t.Fatalf("%s changed with Attention disabled: enabled %d %s, disabled %d %s", path, on.Code, on.Body, off.Code, off.Body)
+		}
+	}
+
+	// Custom thresholds cannot enable evaluation when Attention is disabled.
 	if err := store.Close(); err != nil {
 		t.Fatal(err)
 	}
-	w = get("beta")
-	if w.Code != 200 || w.Body.String() != "{\"conditions\":[],\"target\":\"beta\"}\n" {
-		t.Fatalf("target disabled %d: %s", w.Code, w.Body)
-	}
-	s.SetAttentionEnabled(false)
-	w = get("alpha")
-	if w.Code != 200 || w.Body.String() != "{\"conditions\":[]}\n" {
+	w := get(disabled, "/api/attention?target=alpha")
+	if w.Code != 404 || w.Body.String() != "404 page not found\n" {
 		t.Fatalf("global disable %d: %s", w.Code, w.Body)
 	}
 }

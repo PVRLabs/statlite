@@ -470,5 +470,5 @@ still apply, but long ranges require more server and browser work.
 Attention automatically detects elevated HTTP 5xx error rates for supported
 targets. It is enabled by default and requires no additional configuration.
 
-You can override thresholds, disable checks per target, or disable Attention
-globally. See [Attention](attention.md) for details and configuration examples.
+You can change the shared thresholds or disable Attention globally.
+See [Attention](attention.md) for details and configuration examples.

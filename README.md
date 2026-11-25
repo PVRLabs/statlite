@@ -27,6 +27,9 @@ It collects traffic, latency, CPU, memory, optional application health, and
 optional host metrics. Metrics and history stay on your server, without
 continuously sending application metrics to a third-party monitoring SaaS.
 
+The dashboard highlights elevated server error rates even while an application
+reports UP. See the [Attention guide](docs/attention.md).
+
 StatLite is built for [resource-constrained servers](docs/low-resource-monitoring.md).
 Low memory, CPU, disk, and operational overhead are treated as product
 constraints.

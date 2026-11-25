@@ -5,7 +5,7 @@ errors. StatLite shows an amber Attention strip below the status cards when
 the error rate is elevated. The strip flags degraded request handling while
 the App status card continues to show the application's reported health.
 
-![StatLite dashboard with App status UP and an expanded Attention warning showing 20% 5xx, the threshold, and poll coverage](images/attention.webp)
+![StatLite dashboard with App status UP and an expanded Attention strip showing 20% 5xx, the threshold, and coverage](images/attention.webp)
 
 ## How StatLite detects elevated errors
 
@@ -35,26 +35,29 @@ dismissal in place.
 
 ## Configure Attention
 
-Use the optional `attention.http_5xx` block on an existing target to override
-these defaults. Each omitted field keeps its built-in value. The evaluation
-window is fixed at 10 minutes.
+Use the optional top-level `attention` block to set thresholds for all
+targets. Each omitted field keeps its built-in value. The evaluation window
+is fixed at 10 minutes.
 
 ```yaml
-    attention:
-      http_5xx:
-        error_rate_percent: 15
-        min_requests: 200
-        min_errors: 25
+attention:
+  error_rate_percent: 15
+  min_requests: 200
+  min_errors: 25
 ```
 
 `error_rate_percent` accepts a percentage greater than 0 and up to 100.
-The count thresholds accept positive integers. Set
-`attention.http_5xx.enabled: false` on a target to disable the check there.
+The count thresholds accept positive integers.
 
-To disable all Attention checks, add this top-level setting. It takes
-precedence over target settings.
+The top-level `attention.enabled` setting controls Attention for all targets.
 
 ```yaml
 attention:
   enabled: false
 ```
+
+With Attention disabled, the dashboard omits the strip and skips Attention
+requests. The internal `/api/attention` endpoint returns HTTP 404. An open
+dashboard tab that receives a 404 hides the strip and retries Attention on
+its normal refresh schedule.
+Restart StatLite to apply the setting.

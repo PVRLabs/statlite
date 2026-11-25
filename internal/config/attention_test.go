@@ -9,10 +9,10 @@ import (
 
 func TestAttentionConfig(t *testing.T) {
 	cfg := validConfig(TargetTypeStatliteMetrics, "http://localhost/statlite/metrics")
-	if !cfg.Attention.IsEnabled() || !cfg.Targets[0].Attention.HTTP5xx.IsEnabled() {
+	if !cfg.Attention.IsEnabled() {
 		t.Fatal("omission must enable Attention")
 	}
-	if rate, requests, errors := cfg.Targets[0].Attention.HTTP5xx.Thresholds(); rate != .10 || requests != 100 || errors != 10 {
+	if rate, requests, errors := cfg.Attention.Thresholds(); rate != .10 || requests != 100 || errors != 10 {
 		t.Fatalf("defaults: %v, %v, %v", rate, requests, errors)
 	}
 
@@ -20,13 +20,11 @@ func TestAttentionConfig(t *testing.T) {
 server: {listen: "127.0.0.1:9090"}
 storage: {sqlite_path: statlite.sqlite}
 polling: {interval: 30s}
-attention: {enabled: false}
+attention: {enabled: false, error_rate_percent: 2.5, min_requests: 50, min_errors: 3}
 targets:
   - name: app
     type: statlite-metrics
     url: http://localhost/statlite/metrics
-    attention:
-      http_5xx: {enabled: false, error_rate_percent: 2.5, min_requests: 50, min_errors: 3}
 `
 	for _, tc := range []struct{ old, replacement, wantError string }{
 		{},
@@ -50,9 +48,9 @@ targets:
 		if err != nil {
 			t.Fatal(err)
 		}
-		settings := decoded.Targets[0].Attention.HTTP5xx
+		settings := decoded.Attention
 		rate, requests, errors := settings.Thresholds()
-		if decoded.Attention.IsEnabled() || settings.IsEnabled() || rate != .025 || requests != 50 || errors != 3 {
+		if decoded.Attention.IsEnabled() || rate != .025 || requests != 50 || errors != 3 {
 			t.Fatalf("decoded settings: %+v rate %v min requests %d min errors %d", settings, rate, requests, errors)
 		}
 	}

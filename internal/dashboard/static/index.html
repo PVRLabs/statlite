@@ -218,10 +218,13 @@ main {
   margin-bottom: 18px;
   padding: 2px 6px;
   min-width: 0;
-  color: var(--amber);
-  border: 1px solid rgba(245, 158, 11, 0.28);
+  color: var(--text);
+  border: 1px solid rgba(245, 158, 11, 0.18);
   border-radius: 8px;
-  background: rgba(245, 158, 11, 0.09);
+  background: rgba(245, 158, 11, 0.04);
+}
+.attention-icon, #attention-title {
+  color: var(--amber);
 }
 .attention-row {
   display: flex;
@@ -262,7 +265,7 @@ main {
   height: 6px;
   border-right: 1px solid currentColor;
   border-bottom: 1px solid currentColor;
-  opacity: 0.75;
+  color: var(--muted);
   transform: translateY(-1px) rotate(45deg);
 }
 #attention-message[aria-expanded="true"] .attention-chevron {
@@ -271,10 +274,12 @@ main {
 #attention-dismiss {
   flex: none;
   min-width: 32px;
+  color: var(--muted);
   font-size: 18px;
 }
 #attention-details {
   margin: 2px 6px 8px;
+  color: var(--muted);
   font-size: 13px;
   overflow-wrap: anywhere;
 }
@@ -575,6 +580,7 @@ pre {
   .target-picker { width: 100%; }
   .target-select { max-width: 100%; width: 100%; }
   .target-endpoint { flex: 0 1 auto; max-width: 100%; }
+  #attention-summary { white-space: normal; overflow-wrap: anywhere; }
   .chart { padding: 12px; }
   .chart-head { align-items: flex-start; flex-direction: column; gap: 4px; }
   .note { text-align: left; }
@@ -622,17 +628,7 @@ pre {
     <div class="metric poll-status"><div class="label">Last poll</div><div id="last-poll" class="value small"><span id="poll-status-state" class="poll-status-state">...</span><span id="poll-status-time" class="poll-status-time"></span></div><div id="poll-error" class="poll-status-error" hidden></div><div id="poll-last-success" class="poll-last-success" hidden></div></div>
   </section>
 
-  <section id="attention-strip" class="attention-strip" aria-label="Attention" hidden>
-    <div class="attention-row">
-      <button id="attention-message" type="button" aria-expanded="false" aria-controls="attention-details">
-        <span aria-hidden="true">⚠</span><span id="attention-summary">Elevated server errors · <strong id="attention-rate"></strong><span id="attention-counts"></span></span>
-        <span class="attention-chevron" aria-hidden="true"></span>
-      </button>
-      <button id="attention-dismiss" type="button" aria-label="Dismiss Attention warning">×</button>
-    </div>
-    <p id="attention-details" hidden></p>
-  </section>
-
+{{dashboard_attention}}
   <section id="metrics-section" class="capability-section" aria-label="Application and process metrics">
     <h2 id="application-heading">Application</h2>
     <div class="chart-grid">

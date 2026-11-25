@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/pvrlabs/statlite/internal/collector"
+	"github.com/pvrlabs/statlite/internal/config"
 	"github.com/pvrlabs/statlite/internal/dashboard"
 	"github.com/pvrlabs/statlite/internal/monitor"
 	"github.com/pvrlabs/statlite/internal/storage"
@@ -534,7 +535,7 @@ func TestStatliteMetricsEmitsCanonicalProfileAndExcludesScrape(t *testing.T) {
 		DiskUsedBytes:    &diskUsed,
 		DiskTotalBytes:   &diskTotal,
 	}}
-	statlite := NewWithManagerRetentionCutoffAndFilesystem("127.0.0.1:0", nil, 0, nil, "/data/statlite.sqlite")
+	statlite := NewWithManagerRetentionCutoffAndFilesystem("127.0.0.1:0", nil, 0, nil, "/data/statlite.sqlite", config.AttentionConfig{})
 	statlite.hostSampler = sampler
 	// Make uptime independent of whether the clock advances before the scrape.
 	statlite.startedAt = time.Now().UTC().Add(-time.Minute)

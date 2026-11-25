@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pvrlabs/statlite/internal/config"
 	"github.com/pvrlabs/statlite/internal/storage"
 )
 
@@ -20,9 +19,8 @@ type TargetMetadata struct {
 }
 
 type ManagedTarget struct {
-	Metadata         TargetMetadata
-	Monitor          *Monitor
-	AttentionHTTP5xx config.HTTP5xxAttentionConfig
+	Metadata TargetMetadata
+	Monitor  *Monitor
 }
 
 type TargetSummary struct {

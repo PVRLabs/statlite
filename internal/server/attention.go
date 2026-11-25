@@ -33,7 +33,7 @@ func (s *Server) handleAttention(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	response := attentionResponse{Conditions: []attentionCondition{}}
-	if s.attentionDisabled || s.manager == nil {
+	if s.manager == nil {
 		writeJSON(w, http.StatusOK, response)
 		return
 	}
@@ -48,11 +48,6 @@ func (s *Server) handleAttention(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	response.Target = target.Metadata.Name
-	settings := target.AttentionHTTP5xx
-	if !settings.IsEnabled() {
-		writeJSON(w, http.StatusOK, response)
-		return
-	}
 	end := s.now().UTC()
 	start := end.Add(-attentionWindow)
 	window, err := target.Monitor.AttentionHTTP5xx(r.Context(), start, end)
@@ -61,7 +56,7 @@ func (s *Server) handleAttention(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	const check = "http_5xx_rate"
-	threshold, minRequests, minErrors := settings.Thresholds()
+	threshold, minRequests, minErrors := s.attention.Thresholds()
 	if window.Adequate && window.Requests >= float64(minRequests) {
 		rate := window.Errors / window.Requests
 		if window.Errors >= float64(minErrors) && rate >= threshold {

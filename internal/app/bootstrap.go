@@ -34,8 +34,7 @@ func NewMonitorManager(targets []config.TargetConfig, store *storage.Store, time
 				Endpoint:       display.Endpoint,
 				EndpointSource: display.EndpointSource,
 			},
-			Monitor:          mon,
-			AttentionHTTP5xx: target.Attention.HTTP5xx,
+			Monitor: mon,
 		})
 	}
 	return monitor.NewManager(managedTargets)
