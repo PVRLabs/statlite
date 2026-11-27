@@ -17,6 +17,7 @@ import (
 
 const (
 	// When adding a target type, also update targetTypeHelp in the dashboard.
+	TargetTypeTraefik         = "traefik"
 	TargetTypeCaddy           = "caddy"
 	TargetTypeSpring          = "spring"
 	TargetTypeQuarkus         = "quarkus"
@@ -58,12 +59,14 @@ type TargetConfig struct {
 	ActuatorBaseURL    string      `yaml:"actuator_base_url"`
 	URL                string      `yaml:"url"`
 	Host               string      `yaml:"host,omitempty"`
+	Service            string      `yaml:"service,omitempty"`
 	HealthURL          string      `yaml:"health_url,omitempty"`
 	MetricsSource      string      `yaml:"metrics_source,omitempty"`
 	CollectHostMetrics bool        `yaml:"collect_host_metrics,omitempty"`
 	Auth               *AuthConfig `yaml:"auth,omitempty"`
 
 	hostSet                bool
+	serviceSet             bool
 	actuatorURLSet         bool
 	metricsSourceSet       bool
 	collectHostSet         bool
@@ -205,6 +208,8 @@ func (t *TargetConfig) UnmarshalYAML(value *yaml.Node) error {
 			t.collectHostSet = true
 		case "host":
 			t.hostSet = true
+		case "service":
+			t.serviceSet = true
 		case "health_url":
 			t.healthURLSet = true
 		}
@@ -253,6 +258,7 @@ func (c *Config) validateTargets() error {
 		return fmt.Errorf("at least one target is required")
 	}
 	seenCaddySelections := make(map[string]string)
+	seenTraefikSelections := make(map[string]string)
 	seenTargetNames := make(map[string]int, len(c.Targets))
 	for i := range c.Targets {
 		target := &c.Targets[i]
@@ -274,12 +280,24 @@ func (c *Config) validateTargets() error {
 		if targetType != TargetTypeCaddy && (target.Host != "" || target.hostSet) {
 			return targetError(target, "host", "is supported only for type caddy")
 		}
+		if targetType != TargetTypeTraefik && (target.Service != "" || target.serviceSet) {
+			return targetError(target, "service", "is supported only for type traefik")
+		}
 		switch targetType {
+		case TargetTypeTraefik:
+			if err := validateTraefikTarget(target); err != nil {
+				return err
+			}
+			selection := selectedEndpointKey(target.URL, target.Service)
+			if previous, ok := seenTraefikSelections[selection]; ok {
+				return targetError(target, "service", fmt.Sprintf("duplicates Traefik endpoint and service selection of target %q", previous))
+			}
+			seenTraefikSelections[selection] = target.Name
 		case TargetTypeCaddy:
 			if err := validateCaddyTarget(target); err != nil {
 				return err
 			}
-			selection := caddySelectionKey(target)
+			selection := selectedEndpointKey(target.URL, target.Host)
 			if previous, ok := seenCaddySelections[selection]; ok {
 				return targetError(target, "host", fmt.Sprintf("duplicates Caddy endpoint and host selection of target %q", previous))
 			}
@@ -301,11 +319,11 @@ func (c *Config) validateTargets() error {
 				return err
 			}
 		default:
-			return targetError(target, "type", fmt.Sprintf("unsupported value %q (supported: spring, quarkus, micronaut, statlite-metrics, caddy)", targetType))
+			return targetError(target, "type", fmt.Sprintf("unsupported value %q (supported: spring, quarkus, micronaut, statlite-metrics, caddy, traefik)", targetType))
 		}
 		if target.Auth != nil {
-			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus && targetType != TargetTypeMicronaut && targetType != TargetTypeCaddy {
-				return targetError(target, "auth", "is supported only for type spring, quarkus, micronaut, and caddy")
+			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus && targetType != TargetTypeMicronaut && targetType != TargetTypeCaddy && targetType != TargetTypeTraefik {
+				return targetError(target, "auth", "is supported only for type spring, quarkus, micronaut, caddy, and traefik")
 			}
 			if target.Auth.Type != "basic" {
 				return targetError(target, "auth.type", fmt.Sprintf("unsupported value %q (only basic is supported)", target.Auth.Type))
@@ -574,8 +592,8 @@ func validateCaddyTarget(target *TargetConfig) error {
 	return nil
 }
 
-func caddySelectionKey(target *TargetConfig) string {
-	u, _ := url.Parse(target.URL)
+func selectedEndpointKey(endpoint, selector string) string {
+	u, _ := url.Parse(endpoint)
 	u.Scheme = strings.ToLower(u.Scheme)
 	u.Host = strings.ToLower(u.Host)
 	if u.Scheme == "http" && u.Port() == "80" || u.Scheme == "https" && u.Port() == "443" {
@@ -584,5 +602,5 @@ func caddySelectionKey(target *TargetConfig) string {
 	if u.Path == "" {
 		u.Path = "/"
 	}
-	return u.String() + "\x00" + target.Host
+	return u.String() + "\x00" + selector
 }

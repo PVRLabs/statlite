@@ -3,10 +3,8 @@ package collector
 import (
 	"context"
 	"fmt"
-	"math"
 	"slices"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -15,7 +13,6 @@ import (
 
 const CaddyMetricsSource = "caddy"
 const caddyMaxTuples = 256
-const caddyMaxCount = 1<<53 - 1
 
 // CaddyCollector owns bounded, in-memory continuity state for one exact host.
 // Source labels never leave the adapter. Calls are serialized through the scrape
@@ -41,7 +38,7 @@ func NewCaddyCollector(targetName, endpoint, host string, client *prometheus.Cli
 func (c *CaddyCollector) Collect(ctx context.Context) (*CollectionResult, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	result := &CollectionResult{TargetName: c.targetName, MetricsSource: CaddyMetricsSource, PollStartedAt: time.Now().UTC()}
+	result := &CollectionResult{TargetName: c.targetName, MetricsSource: CaddyMetricsSource, TracksCounterContinuity: true, PollStartedAt: time.Now().UTC()}
 	defer func() { result.PollFinishedAt = time.Now().UTC() }()
 	fail := func(kind string, err error) (*CollectionResult, error) {
 		c.previous, c.server = nil, ""
@@ -116,19 +113,10 @@ func (p *caddyPopulation) accept(sample prometheus.Sample) error {
 		return fmt.Errorf("ambiguous Caddy HTTP population: host %q matches multiple subroute servers", p.host)
 	}
 	p.server = labels["server"]
-	if !finiteNonnegative(sample.Value) || (isCount && (math.Trunc(sample.Value) != sample.Value || sample.Value > caddyMaxCount)) {
+	if !finiteNonnegative(sample.Value) || (isCount && !validPrometheusCount(sample.Value)) {
 		return fmt.Errorf("Caddy HTTP population has invalid %s value", sample.Name)
 	}
-	// Quoted components preserve the full tuple, including
-	// unknown labels, without hash collisions or dependence on exposition order.
-	ordered := slices.Clone(sample.Labels)
-	slices.SortFunc(ordered, func(a, b prometheus.Label) int { return strings.Compare(a.Name, b.Name) })
-	var key strings.Builder
-	for _, label := range ordered {
-		key.WriteString(strconv.Quote(label.Name))
-		key.WriteString(strconv.Quote(label.Value))
-	}
-	identity := key.String()
+	identity := prometheusTupleKey(sample.Labels)
 	tuple, exists := p.tuples[identity]
 	if !exists && len(p.tuples) >= caddyMaxTuples {
 		return fmt.Errorf("Caddy HTTP population exceeds %d tuples", caddyMaxTuples)
@@ -162,7 +150,7 @@ func (p *caddyPopulation) totals() ([5]float64, error) {
 		if !tuple.hasCount || !tuple.hasSum {
 			return totals, fmt.Errorf("Caddy HTTP count and duration label tuples do not match")
 		}
-		if tuple.count > caddyMaxCount-totals[0] {
+		if tuple.count > maxExactPrometheusCount-totals[0] {
 			return totals, fmt.Errorf("Caddy HTTP aggregate count exceeds exact integer range")
 		}
 		totals[0] += tuple.count

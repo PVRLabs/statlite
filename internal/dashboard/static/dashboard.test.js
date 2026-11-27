@@ -1113,7 +1113,7 @@ test("Caddy explains collection status and keeps 502 traffic UP without app life
 });
 
 
-test("Caddy target hint preserves primary help and adds a secondary note only for Caddy", () => {
+test("Caddy and Traefik preserve primary help and recommend a direct integration", () => {
   const originalDocument = global.document;
   const document = dashboardDocument();
   global.document = document;
@@ -1125,10 +1125,32 @@ test("Caddy target hint preserves primary help and adds a secondary note only fo
       "For deeper application metrics, you can configure a direct StatLite integration.");
     assert.equal(document.getElementById("target-type-note").hidden, false);
 
+    dashboard.renderTargetContext([], { type: "traefik" });
+    assert.equal(document.getElementById("target-type-help").textContent, dashboard.targetTypeHelp("traefik"));
+    assert.equal(document.getElementById("target-type-note").textContent,
+      "For deeper application metrics, you can configure a direct StatLite integration.");
+    assert.equal(document.getElementById("target-type-note").hidden, false);
+
     dashboard.renderTargetContext([], { type: "spring" });
     assert.equal(document.getElementById("target-type-help").textContent, dashboard.targetTypeHelp("spring"));
     assert.equal(document.getElementById("target-type-note").hidden, true);
     assert.equal(document.getElementById("target-type-note").textContent, "");
+  } finally {
+    global.document = originalDocument;
+  }
+});
+
+test("Traefik reports service collection status and leaves backend restart unavailable", () => {
+  const originalDocument = global.document;
+  const document = dashboardDocument();
+  global.document = document;
+  const metadata = { name: "edge", type: "traefik", endpoint: "http://traefik:8082/metrics" };
+  const latest = { status: "ok", result: { samples: [] } };
+  try {
+    dashboard.renderSummary({ selected_target: metadata, targets: [{ metadata, latest }], latest, latest_restart_status: "none" });
+    assert.match(document.getElementById("app-status").innerHTML, />UP</);
+    assert.match(document.getElementById("app-status").attributes["aria-label"], /Collection status: UP.*Backend health is unavailable/);
+    assert.equal(document.getElementById("restart-detected").textContent, "Unavailable");
   } finally {
     global.document = originalDocument;
   }

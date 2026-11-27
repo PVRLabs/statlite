@@ -60,7 +60,8 @@ func runInspectWithTyped(args []string, stdout, stderr io.Writer, inspectApplica
 	inspectFlags.Usage = func() {
 		printInspectHelp(stderr)
 	}
-	typed := inspectFlags.String("type", "", "inspect a specific target type (currently: quarkus, micronaut)")
+	typed := inspectFlags.String("type", "", "inspect a specific target type (currently: quarkus, micronaut, traefik)")
+	service := inspectFlags.String("service", "", "provider-qualified service for type traefik")
 	name := inspectFlags.String("name", "", "target name (default: derived from type, host, and port)")
 	createPath := inspectFlags.String("create-config", "", "create a new configuration file at PATH")
 	addPath := inspectFlags.String("add-to-config", "", "append a target to an existing configuration file at PATH")
@@ -75,9 +76,11 @@ func runInspectWithTyped(args []string, stdout, stderr io.Writer, inspectApplica
 		}
 		return 2
 	}
-	var createSet, addSet bool
+	var createSet, addSet, serviceSet bool
 	inspectFlags.Visit(func(option *flag.Flag) {
 		switch option.Name {
+		case "service":
+			serviceSet = true
 		case "create-config":
 			createSet = true
 		case "add-to-config":
@@ -102,8 +105,14 @@ func runInspectWithTyped(args []string, stdout, stderr io.Writer, inspectApplica
 		return 2
 	}
 
+	if serviceSet && *typed != config.TargetTypeTraefik {
+		fmt.Fprintln(stderr, "inspect: --service requires --type traefik")
+		return 2
+	}
 	var result *inspect.Result
-	if *typed == "" {
+	if *typed == config.TargetTypeTraefik {
+		result, err = inspect.Traefik(context.Background(), inspectFlags.Arg(0), *service)
+	} else if *typed == "" {
 		result, err = inspectApplication(context.Background(), inspectFlags.Arg(0))
 	} else {
 		result, err = inspectByType(context.Background(), inspect.TargetType(*typed), inspectFlags.Arg(0))
@@ -338,6 +347,7 @@ Usage:
   statlite inspect <application-url>
   statlite inspect --type quarkus <application-or-metrics-url>
   statlite inspect --type micronaut <application-or-metrics-url>
+  statlite inspect --type traefik --service <name@provider> <metrics-url>
   statlite inspect <application-url> --create-config PATH
   statlite inspect <application-url> --add-to-config PATH
   statlite --version
@@ -361,6 +371,7 @@ func printInspectHelp(w io.Writer) {
 Example:
   statlite inspect 'http://localhost:8080'
   statlite inspect --type micronaut 'http://localhost:8080/prometheus'
+  statlite inspect --type traefik --service alpha@file 'http://localhost:8082/metrics'
   statlite inspect 'http://localhost:8080' --create-config ./statlite.yaml
   statlite inspect 'http://localhost:8080' --add-to-config ./statlite.yaml
 
@@ -368,7 +379,8 @@ Probe a supported application endpoint and print an inspection summary.
 Plain inspection is read-only and does not require or create statlite.yaml.
 --create-config PATH writes a new config only if PATH does not exist.
 --add-to-config PATH appends a target to an existing config whose last section is
-a normal targets list. Existing names and endpoints cause an error.
+a normal targets list. Existing names and duplicate Traefik service selections
+cause an error. Other target types require a distinct endpoint.
 --name overrides the stable type-host-port name. Options may appear before
 or after the URL.
 
@@ -382,7 +394,8 @@ Use --type micronaut with a base URL or exact Prometheus endpoint. A root base
 URL resolves to /prometheus; non-root paths allow one context fallback after a
 conclusive miss. URLs with a query are exact endpoints. Micronaut inspection
 checks compatibility without proving framework identity; untyped inspection
-does not recognize Micronaut.`)
+does not recognize Micronaut.
+Use --type traefik with an exact metrics URL and --service name@provider.`)
 }
 
 const configurationDocsURL = "https://github.com/PVRLabs/statlite/blob/main/docs/configuration.md"
@@ -400,9 +413,10 @@ type suggestedPollingConfig struct {
 }
 
 type suggestedTarget struct {
-	Name string `yaml:"name"`
-	Type string `yaml:"type"`
-	URL  string `yaml:"url,omitempty"`
+	Name    string `yaml:"name"`
+	Type    string `yaml:"type"`
+	URL     string `yaml:"url,omitempty"`
+	Service string `yaml:"service,omitempty"`
 }
 
 type suggestedConfig struct {
@@ -452,6 +466,8 @@ func renderInspectionWithOptions(result *inspect.Result, target suggestedTarget,
 
 func inspectionPresentation(targetType inspect.TargetType) (inspectionTargetPresentation, error) {
 	switch targetType {
+	case inspect.TargetTraefik:
+		return inspectionTargetPresentation{displayName: "Traefik Metrics", targetType: config.TargetTypeTraefik, errorContext: "traefik target"}, nil
 	case inspect.TargetSpring:
 		return inspectionTargetPresentation{
 			displayName:  "Spring Boot Actuator",
@@ -488,7 +504,7 @@ func renderSuggestedTargetConfig(target suggestedTarget, errorContext string) (s
 		Server:  config.ServerConfig{Listen: "127.0.0.1:9090"},
 		Storage: config.StorageConfig{SQLitePath: "./statlite.sqlite"},
 		Polling: config.PollingConfig{Interval: "30s"},
-		Targets: []config.TargetConfig{{Name: target.Name, Type: target.Type, URL: target.URL}},
+		Targets: []config.TargetConfig{{Name: target.Name, Type: target.Type, URL: target.URL, Service: target.Service}},
 	}
 	if err := config.Validate(&validation); err != nil {
 		return "", fmt.Errorf("%s: %w", errorContext, err)

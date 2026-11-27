@@ -32,6 +32,7 @@ var errRedirectLimit = errors.New("inspect redirect limit exceeded")
 type TargetType string
 
 const (
+	TargetTraefik         TargetType = "traefik"
 	TargetSpring          TargetType = "spring"
 	TargetQuarkus         TargetType = "quarkus"
 	TargetMicronaut       TargetType = "micronaut"
@@ -49,6 +50,7 @@ const (
 type Result struct {
 	TargetType   TargetType
 	Endpoint     string
+	Service      string
 	Capabilities []string
 	Warnings     []string
 	Status       CompatibilityStatus
@@ -128,10 +130,12 @@ func Inspect(ctx context.Context, targetType TargetType, rawURL string) (*Result
 		return inspectQuarkus(ctx, rawURL)
 	case TargetMicronaut:
 		return inspectMicronaut(ctx, rawURL)
+	case TargetTraefik:
+		return Traefik(ctx, rawURL, "")
 	default:
 		return nil, &Failure{
 			Kind: FailureTypeUnsupported,
-			Err:  fmt.Errorf("unsupported inspection type %q (supported: quarkus, micronaut)", targetType),
+			Err:  fmt.Errorf("unsupported inspection type %q (supported: quarkus, micronaut, traefik)", targetType),
 		}
 	}
 }
@@ -142,7 +146,7 @@ func Inspect(ctx context.Context, targetType TargetType, rawURL string) (*Result
 func inspectSpring(context.Context, string) (*Result, error) {
 	return nil, &Failure{
 		Kind: FailureTypeUnavailable,
-		Err:  errors.New("typed inspection type \"spring\" is not available (supported: quarkus, micronaut)"),
+		Err:  errors.New("typed inspection type \"spring\" is not available (supported: quarkus, micronaut, traefik)"),
 	}
 }
 

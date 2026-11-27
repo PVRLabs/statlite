@@ -197,3 +197,46 @@ and total request time in seconds. Average latency is measured at Caddy.
 Application health, start time, and resources are unavailable. Known continuity
 breaks create anonymous baselines with no cross-boundary delta or app restart.
 See the guide for exact mappings, initial missing metrics, and sampling limits.
+
+## Traefik service HTTP source
+
+The Traefik profile selects one exact provider-qualified service, such as
+`alpha@file`, from the configured Prometheus metrics URL. It uses
+`traefik_service_requests_total` for requests and exact HTTP status classes.
+Code 404 also contributes to 4xx. Code 0 contributes to requests and has
+unknown status. The profile uses the service duration sum in seconds when
+every count and sum pair has the same full labels as its request counter and
+the counts match. Router and entrypoint traffic are outside the service
+population. Backend health, CPU, heap, and process start are unavailable.
+
+Typed inspection reports partial compatibility when it recognizes Traefik
+but has yet to observe request metrics for the selected service. The target
+shows DOWN once polled and until those metrics are observed. This collection
+status alone cannot establish a backend outage. Check the exact service name
+and per-service metrics, then send a request through the service.
+
+The collector keeps at most 256 request tuples and 256 duration tuples for
+the selected service. Exceeding the request limit fails collection. Exceeding
+the duration limit suppresses latency and preserves valid request metrics.
+A failed scrape or an absent request population clears the baseline. Missing
+tuples, counter drops, selector changes, observable proxy restarts and
+configuration reloads start a fresh request baseline. An unrelated reload
+can also leave a gap in HTTP metrics and reduce Attention coverage.
+
+Traefik 3.8.0 creates each service request tuple from zero on first use and
+removes retired service tuples during configuration cleanup. StatLite includes
+a new tuple's positive count in the interval when both scrapes observe the same
+valid proxy start time and configuration reload counter and the existing
+population remains continuous. This includes the first occurrence of a 5xx
+status. If either signal is unavailable, a new positive tuple starts a fresh
+baseline. A first observation of zero contributes zero.
+[Service instrumentation](https://github.com/traefik/traefik/blob/v3.8.0/pkg/middlewares/metrics/metrics.go#L157-L166)
+[Prometheus collector](https://github.com/traefik/traefik/blob/v3.8.0/pkg/observability/metrics/prometheus.go#L354-L404)
+
+Traefik updates the request counter and the duration histogram separately.
+A scrape between the updates can see a temporary count mismatch and omit
+latency while preserving valid HTTP counts. Latency resumes after two
+consecutive compatible observations. The proxy start time
+is only a counter continuity signal. If a counter resets and regrows between
+polls without a detectable exporter identity or scope change, the reset is
+unobservable. A reload may briefly leave the old service labels visible.

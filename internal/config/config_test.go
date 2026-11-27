@@ -901,7 +901,7 @@ targets:
 			if err == nil {
 				t.Fatal("Load() error = nil, want error")
 			}
-			if !strings.Contains(err.Error(), "auth: is supported only for type spring, quarkus, micronaut, and caddy") {
+			if !strings.Contains(err.Error(), "auth: is supported only for type spring, quarkus, micronaut, caddy, and traefik") {
 				t.Fatalf("Load() error = %q, want unsupported target auth error", err)
 			}
 		})

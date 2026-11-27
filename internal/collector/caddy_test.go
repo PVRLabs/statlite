@@ -15,12 +15,12 @@ import (
 	"github.com/pvrlabs/statlite/internal/prometheus"
 )
 
-type caddyTransport func(*http.Request) (*http.Response, error)
+type scrapeTestTransport func(*http.Request) (*http.Response, error)
 
-func (f caddyTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+func (f scrapeTestTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 func caddyTestCollector(t *testing.T, body *string, limits prometheus.Limits) *CaddyCollector {
 	t.Helper()
-	client, err := prometheus.NewClientWithTransport(time.Second, limits, nil, caddyTransport(func(*http.Request) (*http.Response, error) {
+	client, err := prometheus.NewClientWithTransport(time.Second, limits, nil, scrapeTestTransport(func(*http.Request) (*http.Response, error) {
 		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"text/plain"}}, Body: io.NopCloser(strings.NewReader(*body))}, nil
 	}))
 	if err != nil {
@@ -181,7 +181,7 @@ func TestCaddyScrapeLimitsAndTransportRecovery(t *testing.T) {
 			case "label bytes":
 				body += `other{a="` + strings.Repeat("x", 100) + `"} 1` + "\n"
 			case "transport":
-				c.client, _ = prometheus.NewClientWithTransport(time.Second, limits, nil, caddyTransport(func(*http.Request) (*http.Response, error) { return nil, fmt.Errorf("connection lost") }))
+				c.client, _ = prometheus.NewClientWithTransport(time.Second, limits, nil, scrapeTestTransport(func(*http.Request) (*http.Response, error) { return nil, fmt.Errorf("connection lost") }))
 			}
 			r, err := c.Collect(context.Background())
 			if err == nil || len(r.Samples) != 0 || c.previous != nil {
@@ -207,7 +207,7 @@ func TestCaddyFullTuplePairingAndBoundaries(t *testing.T) {
 	body := good
 	c := caddyTestCollector(t, &body, prometheus.DefaultLimits)
 	r, err := c.Collect(context.Background())
-	if err != nil || r.Samples[0].Value != caddyMaxCount || r.Samples[4].Value != 0.25 {
+	if err != nil || r.Samples[0].Value != maxExactPrometheusCount || r.Samples[4].Value != 0.25 {
 		t.Fatalf("paired: %+v %v", r, err)
 	}
 	body += strings.Replace(strings.Split(good, "\n")[0], `handler="subroute",host="alpha.test"`, `host="alpha.test",handler="subroute"`, 1) + "\n"
@@ -237,7 +237,7 @@ func TestCaddyInterruptedResponseDiscardsValidPrefix(t *testing.T) {
 	}
 	original := c.client
 	var err error
-	c.client, err = prometheus.NewClientWithTransport(time.Second, prometheus.DefaultLimits, nil, caddyTransport(func(*http.Request) (*http.Response, error) {
+	c.client, err = prometheus.NewClientWithTransport(time.Second, prometheus.DefaultLimits, nil, scrapeTestTransport(func(*http.Request) (*http.Response, error) {
 		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"text/plain"}}, Body: io.NopCloser(io.MultiReader(strings.NewReader(body), caddyBrokenReader{}))}, nil
 	}))
 	if err != nil {

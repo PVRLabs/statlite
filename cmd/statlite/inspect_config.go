@@ -12,6 +12,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/pvrlabs/statlite/internal/config"
 	"github.com/pvrlabs/statlite/internal/inspect"
 	"gopkg.in/yaml.v3"
 )
@@ -24,7 +25,7 @@ func reorderInspectArgs(args []string) ([]string, error) {
 		arg := args[i]
 		if strings.HasPrefix(arg, "-") {
 			flags = append(flags, arg)
-			if arg == "--type" || arg == "-type" || arg == "--name" || arg == "-name" || arg == "--create-config" || arg == "-create-config" || arg == "--add-to-config" || arg == "-add-to-config" {
+			if arg == "--type" || arg == "-type" || arg == "--name" || arg == "-name" || arg == "--service" || arg == "-service" || arg == "--create-config" || arg == "-create-config" || arg == "--add-to-config" || arg == "-add-to-config" {
 				if i+1 == len(args) || strings.HasPrefix(args[i+1], "--") {
 					return nil, fmt.Errorf("%s requires a value", arg)
 				}
@@ -53,7 +54,7 @@ func suggestedInspectionTarget(result *inspect.Result, name string) (suggestedTa
 		}
 	}
 	name = strings.TrimSpace(name)
-	target := suggestedTarget{Name: name, Type: presentation.targetType, URL: result.Endpoint}
+	target := suggestedTarget{Name: name, Type: presentation.targetType, URL: result.Endpoint, Service: result.Service}
 	if _, err := renderSuggestedTargetConfig(target, presentation.errorContext); err != nil {
 		return suggestedTarget{}, inspectionTargetPresentation{}, err
 	}
@@ -101,6 +102,9 @@ func inspectWriteCommand(rawURL, endpoint, typed string, target suggestedTarget,
 	command := "statlite inspect " + shellQuote(rawURL)
 	if typed != "" {
 		command += " --type " + shellQuote(typed)
+	}
+	if target.Service != "" {
+		command += " --service " + shellQuote(target.Service)
 	}
 	// The default name is stable, so the command can omit --name.
 	if derived, err := derivedTargetName(target.Type, endpoint); err == nil && derived != target.Name {
@@ -213,17 +217,22 @@ func inspectionTargetAppend(content []byte, target suggestedTarget) ([]byte, err
 		}
 		var existing struct {
 			Name            string `yaml:"name"`
+			Type            string `yaml:"type"`
+			Service         string `yaml:"service"`
 			URL             string `yaml:"url"`
 			ActuatorBaseURL string `yaml:"actuator_base_url"`
 		}
 		if err := item.Decode(&existing); err != nil {
 			return nil, fmt.Errorf("cannot read existing target: %w", err)
 		}
-		if hasConfigEnvReference(existing.Name) || hasConfigEnvReference(existing.URL) || hasConfigEnvReference(existing.ActuatorBaseURL) {
-			return nil, errors.New("cannot safely check duplicate target names or endpoints when an existing target uses environment variables in name, url, or actuator_base_url; add the target manually")
+		if hasConfigEnvReference(existing.Name) || hasConfigEnvReference(existing.URL) || hasConfigEnvReference(existing.ActuatorBaseURL) || hasConfigEnvReference(existing.Service) {
+			return nil, errors.New("cannot safely check duplicate target names or endpoints when an existing target uses environment variables in name, url, actuator_base_url, or service; add the target manually")
 		}
 		if strings.TrimSpace(existing.Name) == strings.TrimSpace(target.Name) {
 			return nil, fmt.Errorf("target name %q already exists", target.Name)
+		}
+		if target.Type == config.TargetTypeTraefik && existing.Type == target.Type && existing.Service != target.Service {
+			continue
 		}
 		for _, endpoint := range []string{existing.URL, existing.ActuatorBaseURL} {
 			if endpoint != "" && sameEndpoint(endpoint, target.URL) {

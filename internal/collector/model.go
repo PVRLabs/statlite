@@ -22,6 +22,8 @@ const (
 )
 
 type CollectionResult struct {
+	// TracksCounterContinuity lets the collector manage anonymous baselines.
+	TracksCounterContinuity bool `json:"-"`
 	// CounterContinuityBreak requests a fresh anonymous counter baseline, not an application restart.
 	CounterContinuityBreak bool             `json:"-"`
 	TargetName             string           `json:"target_name"`

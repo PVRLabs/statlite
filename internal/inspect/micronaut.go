@@ -93,6 +93,10 @@ func micronautFailure(err error) *Failure {
 	if errors.Is(err, collector.ErrMicronautIncompatible) {
 		return &Failure{Kind: FailureIncompatible, Err: err}
 	}
+	return prometheusInspectionFailure(err)
+}
+
+func prometheusInspectionFailure(err error) *Failure {
 	var scrapeErr *prometheus.Error
 	if errors.As(err, &scrapeErr) {
 		switch scrapeErr.Class {

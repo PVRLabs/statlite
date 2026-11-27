@@ -167,6 +167,8 @@ func (m *Monitor) IntegrationType() string {
 		return config.TargetTypeQuarkus
 	case *collector.StatliteMetricsCollector:
 		return config.TargetTypeStatliteMetrics
+	case *collector.TraefikCollector:
+		return config.TargetTypeTraefik
 	case *collector.CaddyCollector:
 		return config.TargetTypeCaddy
 	default:
@@ -403,8 +405,8 @@ func (m *Monitor) loadSuccessfulHistory(ctx context.Context) (*storage.Snapshot,
 }
 
 func (m *Monitor) detectAppRun(ctx context.Context, result *collector.CollectionResult) (int64, bool, string, error) {
-	if result.MetricsSource == collector.CaddyMetricsSource {
-		// Caddy runs are counter boundaries, never application lifecycle signals.
+	if result.TracksCounterContinuity {
+		// These runs represent counter boundaries independently of application lifecycle.
 		// Loaded history alone cannot establish continuity for this monitor, and
 		// any failed attempt (including persistence) invalidates its baseline.
 		result.ProcessStartTime = nil

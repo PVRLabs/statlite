@@ -471,14 +471,16 @@ function targetPresentation(target) {
     tone = "neutral";
   }
 
-  const caddy = targetType === "caddy";
-  const statusExplanation = caddy
+  const proxyExplanation = targetType === "caddy"
     ? "UP means StatLite can collect Caddy metrics. It does not guarantee that the upstream application is healthy."
-    : springHealthUnknown
-      ? "StatLite collected metrics but could not retrieve Spring Actuator health."
+    : targetType === "traefik"
+      ? "UP means StatLite can collect metrics for the selected Traefik service. Backend health is unavailable."
       : "";
+  const statusExplanation = proxyExplanation || (springHealthUnknown
+    ? "StatLite collected metrics but could not retrieve Spring Actuator health."
+    : "");
   const statusDescription = statusExplanation
-    ? (caddy ? "Collection status: " : "App status: ") + label + ". " + statusExplanation
+    ? (proxyExplanation ? "Collection status: " : "App status: ") + label + ". " + statusExplanation
     : currentFailure
       ? "App status: DOWN because StatLite cannot currently collect from the application" + (rawHealth ? "; last reported application health: " + rawHealth : "")
       : rawHealth
@@ -578,7 +580,8 @@ function renderPollStatus(monitor) {
 }
 
 function renderRestart(summary) {
-  if ((summary.selected_target || {}).type === "caddy") {
+  const targetType = (summary.selected_target || {}).type;
+  if (targetType === "caddy" || targetType === "traefik") {
     setText("restart-detected", "Unavailable");
     return;
   }
@@ -619,7 +622,7 @@ function renderTargetContext(targets, selected) {
   document.getElementById("target-type").textContent = selected.type || "target";
   document.getElementById("target-type-help").textContent = targetTypeHelp(selected.type);
   const targetTypeNote = document.getElementById("target-type-note");
-  targetTypeNote.hidden = String(selected.type || "").toLowerCase() !== "caddy";
+  targetTypeNote.hidden = !["caddy", "traefik"].includes(String(selected.type || "").toLowerCase());
   targetTypeNote.textContent = targetTypeNote.hidden ? "" : "For deeper application metrics, you can configure a direct StatLite integration.";
   document.getElementById("runtime-tooltip").textContent = runtimeHelp();
   select.classList.toggle("hidden", !multiple);
@@ -848,6 +851,8 @@ function targetTypeHelp(value) {
     return "Monitors a Spring Boot application through Actuator health and metrics endpoints.";
   case "caddy":
     return "Monitors HTTP requests for one exact host through Caddy. Response time is measured at Caddy; application health and resources are unavailable.";
+  case "traefik":
+    return "Monitors HTTP requests for one Traefik service. Response time is measured at Traefik. Backend health and resources are unavailable.";
   case "quarkus":
     return "Monitors a Quarkus application through its metrics endpoint; SmallRye Health is used when available.";
   case "micronaut":
