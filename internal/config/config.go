@@ -17,6 +17,7 @@ import (
 
 const (
 	// When adding a target type, also update targetTypeHelp in the dashboard.
+	TargetTypeDjango          = "django"
 	TargetTypeFastAPI         = "fastapi"
 	TargetTypeTraefik         = "traefik"
 	TargetTypeCaddy           = "caddy"
@@ -60,6 +61,7 @@ type TargetConfig struct {
 	ActuatorBaseURL    string      `yaml:"actuator_base_url"`
 	URL                string      `yaml:"url"`
 	Host               string      `yaml:"host,omitempty"`
+	DjangoMetricsMode  string      `yaml:"django_metrics_mode,omitempty"`
 	Service            string      `yaml:"service,omitempty"`
 	HealthURL          string      `yaml:"health_url,omitempty"`
 	MetricsSource      string      `yaml:"metrics_source,omitempty"`
@@ -67,6 +69,7 @@ type TargetConfig struct {
 	Auth               *AuthConfig `yaml:"auth,omitempty"`
 
 	hostSet                bool
+	djangoMetricsModeSet   bool
 	serviceSet             bool
 	actuatorURLSet         bool
 	metricsSourceSet       bool
@@ -209,6 +212,8 @@ func (t *TargetConfig) UnmarshalYAML(value *yaml.Node) error {
 			t.collectHostSet = true
 		case "host":
 			t.hostSet = true
+		case "django_metrics_mode":
+			t.djangoMetricsModeSet = true
 		case "service":
 			t.serviceSet = true
 		case "health_url":
@@ -284,6 +289,13 @@ func (c *Config) validateTargets() error {
 		if targetType != TargetTypeTraefik && (target.Service != "" || target.serviceSet) {
 			return targetError(target, "service", "is supported only for type traefik")
 		}
+		if targetType == TargetTypeDjango {
+			if !ValidDjangoMetricsMode(target.DjangoMetricsMode) {
+				return targetError(target, "django_metrics_mode", "requires inline or separate")
+			}
+		} else if target.DjangoMetricsMode != "" || target.djangoMetricsModeSet {
+			return targetError(target, "django_metrics_mode", "is supported only for type django")
+		}
 		switch targetType {
 		case TargetTypeTraefik:
 			if err := validateTraefikTarget(target); err != nil {
@@ -315,16 +327,16 @@ func (c *Config) validateTargets() error {
 			if err := validateMicronautTarget(target); err != nil {
 				return err
 			}
-		case TargetTypeFastAPI, TargetTypeStatliteMetrics:
+		case TargetTypeDjango, TargetTypeFastAPI, TargetTypeStatliteMetrics:
 			if err := validateExactMetricsTarget(target); err != nil {
 				return err
 			}
 		default:
-			return targetError(target, "type", fmt.Sprintf("unsupported value %q (supported: spring, quarkus, micronaut, statlite-metrics, caddy, traefik, fastapi)", targetType))
+			return targetError(target, "type", fmt.Sprintf("unsupported value %q (supported: spring, quarkus, micronaut, statlite-metrics, caddy, traefik, fastapi, django)", targetType))
 		}
 		if target.Auth != nil {
-			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus && targetType != TargetTypeMicronaut && targetType != TargetTypeCaddy && targetType != TargetTypeTraefik && targetType != TargetTypeFastAPI {
-				return targetError(target, "auth", "is supported only for type spring, quarkus, micronaut, caddy, traefik, and fastapi")
+			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus && targetType != TargetTypeMicronaut && targetType != TargetTypeCaddy && targetType != TargetTypeTraefik && targetType != TargetTypeFastAPI && targetType != TargetTypeDjango {
+				return targetError(target, "auth", "is supported only for type spring, quarkus, micronaut, caddy, traefik, fastapi, and django")
 			}
 			if target.Auth.Type != "basic" {
 				return targetError(target, "auth.type", fmt.Sprintf("unsupported value %q (only basic is supported)", target.Auth.Type))

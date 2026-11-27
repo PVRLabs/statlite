@@ -114,6 +114,21 @@ block. Send an application request
 before inspecting a cold endpoint to see its HTTP capabilities. See the
 [FastAPI target guide](targets/fastapi.md) for both verified recipes.
 
+Django uses `type: django` and requires `django_metrics_mode: inline` or
+`django_metrics_mode: separate`. Configure the exact django-prometheus
+metrics URL. The `inline` mode filters the standard Django metrics view
+from HTTP counts. The `separate` mode requires a metrics listener in the
+application process and the Django metrics URL include removed. It can
+also report average latency. See [Django metric coverage](metrics.md#django-http-and-process-metrics).
+
+```bash
+statlite inspect --type django --django-metrics-mode inline 'http://localhost:8000/metrics'
+statlite inspect --type django --django-metrics-mode separate 'http://localhost:8001/metrics'
+```
+
+Send an application request before inspecting a cold endpoint to see its HTTP
+capabilities. Configure Basic Auth manually for polling protected endpoints.
+
 On success, plain `inspect` prints the recognized capabilities, a minimal
 configuration, and commands to create or add it. The suggested target gets a
 stable `<type>-<host>-<port>` name. Override it with `--name` if needed;

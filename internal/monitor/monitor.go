@@ -167,6 +167,8 @@ func (m *Monitor) IntegrationType() string {
 		return config.TargetTypeQuarkus
 	case *collector.StatliteMetricsCollector:
 		return config.TargetTypeStatliteMetrics
+	case *collector.DjangoCollector:
+		return config.TargetTypeDjango
 	case *collector.FastAPICollector:
 		return config.TargetTypeFastAPI
 	case *collector.TraefikCollector:

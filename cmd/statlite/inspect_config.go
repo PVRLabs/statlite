@@ -25,7 +25,8 @@ func reorderInspectArgs(args []string) ([]string, error) {
 		arg := args[i]
 		if strings.HasPrefix(arg, "-") {
 			flags = append(flags, arg)
-			if arg == "--type" || arg == "-type" || arg == "--name" || arg == "-name" || arg == "--service" || arg == "-service" || arg == "--create-config" || arg == "-create-config" || arg == "--add-to-config" || arg == "-add-to-config" {
+			switch strings.TrimPrefix(strings.TrimPrefix(arg, "-"), "-") {
+			case "type", "name", "service", "django-metrics-mode", "create-config", "add-to-config":
 				if i+1 == len(args) || strings.HasPrefix(args[i+1], "--") {
 					return nil, fmt.Errorf("%s requires a value", arg)
 				}
@@ -54,7 +55,7 @@ func suggestedInspectionTarget(result *inspect.Result, name string) (suggestedTa
 		}
 	}
 	name = strings.TrimSpace(name)
-	target := suggestedTarget{Name: name, Type: presentation.targetType, URL: result.Endpoint, Service: result.Service}
+	target := suggestedTarget{Name: name, Type: presentation.targetType, URL: result.Endpoint, Service: result.Service, DjangoMetricsMode: result.DjangoMetricsMode}
 	if _, err := renderSuggestedTargetConfig(target, presentation.errorContext); err != nil {
 		return suggestedTarget{}, inspectionTargetPresentation{}, err
 	}
@@ -102,6 +103,9 @@ func inspectWriteCommand(rawURL, endpoint, typed string, target suggestedTarget,
 	command := "statlite inspect " + shellQuote(rawURL)
 	if typed != "" {
 		command += " --type " + shellQuote(typed)
+	}
+	if target.DjangoMetricsMode != "" {
+		command += " --django-metrics-mode " + shellQuote(target.DjangoMetricsMode)
 	}
 	if target.Service != "" {
 		command += " --service " + shellQuote(target.Service)

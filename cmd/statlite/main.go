@@ -60,7 +60,8 @@ func runInspectWithTyped(args []string, stdout, stderr io.Writer, inspectApplica
 	inspectFlags.Usage = func() {
 		printInspectHelp(stderr)
 	}
-	typed := inspectFlags.String("type", "", "inspect a specific target type (currently: quarkus, micronaut, traefik, fastapi)")
+	typed := inspectFlags.String("type", "", "inspect a specific target type (currently: quarkus, micronaut, traefik, fastapi, django)")
+	djangoMode := inspectFlags.String("django-metrics-mode", "", "django-prometheus recipe: inline or separate")
 	service := inspectFlags.String("service", "", "provider-qualified service for type traefik")
 	name := inspectFlags.String("name", "", "target name (default: derived from type, host, and port)")
 	createPath := inspectFlags.String("create-config", "", "create a new configuration file at PATH")
@@ -76,9 +77,11 @@ func runInspectWithTyped(args []string, stdout, stderr io.Writer, inspectApplica
 		}
 		return 2
 	}
-	var createSet, addSet, serviceSet bool
+	var createSet, addSet, serviceSet, djangoModeSet bool
 	inspectFlags.Visit(func(option *flag.Flag) {
 		switch option.Name {
+		case "django-metrics-mode":
+			djangoModeSet = true
 		case "service":
 			serviceSet = true
 		case "create-config":
@@ -109,8 +112,14 @@ func runInspectWithTyped(args []string, stdout, stderr io.Writer, inspectApplica
 		fmt.Fprintln(stderr, "inspect: --service requires --type traefik")
 		return 2
 	}
+	if djangoModeSet && *typed != config.TargetTypeDjango {
+		fmt.Fprintln(stderr, "inspect: --django-metrics-mode requires --type django")
+		return 2
+	}
 	var result *inspect.Result
-	if *typed == config.TargetTypeTraefik {
+	if *typed == config.TargetTypeDjango {
+		result, err = inspect.Django(context.Background(), inspectFlags.Arg(0), *djangoMode)
+	} else if *typed == config.TargetTypeTraefik {
 		result, err = inspect.Traefik(context.Background(), inspectFlags.Arg(0), *service)
 	} else if *typed == "" {
 		result, err = inspectApplication(context.Background(), inspectFlags.Arg(0))
@@ -349,6 +358,7 @@ Usage:
   statlite inspect --type micronaut <application-or-metrics-url>
   statlite inspect --type traefik --service <name@provider> <metrics-url>
   statlite inspect --type fastapi <metrics-url>
+  statlite inspect --type django --django-metrics-mode <inline|separate> <metrics-url>
   statlite inspect <application-url> --create-config PATH
   statlite inspect <application-url> --add-to-config PATH
   statlite --version
@@ -397,7 +407,8 @@ conclusive miss. URLs with a query are exact endpoints. Micronaut inspection
 checks compatibility without proving framework identity; untyped inspection
 does not recognize Micronaut.
 Use --type traefik with an exact metrics URL and --service name@provider.
-Use --type fastapi with the exact Instrumentator metrics URL.`)
+Use --type fastapi with the exact Instrumentator metrics URL.
+Use --type django with the exact django-prometheus URL and --django-metrics-mode.`)
 }
 
 const configurationDocsURL = "https://github.com/PVRLabs/statlite/blob/main/docs/configuration.md"
@@ -415,10 +426,11 @@ type suggestedPollingConfig struct {
 }
 
 type suggestedTarget struct {
-	Name    string `yaml:"name"`
-	Type    string `yaml:"type"`
-	URL     string `yaml:"url,omitempty"`
-	Service string `yaml:"service,omitempty"`
+	Name              string `yaml:"name"`
+	Type              string `yaml:"type"`
+	URL               string `yaml:"url,omitempty"`
+	Service           string `yaml:"service,omitempty"`
+	DjangoMetricsMode string `yaml:"django_metrics_mode,omitempty"`
 }
 
 type suggestedConfig struct {
@@ -468,6 +480,8 @@ func renderInspectionWithOptions(result *inspect.Result, target suggestedTarget,
 
 func inspectionPresentation(targetType inspect.TargetType) (inspectionTargetPresentation, error) {
 	switch targetType {
+	case inspect.TargetDjango:
+		return inspectionTargetPresentation{displayName: "Django Metrics", targetType: config.TargetTypeDjango, errorContext: "django target"}, nil
 	case inspect.TargetFastAPI:
 		return inspectionTargetPresentation{displayName: "FastAPI Metrics", targetType: config.TargetTypeFastAPI, errorContext: "fastapi target"}, nil
 	case inspect.TargetTraefik:
@@ -508,7 +522,7 @@ func renderSuggestedTargetConfig(target suggestedTarget, errorContext string) (s
 		Server:  config.ServerConfig{Listen: "127.0.0.1:9090"},
 		Storage: config.StorageConfig{SQLitePath: "./statlite.sqlite"},
 		Polling: config.PollingConfig{Interval: "30s"},
-		Targets: []config.TargetConfig{{Name: target.Name, Type: target.Type, URL: target.URL, Service: target.Service}},
+		Targets: []config.TargetConfig{{Name: target.Name, Type: target.Type, URL: target.URL, Service: target.Service, DjangoMetricsMode: target.DjangoMetricsMode}},
 	}
 	if err := config.Validate(&validation); err != nil {
 		return "", fmt.Errorf("%s: %w", errorContext, err)

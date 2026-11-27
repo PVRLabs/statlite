@@ -32,6 +32,7 @@ var errRedirectLimit = errors.New("inspect redirect limit exceeded")
 type TargetType string
 
 const (
+	TargetDjango          TargetType = "django"
 	TargetFastAPI         TargetType = "fastapi"
 	TargetTraefik         TargetType = "traefik"
 	TargetSpring          TargetType = "spring"
@@ -49,12 +50,13 @@ const (
 
 // Result contains only information needed to render a suggested target.
 type Result struct {
-	TargetType   TargetType
-	Endpoint     string
-	Service      string
-	Capabilities []string
-	Warnings     []string
-	Status       CompatibilityStatus
+	TargetType        TargetType
+	Endpoint          string
+	Service           string
+	DjangoMetricsMode string
+	Capabilities      []string
+	Warnings          []string
+	Status            CompatibilityStatus
 }
 
 // FailureKind describes the small set of outcomes the command layer needs to
@@ -131,6 +133,8 @@ func Inspect(ctx context.Context, targetType TargetType, rawURL string) (*Result
 		return inspectQuarkus(ctx, rawURL)
 	case TargetMicronaut:
 		return inspectMicronaut(ctx, rawURL)
+	case TargetDjango:
+		return Django(ctx, rawURL, "")
 	case TargetFastAPI:
 		return inspectFastAPI(ctx, rawURL)
 	case TargetTraefik:
@@ -138,7 +142,7 @@ func Inspect(ctx context.Context, targetType TargetType, rawURL string) (*Result
 	default:
 		return nil, &Failure{
 			Kind: FailureTypeUnsupported,
-			Err:  fmt.Errorf("unsupported inspection type %q (supported: quarkus, micronaut, traefik, fastapi)", targetType),
+			Err:  fmt.Errorf("unsupported inspection type %q (supported: quarkus, micronaut, traefik, fastapi, django)", targetType),
 		}
 	}
 }
@@ -149,7 +153,7 @@ func Inspect(ctx context.Context, targetType TargetType, rawURL string) (*Result
 func inspectSpring(context.Context, string) (*Result, error) {
 	return nil, &Failure{
 		Kind: FailureTypeUnavailable,
-		Err:  errors.New("typed inspection type \"spring\" is not available (supported: quarkus, micronaut, traefik, fastapi)"),
+		Err:  errors.New("typed inspection type \"spring\" is not available (supported: quarkus, micronaut, traefik, fastapi, django)"),
 	}
 }
 

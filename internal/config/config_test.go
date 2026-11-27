@@ -901,7 +901,7 @@ targets:
 			if err == nil {
 				t.Fatal("Load() error = nil, want error")
 			}
-			if !strings.Contains(err.Error(), "auth: is supported only for type spring, quarkus, micronaut, caddy, traefik, and fastapi") {
+			if !strings.Contains(err.Error(), "auth: is supported only for type spring, quarkus, micronaut, caddy, traefik, fastapi, and django") {
 				t.Fatalf("Load() error = %q, want unsupported target auth error", err)
 			}
 		})
@@ -949,4 +949,40 @@ func writeConfig(t *testing.T, content string) string {
 		t.Fatalf("writing config: %v", err)
 	}
 	return path
+}
+
+func TestLoadDjangoMetricsMode(t *testing.T) {
+	for _, tc := range []struct {
+		name, targetType, mode string
+		valid                  bool
+	}{
+		{"inline", TargetTypeDjango, "    django_metrics_mode: inline\n", true},
+		{"separate", TargetTypeDjango, "    django_metrics_mode: separate\n", true},
+		{"missing", TargetTypeDjango, "", false},
+		{"invalid", TargetTypeDjango, "    django_metrics_mode: auto\n", false},
+		{"empty field on other type", TargetTypeFastAPI, "    django_metrics_mode:\n", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writeConfig(t, `
+server:
+  listen: 127.0.0.1:9090
+storage:
+  sqlite_path: ./statlite.sqlite
+polling:
+  interval: 1m
+targets:
+  - name: app
+    type: `+tc.targetType+`
+    url: http://example.com/metrics
+`+tc.mode)
+			_, err := Load(path)
+			if tc.valid {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), "django_metrics_mode") {
+				t.Fatalf("expected mode validation failure, got %v", err)
+			}
+		})
+	}
 }

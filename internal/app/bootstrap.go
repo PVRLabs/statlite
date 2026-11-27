@@ -48,6 +48,12 @@ func newCollector(target config.TargetConfig, timeout time.Duration) (monitor.Co
 		return newStatliteMetricsCollector(target, timeout)
 	case config.TargetTypeMicronaut:
 		return newMicronautCollector(target, timeout)
+	case config.TargetTypeDjango:
+		client, err := prometheus.NewClient(timeout, prometheus.DefaultLimits, prometheusAuthConfig(target.Auth))
+		if err != nil {
+			return nil, fmt.Errorf("django metrics client: %w", err)
+		}
+		return collector.NewDjangoCollector(target.Name, target.URL, target.DjangoMetricsMode, client), nil
 	case config.TargetTypeFastAPI:
 		client, err := prometheus.NewClient(timeout, collector.FastAPIPrometheusLimits(), prometheusAuthConfig(target.Auth))
 		if err != nil {
