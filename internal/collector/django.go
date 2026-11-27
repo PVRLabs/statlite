@@ -30,7 +30,7 @@ type DjangoCollector struct {
 	mu                         sync.Mutex
 	previous                   requestBaseline
 	duration                   prometheusDuration
-	process                    pythonProcessBaseline
+	process                    prometheusProcessBaseline
 }
 
 func NewDjangoCollector(targetName, endpoint, mode string, client *prometheus.Client) *DjangoCollector {
@@ -48,7 +48,7 @@ func (c *DjangoCollector) Collect(ctx context.Context) (*CollectionResult, error
 
 	s, err := scrapeDjango(ctx, c.endpoint, c.mode, c.client)
 	if err != nil {
-		c.previous, c.duration, c.process = requestBaseline{}, prometheusDuration{}, pythonProcessBaseline{}
+		c.previous, c.duration, c.process = requestBaseline{}, prometheusDuration{}, prometheusProcessBaseline{}
 		result.addEvent(EventSeverityError, "django_metrics_unavailable", "", err.Error())
 		return result, err
 	}
@@ -83,8 +83,8 @@ func (c *DjangoCollector) Collect(ctx context.Context) (*CollectionResult, error
 type djangoScrape struct {
 	mode                    string
 	requests                map[string]httpRequestTuple
-	totals                  pythonRequestTotals
-	process                 pythonProcess
+	totals                  prometheusRequestTotals
+	process                 prometheusProcess
 	signature               prometheusUnlabelledValue
 	duration                prometheusDuration
 	badDuration, inlineView bool
@@ -133,7 +133,7 @@ func (s *djangoScrape) acceptResponse(sample prometheus.Sample) error {
 	if isViewTuple != (s.mode == config.DjangoMetricsModeInline) {
 		return nil
 	}
-	code, grouped, valid := pythonStatus(status)
+	code, grouped, valid := prometheusHTTPStatus(status)
 	validLabels := len(sample.Labels) == 1
 	if isViewTuple {
 		validLabels = len(sample.Labels) == 3 && hasView && hasMethod
@@ -145,7 +145,7 @@ func (s *djangoScrape) acceptResponse(sample prometheus.Sample) error {
 	if _, exists := s.requests[key]; exists {
 		return errors.New("duplicate Django response tuple")
 	}
-	if len(s.requests) >= pythonMaxTuples || !s.totals.add(sample.Value, code, false) {
+	if len(s.requests) >= maxPrometheusHTTPTuples || !s.totals.add(sample.Value, code, false) {
 		return errors.New("Django response population exceeds tuple or exact count limit")
 	}
 	s.requests[key] = httpRequestTuple{count: sample.Value}

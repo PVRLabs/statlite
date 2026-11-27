@@ -20,6 +20,7 @@ const (
 	TargetTypeDjango          = "django"
 	TargetTypeFastAPI         = "fastapi"
 	TargetTypeFlask           = "flask"
+	TargetTypeExpress         = "express"
 	TargetTypeTraefik         = "traefik"
 	TargetTypeCaddy           = "caddy"
 	TargetTypeSpring          = "spring"
@@ -328,16 +329,16 @@ func (c *Config) validateTargets() error {
 			if err := validateMicronautTarget(target); err != nil {
 				return err
 			}
-		case TargetTypeDjango, TargetTypeFastAPI, TargetTypeFlask, TargetTypeStatliteMetrics:
+		case TargetTypeDjango, TargetTypeFastAPI, TargetTypeFlask, TargetTypeExpress, TargetTypeStatliteMetrics:
 			if err := validateExactMetricsTarget(target); err != nil {
 				return err
 			}
 		default:
-			return targetError(target, "type", fmt.Sprintf("unsupported value %q (supported: spring, quarkus, micronaut, statlite-metrics, caddy, traefik, fastapi, django, flask)", targetType))
+			return targetError(target, "type", fmt.Sprintf("unsupported value %q (supported: spring, quarkus, micronaut, statlite-metrics, caddy, traefik, fastapi, django, flask, express)", targetType))
 		}
 		if target.Auth != nil {
-			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus && targetType != TargetTypeMicronaut && targetType != TargetTypeCaddy && targetType != TargetTypeTraefik && targetType != TargetTypeFastAPI && targetType != TargetTypeDjango && targetType != TargetTypeFlask {
-				return targetError(target, "auth", "is supported only for type spring, quarkus, micronaut, caddy, traefik, fastapi, django, and flask")
+			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus && targetType != TargetTypeMicronaut && targetType != TargetTypeCaddy && targetType != TargetTypeTraefik && targetType != TargetTypeFastAPI && targetType != TargetTypeDjango && targetType != TargetTypeFlask && targetType != TargetTypeExpress {
+				return targetError(target, "auth", "is supported only for type spring, quarkus, micronaut, caddy, traefik, fastapi, django, flask, and express")
 			}
 			if target.Auth.Type != "basic" {
 				return targetError(target, "auth.type", fmt.Sprintf("unsupported value %q (only basic is supported)", target.Auth.Type))

@@ -1,0 +1,9 @@
+{
+  "name": "statlite-native-express-smoke",
+  "private": true,
+  "dependencies": {
+    "express": "5.1.0",
+    "express-prom-bundle": "8.0.0",
+    "prom-client": "15.1.3"
+  }
+}

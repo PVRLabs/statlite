@@ -435,8 +435,8 @@ func TestRunInspectTypeErrorsUseAccurateUsageMessages(t *testing.T) {
 		targetType string
 		want       string
 	}{
-		{targetType: "prometheus", want: `unsupported inspection type "prometheus" (supported: quarkus, micronaut, traefik, fastapi, django, flask)`},
-		{targetType: "spring", want: `typed inspection type "spring" is not available (supported: quarkus, micronaut, traefik, fastapi, django, flask)`},
+		{targetType: "prometheus", want: `unsupported inspection type "prometheus" (supported: quarkus, micronaut, traefik, fastapi, django, flask, express)`},
+		{targetType: "spring", want: `typed inspection type "spring" is not available (supported: quarkus, micronaut, traefik, fastapi, django, flask, express)`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.targetType, func(t *testing.T) {

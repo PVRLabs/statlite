@@ -79,7 +79,9 @@ jobs:
         with:
           node-version: "24.21.0"
           cache: npm
-          cache-dependency-path: examples/node-express-demo/package-lock.json
+          cache-dependency-path: |
+            examples/node-express-demo/package-lock.json
+            test/integration/express/package-lock.json
 
       - name: Set up Java
         if: matrix.case == 'spring' || matrix.case == 'quarkus'
@@ -101,6 +103,11 @@ jobs:
         if: matrix.case == 'express'
         working-directory: examples/node-express-demo
         run: npm ci
+
+      - name: Install native Express smoke dependencies
+        if: matrix.case == 'express'
+        working-directory: test/integration/express
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Report FastAPI versions
         if: matrix.case == 'fastapi'
@@ -178,6 +185,12 @@ jobs:
           APP_PORT: ${{ matrix.app_port }}
           STATLITE_BIN: ${{ runner.temp }}/statlite
         run: ./scripts/ci/integration-direct-v1.sh "$CASE"
+
+      - name: Run native Express integration smoke test
+        if: matrix.case == 'express'
+        env:
+          STATLITE_BIN: ${{ runner.temp }}/statlite
+        run: node --test test/integration/express/smoke.test.cjs
 
       - name: Run Flask integration smoke test
         if: matrix.case == 'flask'

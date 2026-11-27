@@ -27,7 +27,7 @@ type FlaskCollector struct {
 	mu                   sync.Mutex
 	previous             requestBaseline
 	previousDurations    map[string]flaskDuration
-	process              pythonProcessBaseline
+	process              prometheusProcessBaseline
 }
 
 func NewFlaskCollector(targetName, endpoint string, client *prometheus.Client) *FlaskCollector {
@@ -45,7 +45,7 @@ func (c *FlaskCollector) Collect(ctx context.Context) (*CollectionResult, error)
 
 	s, err := scrapeFlask(ctx, c.endpoint, c.client)
 	if err != nil {
-		c.previous, c.previousDurations, c.process = requestBaseline{}, nil, pythonProcessBaseline{}
+		c.previous, c.previousDurations, c.process = requestBaseline{}, nil, prometheusProcessBaseline{}
 		result.addEvent(EventSeverityError, "flask_metrics_unavailable", "", err.Error())
 		return result, err
 	}
@@ -96,8 +96,8 @@ type flaskScrape struct {
 	requests                      map[string]httpRequestTuple
 	durations                     map[string]flaskDuration
 	badDurations                  bool
-	totals                        pythonRequestTotals
-	process                       pythonProcess
+	totals                        prometheusRequestTotals
+	process                       prometheusProcess
 }
 
 func scrapeFlask(ctx context.Context, endpoint string, client *prometheus.Client) (*flaskScrape, error) {
@@ -147,7 +147,7 @@ func (s *flaskScrape) acceptHTTP(sample prometheus.Sample) error {
 			path = label.Value
 		}
 	}
-	code, grouped, valid := pythonStatus(status)
+	code, grouped, valid := prometheusHTTPStatus(status)
 	validResponse := method != "" && valid && !grouped
 	responseKey := prometheusTupleKey([]prometheus.Label{{Name: "method", Value: method}, {Name: "status", Value: status}})
 	if isRequest {
@@ -157,7 +157,7 @@ func (s *flaskScrape) acceptHTTP(sample prometheus.Sample) error {
 		if _, exists := s.requests[responseKey]; exists {
 			return errors.New("duplicate Flask response tuple")
 		}
-		if len(s.requests) >= pythonMaxTuples || !s.totals.add(sample.Value, code, false) {
+		if len(s.requests) >= maxPrometheusHTTPTuples || !s.totals.add(sample.Value, code, false) {
 			return errors.New("Flask response population exceeds tuple or exact count limit")
 		}
 		s.requests[responseKey] = httpRequestTuple{count: sample.Value}
@@ -170,7 +170,7 @@ func (s *flaskScrape) acceptHTTP(sample prometheus.Sample) error {
 	}
 	key := prometheusTupleKey(sample.Labels)
 	d, exists := s.durations[key]
-	if (!exists && len(s.durations) >= pythonMaxTuples) || !d.accept(sample.Name == flaskCount, sample.Value) {
+	if (!exists && len(s.durations) >= maxPrometheusHTTPTuples) || !d.accept(sample.Name == flaskCount, sample.Value) {
 		s.badDurations = true
 		return nil
 	}

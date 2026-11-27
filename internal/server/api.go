@@ -135,7 +135,7 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cpuUnit := "ratio"
-	if target.Metadata.Type == config.TargetTypeStatliteMetrics || target.Metadata.Type == config.TargetTypeFastAPI || target.Metadata.Type == config.TargetTypeDjango || target.Metadata.Type == config.TargetTypeFlask {
+	if target.Metadata.Type == config.TargetTypeStatliteMetrics || target.Metadata.Type == config.TargetTypeFastAPI || target.Metadata.Type == config.TargetTypeDjango || target.Metadata.Type == config.TargetTypeFlask || target.Metadata.Type == config.TargetTypeExpress {
 		cpuUnit = "cores"
 	}
 	storage.ConfigureDashboardCPU(series, cpuUnit)

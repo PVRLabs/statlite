@@ -314,3 +314,25 @@ resumes after two consecutive compatible observations.
 
 Compatible process metrics supply uptime, restart detection, and CPU in
 cores. Heap and application health are unavailable.
+
+## Express HTTP and process metrics
+
+The `express` target reads the default `express-prom-bundle` histogram from
+one Node.js process. Its `http_request_duration_seconds_count` tuples use
+exact `status_code` labels. StatLite derives requests, exact 404, 4xx, and
+5xx from those counts. This includes unmatched 404s and unhandled
+exceptions that return 500. The bundle excludes its own scrape traffic by
+default.
+
+Latency uses the matching `http_request_duration_seconds_sum` values in
+seconds. Missing or inconsistent sums leave latency unavailable while
+preserving valid request totals. A failed scrape, disappeared or decreased
+count, or detected restart starts a new counter baseline. A new positive
+status tuple also starts a new baseline when process identity is unavailable.
+
+The bundle's optional default metrics supply CPU in cores, V8 heap used in
+bytes, and a process start timestamp rounded to a whole second. CPU
+requires two consecutive observations from the same process. The bundle's
+`up` gauge does not report application health. Use a single process with
+the default histogram labels. Summary mode, grouped statuses, custom
+labels, and worker aggregation are outside this profile.

@@ -22,16 +22,16 @@ func TestPythonStatus(t *testing.T) {
 		{"599", 599, false, true}, {"0", 0, false, false}, {"6xx", 0, false, false},
 		{"5XX", 0, false, false}, {"4x4", 0, false, false}, {" 404", 0, false, false},
 	} {
-		code, grouped, valid := pythonStatus(tc.label)
+		code, grouped, valid := prometheusHTTPStatus(tc.label)
 		if code != tc.code || grouped != tc.grouped || valid != tc.valid {
-			t.Errorf("pythonStatus(%q) = %d, %v, %v", tc.label, code, grouped, valid)
+			t.Errorf("prometheusHTTPStatus(%q) = %d, %v, %v", tc.label, code, grouped, valid)
 		}
 	}
 }
 
 func TestPythonProcess(t *testing.T) {
 	at := time.Unix(1000, 0)
-	var previous pythonProcessBaseline
+	var previous prometheusProcessBaseline
 	for _, tc := range []struct {
 		name               string
 		start, cpu         float64
@@ -51,7 +51,7 @@ func TestPythonProcess(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			at = at.Add(2 * time.Second)
-			var p pythonProcess
+			var p prometheusProcess
 			if tc.start > 0 {
 				p.accept(prometheus.Sample{Name: "process_start_time_seconds", Value: tc.start})
 			}

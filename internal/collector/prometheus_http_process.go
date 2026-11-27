@@ -7,10 +7,10 @@ import (
 	"github.com/pvrlabs/statlite/internal/prometheus"
 )
 
-const pythonMaxTuples = 256
+const maxPrometheusHTTPTuples = 256
 
-// pythonStatus returns an exact code or a class representative (e.g. 400).
-func pythonStatus(label string) (code int, grouped, valid bool) {
+// prometheusHTTPStatus returns an exact code or a class representative (e.g. 400).
+func prometheusHTTPStatus(label string) (code int, grouped, valid bool) {
 	if len(label) != 3 || label[0] < '1' || label[0] > '5' {
 		return 0, false, false
 	}
@@ -24,12 +24,12 @@ func pythonStatus(label string) (code int, grouped, valid bool) {
 	return code + int(label[1]-'0')*10 + int(label[2]-'0'), false, true
 }
 
-type pythonRequestTotals struct {
+type prometheusRequestTotals struct {
 	requests, notFound, clientErrors, serverErrors float64
 	grouped                                        bool
 }
 
-func (t *pythonRequestTotals) add(count float64, code int, grouped bool) bool {
+func (t *prometheusRequestTotals) add(count float64, code int, grouped bool) bool {
 	if count > maxExactPrometheusCount-t.requests {
 		return false
 	}
@@ -47,7 +47,7 @@ func (t *pythonRequestTotals) add(count float64, code int, grouped bool) bool {
 	return true
 }
 
-func (t pythonRequestTotals) emit(result *CollectionResult) {
+func (t prometheusRequestTotals) emit(result *CollectionResult) {
 	result.addSample("http_requests_total", MetricKindCounter, t.requests, "requests")
 	result.addSample("http_4xx_total", MetricKindCounter, t.clientErrors, "requests")
 	result.addSample("http_5xx_total", MetricKindCounter, t.serverErrors, "requests")
@@ -67,11 +67,12 @@ func (m *prometheusUnlabelledValue) accept(sample prometheus.Sample) {
 	m.value = sample.Value
 }
 
-type pythonProcess struct {
-	start, cpu prometheusUnlabelledValue
+type prometheusProcess struct {
+	start, cpu     prometheusUnlabelledValue
+	startTimeSlack time.Duration
 }
 
-func (p *pythonProcess) accept(sample prometheus.Sample) bool {
+func (p *prometheusProcess) accept(sample prometheus.Sample) bool {
 	switch sample.Name {
 	case "process_start_time_seconds":
 		p.start.accept(sample)
@@ -83,32 +84,32 @@ func (p *pythonProcess) accept(sample prometheus.Sample) bool {
 	return true
 }
 
-func (p pythonProcess) startTime(at time.Time) *time.Time {
+func (p prometheusProcess) startTime(at time.Time) *time.Time {
 	if !p.start.valid || p.start.value <= 0 || p.start.value >= 1<<53 {
 		return nil
 	}
 	seconds, fraction := math.Modf(p.start.value)
 	start := time.Unix(int64(seconds), int64(math.Round(fraction*1e9))).UTC()
-	if start.After(at) {
+	if start.After(at.Add(p.startTimeSlack)) {
 		return nil
 	}
 	return &start
 }
 
-type pythonProcessBaseline struct {
+type prometheusProcessBaseline struct {
 	at       time.Time
 	identity float64
 	cpu      prometheusUnlabelledValue
 }
 
-func (p pythonProcess) emit(result *CollectionResult, previous pythonProcessBaseline, at time.Time) pythonProcessBaseline {
-	current := pythonProcessBaseline{at: at, cpu: p.cpu}
+func (p prometheusProcess) emit(result *CollectionResult, previous prometheusProcessBaseline, at time.Time) prometheusProcessBaseline {
+	current := prometheusProcessBaseline{at: at, cpu: p.cpu}
 	result.ProcessStartTime = p.startTime(at)
 	if result.ProcessStartTime == nil {
 		return current
 	}
 	current.identity = p.start.value
-	result.addSample("process_uptime", MetricKindGauge, at.Sub(*result.ProcessStartTime).Seconds(), "seconds")
+	result.addSample("process_uptime", MetricKindGauge, max(0, at.Sub(*result.ProcessStartTime).Seconds()), "seconds")
 	elapsed := at.Sub(previous.at).Seconds()
 	if current.identity == previous.identity && p.cpu.valid && previous.cpu.valid &&
 		p.cpu.value >= previous.cpu.value && elapsed > 0 {

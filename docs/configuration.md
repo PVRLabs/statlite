@@ -141,6 +141,20 @@ Send an application request before inspecting a cold endpoint to see its HTTP
 capabilities. Configure Basic Auth manually for polling protected endpoints.
 See the [Flask target guide](targets/flask.md) for setup and verified coverage.
 
+Express uses `type: express` and the metrics URL from one application process
+running `express-prom-bundle` with its default status-labelled histogram:
+
+```bash
+statlite inspect --type express 'http://localhost:3000/metrics'
+```
+
+Send an application request before inspecting a cold registry. For CPU, V8
+heap and process start, enable the bundle's
+`promClient: { collectDefaultMetrics: {} }` option. Configure Basic Auth
+manually for polling protected endpoints. See the
+[Express metric reference](metrics.md#express-http-and-process-metrics) for
+coverage and continuity behavior.
+
 On success, plain `inspect` prints the recognized capabilities, a minimal
 configuration, and commands to create or add it. The suggested target gets a
 stable `<type>-<host>-<port>` name. Override it with `--name` if needed;

@@ -18,7 +18,7 @@ func flaskTestHistogram(path, status string, count int, sum float64) string {
 
 func TestFlaskPathContinuity(t *testing.T) {
 	var overLimit strings.Builder
-	for i := 0; i <= pythonMaxTuples; i++ {
+	for i := 0; i <= maxPrometheusHTTPTuples; i++ {
 		overLimit.WriteString(flaskTestHistogram(fmt.Sprintf("/%d", i), "200", 1, 1))
 	}
 	transport := &fastAPITestTransport{status: 200}
@@ -39,7 +39,7 @@ func TestFlaskPathContinuity(t *testing.T) {
 		{"path counter drops despite aggregate growth", flaskTestHistogram("/b", "200", 3, 3) + flaskTestHistogram("/c", "200", 2, 2), 5, 100, false, false},
 		{"rebaseline after drop", flaskTestHistogram("/b", "200", 4, 4) + flaskTestHistogram("/c", "200", 2, 2), 6, 100, true, false},
 		{"sum changes without observations", flaskTestHistogram("/b", "200", 4, 5) + flaskTestHistogram("/c", "200", 3, 3), 7, 100, false, false},
-		{"limit", overLimit.String(), pythonMaxTuples + 1, 100, false, false},
+		{"limit", overLimit.String(), maxPrometheusHTTPTuples + 1, 100, false, false},
 		{"restart with growth", flaskTestHistogram("/new", "200", 1000, 100), 1000, 200, true, true},
 		{"after restart", flaskTestHistogram("/new", "200", 1001, 101), 1001, 200, true, false},
 	} {
@@ -56,7 +56,7 @@ func TestFlaskPathContinuity(t *testing.T) {
 				result.CounterContinuityBreak != tc.wantContinuityBreak {
 				t.Fatalf("unexpected poll: %+v", result)
 			}
-			if len(c.previousDurations) > pythonMaxTuples || !latency && c.previousDurations != nil {
+			if len(c.previousDurations) > maxPrometheusHTTPTuples || !latency && c.previousDurations != nil {
 				t.Fatalf("retained %d duration tuples", len(c.previousDurations))
 			}
 		})

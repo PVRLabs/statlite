@@ -31,7 +31,7 @@ type FastAPICollector struct {
 	mu                   sync.Mutex
 	previous             requestBaseline
 	previousDurations    map[fastAPIRoute]prometheusDuration
-	process              pythonProcessBaseline
+	process              prometheusProcessBaseline
 }
 
 // FastAPIPrometheusLimits requires the actual scrape route so its handler
@@ -57,7 +57,7 @@ func (c *FastAPICollector) Collect(ctx context.Context) (*CollectionResult, erro
 
 	s, err := scrapeFastAPI(ctx, c.endpoint, c.client)
 	if err != nil {
-		c.previous, c.previousDurations, c.process = requestBaseline{}, nil, pythonProcessBaseline{}
+		c.previous, c.previousDurations, c.process = requestBaseline{}, nil, prometheusProcessBaseline{}
 		result.addEvent(EventSeverityError, "fastapi_metrics_unavailable", "", err.Error())
 		return result, err
 	}
@@ -112,8 +112,8 @@ type fastAPIScrape struct {
 	durations                    map[fastAPIRoute]prometheusDuration
 	badDurations                 bool
 	signatureCount, signatureSum prometheusUnlabelledValue
-	totals                       pythonRequestTotals
-	process                      pythonProcess
+	totals                       prometheusRequestTotals
+	process                      prometheusProcess
 }
 
 func scrapeFastAPI(ctx context.Context, endpoint string, client *prometheus.Client) (*fastAPIScrape, error) {
@@ -174,7 +174,7 @@ func (s *fastAPIScrape) acceptHTTP(sample prometheus.Sample) error {
 	}
 	validRoute := route.handler != "" && route.method != ""
 	if sample.Name == fastAPIRequests {
-		code, grouped, valid := pythonStatus(status)
+		code, grouped, valid := prometheusHTTPStatus(status)
 		if !validRoute || len(sample.Labels) != 3 || !valid || !validPrometheusCount(sample.Value) {
 			return errors.New("invalid FastAPI request tuple")
 		}
@@ -182,7 +182,7 @@ func (s *fastAPIScrape) acceptHTTP(sample prometheus.Sample) error {
 		if _, exists := s.requests[key]; exists {
 			return errors.New("duplicate FastAPI request tuple")
 		}
-		if len(s.requests) >= pythonMaxTuples || !s.totals.add(sample.Value, code, grouped) {
+		if len(s.requests) >= maxPrometheusHTTPTuples || !s.totals.add(sample.Value, code, grouped) {
 			return errors.New("FastAPI request population exceeds tuple or exact count limit")
 		}
 		s.requests[key] = httpRequestTuple{count: sample.Value}
@@ -197,7 +197,7 @@ func (s *fastAPIScrape) acceptHTTP(sample prometheus.Sample) error {
 
 func (s *fastAPIScrape) addDuration(route fastAPIRoute, sample prometheus.Sample) bool {
 	tuple, exists := s.durations[route]
-	if !exists && len(s.durations) >= pythonMaxTuples {
+	if !exists && len(s.durations) >= maxPrometheusHTTPTuples {
 		return false
 	}
 	if !tuple.accept(sample.Name == fastAPICount, sample.Value) {
