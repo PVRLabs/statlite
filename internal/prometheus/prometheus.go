@@ -179,7 +179,13 @@ func responseFormat(value string) (Format, error) {
 	}
 	switch strings.ToLower(mediaType) {
 	case "text/plain":
-		if err := validateContentTypeParams(params, "0.0.4", false); err != nil {
+		// Prometheus Python client 0.23 serves the classic sample syntax
+		// with a 1.0.0 header. The parser still requires legacy identifiers.
+		version := "0.0.4"
+		if params["version"] == "1.0.0" {
+			version = "1.0.0"
+		}
+		if err := validateContentTypeParams(params, version, false); err != nil {
 			return "", err
 		}
 		return TextFormat, nil

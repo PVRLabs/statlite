@@ -33,6 +33,7 @@ http_requests_total{handler="/custom",method="GET",status="2xx"} 1
 					http.NotFound(w, r)
 					return
 				}
+				w.Header().Set("Content-Type", "text/plain; version=1.0.0; charset=utf-8")
 				fmt.Fprint(w, tc.body)
 			}))
 			defer server.Close()

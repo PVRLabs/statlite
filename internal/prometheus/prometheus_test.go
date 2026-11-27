@@ -123,7 +123,7 @@ func TestClientClassifiesResponses(t *testing.T) {
 		{"http", "text/plain", "", http.StatusTooManyRequests, FailureHTTP},
 		{"content type", "application/json", "", http.StatusOK, FailureContentType},
 		{"encoding", "text/plain", "br", http.StatusOK, FailureContentType},
-		{"unsupported text version", "text/plain; version=1.0.0", "", http.StatusOK, FailureContentType},
+		{"unsupported text version", "text/plain; version=2.0.0", "", http.StatusOK, FailureContentType},
 		{"unsupported OpenMetrics version", "application/openmetrics-text; version=99.0", "", http.StatusOK, FailureContentType},
 		{"missing OpenMetrics version", "application/openmetrics-text", "", http.StatusOK, FailureContentType},
 		{"unsupported escaping", "text/plain; version=0.0.4; escaping=allow-utf-8", "", http.StatusOK, FailureContentType},
