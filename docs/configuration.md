@@ -119,7 +119,8 @@ Django uses `type: django` and requires `django_metrics_mode: inline` or
 metrics URL. The `inline` mode filters the standard Django metrics view
 from HTTP counts. The `separate` mode requires a metrics listener in the
 application process and the Django metrics URL include removed. It can
-also report average latency. See [Django metric coverage](metrics.md#django-http-and-process-metrics).
+also report average latency. See the [Django target guide](targets/django.md)
+for setup and verified coverage.
 
 ```bash
 statlite inspect --type django --django-metrics-mode inline 'http://localhost:8000/metrics'
