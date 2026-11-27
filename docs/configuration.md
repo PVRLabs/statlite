@@ -96,6 +96,23 @@ manually with the shared Basic Auth block.
 Compatibility with the supported metrics contract does not prove Micronaut
 framework identity.
 
+FastAPI uses `type: fastapi` and the exact
+`prometheus-fastapi-instrumentator` metrics URL:
+
+```bash
+statlite inspect --type fastapi 'http://localhost:8000/metrics'
+```
+
+Use the application metrics route directly, with the URL path matching the
+exporter's `handler` label for the route. If a proxy rewrites that path,
+exclude the internal metrics route in the exporter and choose an external
+metrics URL path that does not match any application `handler` label.
+StatLite filters the configured URL path from both request and duration
+metrics, so a matching application handler would lose its traffic from
+both. FastAPI polling supports Basic Auth through the shared configuration
+block. Send an application request
+before inspecting a cold endpoint to see its HTTP capabilities.
+
 On success, plain `inspect` prints the recognized capabilities, a minimal
 configuration, and commands to create or add it. The suggested target gets a
 stable `<type>-<host>-<port>` name. Override it with `--name` if needed;

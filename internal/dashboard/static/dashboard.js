@@ -471,16 +471,18 @@ function targetPresentation(target) {
     tone = "neutral";
   }
 
-  const proxyExplanation = targetType === "caddy"
+  const collectionExplanation = targetType === "caddy"
     ? "UP means StatLite can collect Caddy metrics. It does not guarantee that the upstream application is healthy."
     : targetType === "traefik"
       ? "UP means StatLite can collect metrics for the selected Traefik service. Backend health is unavailable."
-      : "";
-  const statusExplanation = proxyExplanation || (springHealthUnknown
+      : targetType === "fastapi"
+        ? "UP means StatLite can collect FastAPI metrics. Application health is unavailable."
+        : "";
+  const statusExplanation = collectionExplanation || (springHealthUnknown
     ? "StatLite collected metrics but could not retrieve Spring Actuator health."
     : "");
   const statusDescription = statusExplanation
-    ? (proxyExplanation ? "Collection status: " : "App status: ") + label + ". " + statusExplanation
+    ? (collectionExplanation ? "Collection status: " : "App status: ") + label + ". " + statusExplanation
     : currentFailure
       ? "App status: DOWN because StatLite cannot currently collect from the application" + (rawHealth ? "; last reported application health: " + rawHealth : "")
       : rawHealth
@@ -853,6 +855,8 @@ function targetTypeHelp(value) {
     return "Monitors HTTP requests for one exact host through Caddy. Response time is measured at Caddy; application health and resources are unavailable.";
   case "traefik":
     return "Monitors HTTP requests for one Traefik service. Response time is measured at Traefik. Backend health and resources are unavailable.";
+  case "fastapi":
+    return "Monitors a FastAPI application through its Instrumentator metrics endpoint. CPU and restart detection require process metrics.";
   case "quarkus":
     return "Monitors a Quarkus application through its metrics endpoint; SmallRye Health is used when available.";
   case "micronaut":

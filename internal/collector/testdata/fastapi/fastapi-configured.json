@@ -1,0 +1,1130 @@
+{
+  "scenarios": {
+    "scrape_only": {
+      "statuses": [
+        200,
+        200,
+        200
+      ],
+      "deltas": [
+        [
+          "process_virtual_memory_bytes",
+          {},
+          270336.0
+        ],
+        [
+          "python_gc_collections_total",
+          {
+            "generation": "0"
+          },
+          1.0
+        ]
+      ]
+    },
+    "200": {
+      "statuses": [
+        200,
+        200,
+        200
+      ],
+      "deltas": [
+        [
+          "http_request_duration_highr_seconds_count",
+          {},
+          3.0
+        ],
+        [
+          "http_request_duration_highr_seconds_sum",
+          {},
+          0.0015425220000224726
+        ],
+        [
+          "http_request_duration_seconds_count",
+          {
+            "handler": "/ok",
+            "method": "GET"
+          },
+          3.0
+        ],
+        [
+          "http_request_duration_seconds_sum",
+          {
+            "handler": "/ok",
+            "method": "GET"
+          },
+          0.0015425220000224726
+        ],
+        [
+          "http_request_size_bytes_count",
+          {
+            "handler": "/ok"
+          },
+          3.0
+        ],
+        [
+          "http_requests_total",
+          {
+            "handler": "/ok",
+            "method": "GET",
+            "status": "200"
+          },
+          3.0
+        ],
+        [
+          "http_response_size_bytes_count",
+          {
+            "handler": "/ok"
+          },
+          3.0
+        ]
+      ]
+    },
+    "400": {
+      "statuses": [
+        400,
+        400,
+        400
+      ],
+      "deltas": [
+        [
+          "http_request_duration_highr_seconds_count",
+          {},
+          3.0
+        ],
+        [
+          "http_request_duration_highr_seconds_sum",
+          {},
+          0.0012878059998229219
+        ],
+        [
+          "http_request_duration_seconds_count",
+          {
+            "handler": "/bad",
+            "method": "GET"
+          },
+          3.0
+        ],
+        [
+          "http_request_duration_seconds_sum",
+          {
+            "handler": "/bad",
+            "method": "GET"
+          },
+          0.0012878059998229219
+        ],
+        [
+          "http_request_size_bytes_count",
+          {
+            "handler": "/bad"
+          },
+          3.0
+        ],
+        [
+          "http_requests_total",
+          {
+            "handler": "/bad",
+            "method": "GET",
+            "status": "400"
+          },
+          3.0
+        ],
+        [
+          "http_response_size_bytes_count",
+          {
+            "handler": "/bad"
+          },
+          3.0
+        ],
+        [
+          "process_cpu_seconds_total",
+          {},
+          0.010000000000000009
+        ]
+      ]
+    },
+    "404": {
+      "statuses": [
+        404,
+        404,
+        404
+      ],
+      "deltas": [
+        [
+          "http_request_duration_highr_seconds_count",
+          {},
+          3.0
+        ],
+        [
+          "http_request_duration_highr_seconds_sum",
+          {},
+          0.001189263000014762
+        ],
+        [
+          "http_request_duration_seconds_count",
+          {
+            "handler": "none",
+            "method": "GET"
+          },
+          3.0
+        ],
+        [
+          "http_request_duration_seconds_sum",
+          {
+            "handler": "none",
+            "method": "GET"
+          },
+          0.001189263000014762
+        ],
+        [
+          "http_request_size_bytes_count",
+          {
+            "handler": "none"
+          },
+          3.0
+        ],
+        [
+          "http_requests_total",
+          {
+            "handler": "none",
+            "method": "GET",
+            "status": "404"
+          },
+          3.0
+        ],
+        [
+          "http_response_size_bytes_count",
+          {
+            "handler": "none"
+          },
+          3.0
+        ],
+        [
+          "http_response_size_bytes_sum",
+          {
+            "handler": "none"
+          },
+          66.0
+        ]
+      ]
+    },
+    "500": {
+      "statuses": [
+        500,
+        500,
+        500
+      ],
+      "deltas": [
+        [
+          "http_request_duration_highr_seconds_count",
+          {},
+          3.0
+        ],
+        [
+          "http_request_duration_highr_seconds_sum",
+          {},
+          0.0018029600000772916
+        ],
+        [
+          "http_request_duration_seconds_count",
+          {
+            "handler": "/error",
+            "method": "GET"
+          },
+          3.0
+        ],
+        [
+          "http_request_duration_seconds_sum",
+          {
+            "handler": "/error",
+            "method": "GET"
+          },
+          0.0018029600000772916
+        ],
+        [
+          "http_request_size_bytes_count",
+          {
+            "handler": "/error"
+          },
+          3.0
+        ],
+        [
+          "http_requests_total",
+          {
+            "handler": "/error",
+            "method": "GET",
+            "status": "500"
+          },
+          3.0
+        ],
+        [
+          "http_response_size_bytes_count",
+          {
+            "handler": "/error"
+          },
+          3.0
+        ],
+        [
+          "process_cpu_seconds_total",
+          {},
+          0.010000000000000009
+        ],
+        [
+          "process_resident_memory_bytes",
+          {},
+          131072.0
+        ]
+      ]
+    },
+    "unhandled": {
+      "statuses": [
+        500,
+        500,
+        500
+      ],
+      "deltas": [
+        [
+          "http_request_duration_highr_seconds_count",
+          {},
+          3.0
+        ],
+        [
+          "http_request_duration_highr_seconds_sum",
+          {},
+          0.0009418759999562099
+        ],
+        [
+          "http_request_duration_seconds_count",
+          {
+            "handler": "/crash",
+            "method": "GET"
+          },
+          3.0
+        ],
+        [
+          "http_request_duration_seconds_sum",
+          {
+            "handler": "/crash",
+            "method": "GET"
+          },
+          0.0009418759999562099
+        ],
+        [
+          "http_request_size_bytes_count",
+          {
+            "handler": "/crash"
+          },
+          3.0
+        ],
+        [
+          "http_requests_total",
+          {
+            "handler": "/crash",
+            "method": "GET",
+            "status": "500"
+          },
+          3.0
+        ],
+        [
+          "http_response_size_bytes_count",
+          {
+            "handler": "/crash"
+          },
+          3.0
+        ],
+        [
+          "process_resident_memory_bytes",
+          {},
+          1310720.0
+        ],
+        [
+          "process_virtual_memory_bytes",
+          {},
+          2273280.0
+        ],
+        [
+          "python_gc_collections_total",
+          {
+            "generation": "0"
+          },
+          1.0
+        ],
+        [
+          "python_gc_objects_collected_total",
+          {
+            "generation": "0"
+          },
+          314.0
+        ]
+      ]
+    },
+    "slow": {
+      "statuses": [
+        200,
+        200,
+        200
+      ],
+      "deltas": [
+        [
+          "http_request_duration_highr_seconds_count",
+          {},
+          3.0
+        ],
+        [
+          "http_request_duration_highr_seconds_sum",
+          {},
+          0.4549490770000375
+        ],
+        [
+          "http_request_duration_seconds_count",
+          {
+            "handler": "/slow",
+            "method": "GET"
+          },
+          3.0
+        ],
+        [
+          "http_request_duration_seconds_sum",
+          {
+            "handler": "/slow",
+            "method": "GET"
+          },
+          0.4549490770000375
+        ],
+        [
+          "http_request_size_bytes_count",
+          {
+            "handler": "/slow"
+          },
+          3.0
+        ],
+        [
+          "http_requests_total",
+          {
+            "handler": "/slow",
+            "method": "GET",
+            "status": "200"
+          },
+          3.0
+        ],
+        [
+          "http_response_size_bytes_count",
+          {
+            "handler": "/slow"
+          },
+          3.0
+        ],
+        [
+          "process_cpu_seconds_total",
+          {},
+          0.020000000000000018
+        ]
+      ]
+    },
+    "mixed": {
+      "statuses": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        500,
+        500
+      ],
+      "deltas": [
+        [
+          "http_request_duration_highr_seconds_count",
+          {},
+          10.0
+        ],
+        [
+          "http_request_duration_highr_seconds_sum",
+          {},
+          0.0054498119998243055
+        ],
+        [
+          "http_request_duration_seconds_count",
+          {
+            "handler": "/crash",
+            "method": "GET"
+          },
+          1.0
+        ],
+        [
+          "http_request_duration_seconds_count",
+          {
+            "handler": "/error",
+            "method": "GET"
+          },
+          1.0
+        ],
+        [
+          "http_request_duration_seconds_count",
+          {
+            "handler": "/ok",
+            "method": "GET"
+          },
+          8.0
+        ],
+        [
+          "http_request_duration_seconds_sum",
+          {
+            "handler": "/crash",
+            "method": "GET"
+          },
+          0.00021249799999623065
+        ],
+        [
+          "http_request_duration_seconds_sum",
+          {
+            "handler": "/error",
+            "method": "GET"
+          },
+          0.0006621249999625434
+        ],
+        [
+          "http_request_duration_seconds_sum",
+          {
+            "handler": "/ok",
+            "method": "GET"
+          },
+          0.0045751889998655315
+        ],
+        [
+          "http_request_size_bytes_count",
+          {
+            "handler": "/crash"
+          },
+          1.0
+        ],
+        [
+          "http_request_size_bytes_count",
+          {
+            "handler": "/error"
+          },
+          1.0
+        ],
+        [
+          "http_request_size_bytes_count",
+          {
+            "handler": "/ok"
+          },
+          8.0
+        ],
+        [
+          "http_requests_total",
+          {
+            "handler": "/crash",
+            "method": "GET",
+            "status": "500"
+          },
+          1.0
+        ],
+        [
+          "http_requests_total",
+          {
+            "handler": "/error",
+            "method": "GET",
+            "status": "500"
+          },
+          1.0
+        ],
+        [
+          "http_requests_total",
+          {
+            "handler": "/ok",
+            "method": "GET",
+            "status": "200"
+          },
+          8.0
+        ],
+        [
+          "http_response_size_bytes_count",
+          {
+            "handler": "/crash"
+          },
+          1.0
+        ],
+        [
+          "http_response_size_bytes_count",
+          {
+            "handler": "/error"
+          },
+          1.0
+        ],
+        [
+          "http_response_size_bytes_count",
+          {
+            "handler": "/ok"
+          },
+          8.0
+        ],
+        [
+          "process_cpu_seconds_total",
+          {},
+          0.010000000000000009
+        ],
+        [
+          "process_resident_memory_bytes",
+          {},
+          131072.0
+        ]
+      ]
+    }
+  },
+  "interval_elapsed_seconds": 0.534600705999992,
+  "first_runtime": {
+    "process_virtual_memory_bytes": 134938624.0,
+    "process_resident_memory_bytes": 47927296.0,
+    "process_start_time_seconds": 1795803632.8,
+    "process_cpu_seconds_total": 0.32999999999999996,
+    "process_open_fds": 9.0,
+    "process_max_fds": 1024.0
+  },
+  "restart": {
+    "old_pid": 3136,
+    "new_pid": 3138,
+    "old_runtime": {
+      "process_virtual_memory_bytes": 137482240.0,
+      "process_resident_memory_bytes": 49500160.0,
+      "process_start_time_seconds": 1795803632.8,
+      "process_cpu_seconds_total": 0.38,
+      "process_open_fds": 9.0,
+      "process_max_fds": 1024.0
+    },
+    "new_runtime": {
+      "process_virtual_memory_bytes": 134938624.0,
+      "process_resident_memory_bytes": 47923200.0,
+      "process_start_time_seconds": 1795803633.88,
+      "process_cpu_seconds_total": 0.35,
+      "process_open_fds": 9.0,
+      "process_max_fds": 1024.0
+    },
+    "removed_series": [
+      [
+        "http_request_duration_seconds_count",
+        {
+          "handler": "/bad",
+          "method": "GET"
+        },
+        3.0
+      ],
+      [
+        "http_request_duration_seconds_count",
+        {
+          "handler": "/crash",
+          "method": "GET"
+        },
+        4.0
+      ],
+      [
+        "http_request_duration_seconds_count",
+        {
+          "handler": "/error",
+          "method": "GET"
+        },
+        4.0
+      ],
+      [
+        "http_request_duration_seconds_count",
+        {
+          "handler": "/ok",
+          "method": "GET"
+        },
+        11.0
+      ],
+      [
+        "http_request_duration_seconds_count",
+        {
+          "handler": "/slow",
+          "method": "GET"
+        },
+        3.0
+      ],
+      [
+        "http_request_duration_seconds_count",
+        {
+          "handler": "none",
+          "method": "GET"
+        },
+        3.0
+      ],
+      [
+        "http_request_duration_seconds_sum",
+        {
+          "handler": "/bad",
+          "method": "GET"
+        },
+        0.0012878059998229219
+      ],
+      [
+        "http_request_duration_seconds_sum",
+        {
+          "handler": "/crash",
+          "method": "GET"
+        },
+        0.0011543739999524405
+      ],
+      [
+        "http_request_duration_seconds_sum",
+        {
+          "handler": "/error",
+          "method": "GET"
+        },
+        0.002465085000039835
+      ],
+      [
+        "http_request_duration_seconds_sum",
+        {
+          "handler": "/ok",
+          "method": "GET"
+        },
+        0.006117710999888004
+      ],
+      [
+        "http_request_duration_seconds_sum",
+        {
+          "handler": "/slow",
+          "method": "GET"
+        },
+        0.4549490770000375
+      ],
+      [
+        "http_request_duration_seconds_sum",
+        {
+          "handler": "none",
+          "method": "GET"
+        },
+        0.001189263000014762
+      ],
+      [
+        "http_request_size_bytes_count",
+        {
+          "handler": "/bad"
+        },
+        3.0
+      ],
+      [
+        "http_request_size_bytes_count",
+        {
+          "handler": "/crash"
+        },
+        4.0
+      ],
+      [
+        "http_request_size_bytes_count",
+        {
+          "handler": "/error"
+        },
+        4.0
+      ],
+      [
+        "http_request_size_bytes_count",
+        {
+          "handler": "/ok"
+        },
+        11.0
+      ],
+      [
+        "http_request_size_bytes_count",
+        {
+          "handler": "/slow"
+        },
+        3.0
+      ],
+      [
+        "http_request_size_bytes_count",
+        {
+          "handler": "none"
+        },
+        3.0
+      ],
+      [
+        "http_request_size_bytes_sum",
+        {
+          "handler": "/bad"
+        },
+        0.0
+      ],
+      [
+        "http_request_size_bytes_sum",
+        {
+          "handler": "/crash"
+        },
+        0.0
+      ],
+      [
+        "http_request_size_bytes_sum",
+        {
+          "handler": "/error"
+        },
+        0.0
+      ],
+      [
+        "http_request_size_bytes_sum",
+        {
+          "handler": "/ok"
+        },
+        0.0
+      ],
+      [
+        "http_request_size_bytes_sum",
+        {
+          "handler": "/slow"
+        },
+        0.0
+      ],
+      [
+        "http_request_size_bytes_sum",
+        {
+          "handler": "none"
+        },
+        0.0
+      ],
+      [
+        "http_requests_total",
+        {
+          "handler": "/bad",
+          "method": "GET",
+          "status": "400"
+        },
+        3.0
+      ],
+      [
+        "http_requests_total",
+        {
+          "handler": "/crash",
+          "method": "GET",
+          "status": "500"
+        },
+        4.0
+      ],
+      [
+        "http_requests_total",
+        {
+          "handler": "/error",
+          "method": "GET",
+          "status": "500"
+        },
+        4.0
+      ],
+      [
+        "http_requests_total",
+        {
+          "handler": "/ok",
+          "method": "GET",
+          "status": "200"
+        },
+        11.0
+      ],
+      [
+        "http_requests_total",
+        {
+          "handler": "/slow",
+          "method": "GET",
+          "status": "200"
+        },
+        3.0
+      ],
+      [
+        "http_requests_total",
+        {
+          "handler": "none",
+          "method": "GET",
+          "status": "404"
+        },
+        3.0
+      ],
+      [
+        "http_response_size_bytes_count",
+        {
+          "handler": "/bad"
+        },
+        3.0
+      ],
+      [
+        "http_response_size_bytes_count",
+        {
+          "handler": "/crash"
+        },
+        4.0
+      ],
+      [
+        "http_response_size_bytes_count",
+        {
+          "handler": "/error"
+        },
+        4.0
+      ],
+      [
+        "http_response_size_bytes_count",
+        {
+          "handler": "/ok"
+        },
+        11.0
+      ],
+      [
+        "http_response_size_bytes_count",
+        {
+          "handler": "/slow"
+        },
+        3.0
+      ],
+      [
+        "http_response_size_bytes_count",
+        {
+          "handler": "none"
+        },
+        3.0
+      ],
+      [
+        "http_response_size_bytes_sum",
+        {
+          "handler": "/bad"
+        },
+        0.0
+      ],
+      [
+        "http_response_size_bytes_sum",
+        {
+          "handler": "/crash"
+        },
+        0.0
+      ],
+      [
+        "http_response_size_bytes_sum",
+        {
+          "handler": "/error"
+        },
+        0.0
+      ],
+      [
+        "http_response_size_bytes_sum",
+        {
+          "handler": "/ok"
+        },
+        0.0
+      ],
+      [
+        "http_response_size_bytes_sum",
+        {
+          "handler": "/slow"
+        },
+        0.0
+      ],
+      [
+        "http_response_size_bytes_sum",
+        {
+          "handler": "none"
+        },
+        66.0
+      ]
+    ],
+    "raw_changes_at_restart": [
+      [
+        "http_request_duration_highr_seconds_count",
+        {},
+        -28.0
+      ],
+      [
+        "http_request_duration_highr_seconds_sum",
+        {},
+        -0.46716331599975547
+      ],
+      [
+        "process_cpu_seconds_total",
+        {},
+        -0.030000000000000027
+      ],
+      [
+        "process_resident_memory_bytes",
+        {},
+        -1576960.0
+      ],
+      [
+        "process_start_time_seconds",
+        {},
+        1.0800001621246338
+      ],
+      [
+        "process_virtual_memory_bytes",
+        {},
+        -2543616.0
+      ],
+      [
+        "python_gc_collections_total",
+        {
+          "generation": "0"
+        },
+        -2.0
+      ],
+      [
+        "python_gc_objects_collected_total",
+        {
+          "generation": "0"
+        },
+        -314.0
+      ]
+    ],
+    "statuses": [
+      200,
+      500,
+      500
+    ],
+    "deltas_after_rebaseline": [
+      [
+        "http_request_duration_highr_seconds_count",
+        {},
+        3.0
+      ],
+      [
+        "http_request_duration_highr_seconds_sum",
+        {},
+        0.001796056000102908
+      ],
+      [
+        "http_request_duration_seconds_count",
+        {
+          "handler": "/crash",
+          "method": "GET"
+        },
+        1.0
+      ],
+      [
+        "http_request_duration_seconds_count",
+        {
+          "handler": "/error",
+          "method": "GET"
+        },
+        1.0
+      ],
+      [
+        "http_request_duration_seconds_count",
+        {
+          "handler": "/ok",
+          "method": "GET"
+        },
+        1.0
+      ],
+      [
+        "http_request_duration_seconds_sum",
+        {
+          "handler": "/crash",
+          "method": "GET"
+        },
+        0.0002754920000143102
+      ],
+      [
+        "http_request_duration_seconds_sum",
+        {
+          "handler": "/error",
+          "method": "GET"
+        },
+        0.0009688869999990857
+      ],
+      [
+        "http_request_duration_seconds_sum",
+        {
+          "handler": "/ok",
+          "method": "GET"
+        },
+        0.0005516770000895121
+      ],
+      [
+        "http_request_size_bytes_count",
+        {
+          "handler": "/crash"
+        },
+        1.0
+      ],
+      [
+        "http_request_size_bytes_count",
+        {
+          "handler": "/error"
+        },
+        1.0
+      ],
+      [
+        "http_request_size_bytes_count",
+        {
+          "handler": "/ok"
+        },
+        1.0
+      ],
+      [
+        "http_requests_total",
+        {
+          "handler": "/crash",
+          "method": "GET",
+          "status": "500"
+        },
+        1.0
+      ],
+      [
+        "http_requests_total",
+        {
+          "handler": "/error",
+          "method": "GET",
+          "status": "500"
+        },
+        1.0
+      ],
+      [
+        "http_requests_total",
+        {
+          "handler": "/ok",
+          "method": "GET",
+          "status": "200"
+        },
+        1.0
+      ],
+      [
+        "http_response_size_bytes_count",
+        {
+          "handler": "/crash"
+        },
+        1.0
+      ],
+      [
+        "http_response_size_bytes_count",
+        {
+          "handler": "/error"
+        },
+        1.0
+      ],
+      [
+        "http_response_size_bytes_count",
+        {
+          "handler": "/ok"
+        },
+        1.0
+      ],
+      [
+        "process_cpu_seconds_total",
+        {},
+        0.010000000000000009
+      ],
+      [
+        "process_resident_memory_bytes",
+        {},
+        1441792.0
+      ],
+      [
+        "process_virtual_memory_bytes",
+        {},
+        2543616.0
+      ],
+      [
+        "python_gc_collections_total",
+        {
+          "generation": "0"
+        },
+        1.0
+      ]
+    ]
+  },
+  "platform": "Linux-6.8.0-134-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3"
+}

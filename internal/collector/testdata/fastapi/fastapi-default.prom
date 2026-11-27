@@ -1,0 +1,186 @@
+# HELP python_gc_objects_collected_total Objects collected during gc
+# TYPE python_gc_objects_collected_total counter
+python_gc_objects_collected_total{generation="0"} 534.0
+python_gc_objects_collected_total{generation="1"} 52.0
+python_gc_objects_collected_total{generation="2"} 0.0
+# HELP python_gc_objects_uncollectable_total Uncollectable objects found during GC
+# TYPE python_gc_objects_uncollectable_total counter
+python_gc_objects_uncollectable_total{generation="0"} 0.0
+python_gc_objects_uncollectable_total{generation="1"} 0.0
+python_gc_objects_uncollectable_total{generation="2"} 0.0
+# HELP python_gc_collections_total Number of times this generation was collected
+# TYPE python_gc_collections_total counter
+python_gc_collections_total{generation="0"} 114.0
+python_gc_collections_total{generation="1"} 10.0
+python_gc_collections_total{generation="2"} 0.0
+# HELP python_info Python platform information
+# TYPE python_info gauge
+python_info{implementation="CPython",major="3",minor="12",patchlevel="3",version="3.12.3"} 1.0
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 1.3748224e+08
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 4.950016e+07
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.79580362855e+09
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 0.39
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 9.0
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1024.0
+# HELP http_requests_total Total number of requests by method, status and handler.
+# TYPE http_requests_total counter
+http_requests_total{handler="/metrics",method="GET",status="2xx"} 11.0
+http_requests_total{handler="/ok",method="GET",status="2xx"} 11.0
+http_requests_total{handler="/bad",method="GET",status="4xx"} 3.0
+http_requests_total{handler="none",method="GET",status="4xx"} 3.0
+http_requests_total{handler="/error",method="GET",status="5xx"} 4.0
+http_requests_total{handler="/crash",method="GET",status="5xx"} 4.0
+http_requests_total{handler="/slow",method="GET",status="2xx"} 3.0
+# HELP http_requests_created Total number of requests by method, status and handler.
+# TYPE http_requests_created gauge
+http_requests_created{handler="/metrics",method="GET",status="2xx"} 1.7958036296111622e+09
+http_requests_created{handler="/ok",method="GET",status="2xx"} 1.7958036296227517e+09
+http_requests_created{handler="/bad",method="GET",status="4xx"} 1.79580362962945e+09
+http_requests_created{handler="none",method="GET",status="4xx"} 1.7958036296370678e+09
+http_requests_created{handler="/error",method="GET",status="5xx"} 1.795803629644599e+09
+http_requests_created{handler="/crash",method="GET",status="5xx"} 1.7958036296521778e+09
+http_requests_created{handler="/slow",method="GET",status="2xx"} 1.7958036298192844e+09
+# HELP http_request_size_bytes Content length of incoming requests by handler. Only value of header is respected. Otherwise ignored. No percentile calculated. 
+# TYPE http_request_size_bytes summary
+http_request_size_bytes_count{handler="/metrics"} 11.0
+http_request_size_bytes_sum{handler="/metrics"} 0.0
+http_request_size_bytes_count{handler="/ok"} 11.0
+http_request_size_bytes_sum{handler="/ok"} 0.0
+http_request_size_bytes_count{handler="/bad"} 3.0
+http_request_size_bytes_sum{handler="/bad"} 0.0
+http_request_size_bytes_count{handler="none"} 3.0
+http_request_size_bytes_sum{handler="none"} 0.0
+http_request_size_bytes_count{handler="/error"} 4.0
+http_request_size_bytes_sum{handler="/error"} 0.0
+http_request_size_bytes_count{handler="/crash"} 4.0
+http_request_size_bytes_sum{handler="/crash"} 0.0
+http_request_size_bytes_count{handler="/slow"} 3.0
+http_request_size_bytes_sum{handler="/slow"} 0.0
+# HELP http_request_size_bytes_created Content length of incoming requests by handler. Only value of header is respected. Otherwise ignored. No percentile calculated. 
+# TYPE http_request_size_bytes_created gauge
+http_request_size_bytes_created{handler="/metrics"} 1.795803629611181e+09
+http_request_size_bytes_created{handler="/ok"} 1.795803629622766e+09
+http_request_size_bytes_created{handler="/bad"} 1.795803629629464e+09
+http_request_size_bytes_created{handler="none"} 1.795803629637082e+09
+http_request_size_bytes_created{handler="/error"} 1.7958036296446123e+09
+http_request_size_bytes_created{handler="/crash"} 1.7958036296521924e+09
+http_request_size_bytes_created{handler="/slow"} 1.795803629819311e+09
+# HELP http_response_size_bytes Content length of outgoing responses by handler. Only value of header is respected. Otherwise ignored. No percentile calculated. 
+# TYPE http_response_size_bytes summary
+http_response_size_bytes_count{handler="/metrics"} 11.0
+http_response_size_bytes_sum{handler="/metrics"} 89938.0
+http_response_size_bytes_count{handler="/ok"} 11.0
+http_response_size_bytes_sum{handler="/ok"} 0.0
+http_response_size_bytes_count{handler="/bad"} 3.0
+http_response_size_bytes_sum{handler="/bad"} 0.0
+http_response_size_bytes_count{handler="none"} 3.0
+http_response_size_bytes_sum{handler="none"} 66.0
+http_response_size_bytes_count{handler="/error"} 4.0
+http_response_size_bytes_sum{handler="/error"} 0.0
+http_response_size_bytes_count{handler="/crash"} 4.0
+http_response_size_bytes_sum{handler="/crash"} 0.0
+http_response_size_bytes_count{handler="/slow"} 3.0
+http_response_size_bytes_sum{handler="/slow"} 0.0
+# HELP http_response_size_bytes_created Content length of outgoing responses by handler. Only value of header is respected. Otherwise ignored. No percentile calculated. 
+# TYPE http_response_size_bytes_created gauge
+http_response_size_bytes_created{handler="/metrics"} 1.7958036296112053e+09
+http_response_size_bytes_created{handler="/ok"} 1.7958036296227837e+09
+http_response_size_bytes_created{handler="/bad"} 1.795803629629481e+09
+http_response_size_bytes_created{handler="none"} 1.7958036296370993e+09
+http_response_size_bytes_created{handler="/error"} 1.795803629644628e+09
+http_response_size_bytes_created{handler="/crash"} 1.7958036296522095e+09
+http_response_size_bytes_created{handler="/slow"} 1.7958036298193645e+09
+# HELP http_request_duration_highr_seconds Latency with many buckets but no API specific labels. Made for more accurate percentile calculations. 
+# TYPE http_request_duration_highr_seconds histogram
+http_request_duration_highr_seconds_bucket{le="0.01"} 35.0
+http_request_duration_highr_seconds_bucket{le="0.025"} 36.0
+http_request_duration_highr_seconds_bucket{le="0.05"} 36.0
+http_request_duration_highr_seconds_bucket{le="0.075"} 36.0
+http_request_duration_highr_seconds_bucket{le="0.1"} 36.0
+http_request_duration_highr_seconds_bucket{le="0.25"} 39.0
+http_request_duration_highr_seconds_bucket{le="0.5"} 39.0
+http_request_duration_highr_seconds_bucket{le="0.75"} 39.0
+http_request_duration_highr_seconds_bucket{le="1.0"} 39.0
+http_request_duration_highr_seconds_bucket{le="1.5"} 39.0
+http_request_duration_highr_seconds_bucket{le="2.0"} 39.0
+http_request_duration_highr_seconds_bucket{le="2.5"} 39.0
+http_request_duration_highr_seconds_bucket{le="3.0"} 39.0
+http_request_duration_highr_seconds_bucket{le="3.5"} 39.0
+http_request_duration_highr_seconds_bucket{le="4.0"} 39.0
+http_request_duration_highr_seconds_bucket{le="4.5"} 39.0
+http_request_duration_highr_seconds_bucket{le="5.0"} 39.0
+http_request_duration_highr_seconds_bucket{le="7.5"} 39.0
+http_request_duration_highr_seconds_bucket{le="10.0"} 39.0
+http_request_duration_highr_seconds_bucket{le="30.0"} 39.0
+http_request_duration_highr_seconds_bucket{le="60.0"} 39.0
+http_request_duration_highr_seconds_bucket{le="+Inf"} 39.0
+http_request_duration_highr_seconds_count 39.0
+http_request_duration_highr_seconds_sum 0.5001505600002929
+# HELP http_request_duration_highr_seconds_created Latency with many buckets but no API specific labels. Made for more accurate percentile calculations. 
+# TYPE http_request_duration_highr_seconds_created gauge
+http_request_duration_highr_seconds_created 1.7958036295628967e+09
+# HELP http_request_duration_seconds Latency with only few buckets by handler. Made to be only used if aggregation by handler is important. 
+# TYPE http_request_duration_seconds histogram
+http_request_duration_seconds_bucket{handler="/metrics",le="0.1",method="GET"} 11.0
+http_request_duration_seconds_bucket{handler="/metrics",le="0.5",method="GET"} 11.0
+http_request_duration_seconds_bucket{handler="/metrics",le="1.0",method="GET"} 11.0
+http_request_duration_seconds_bucket{handler="/metrics",le="+Inf",method="GET"} 11.0
+http_request_duration_seconds_count{handler="/metrics",method="GET"} 11.0
+http_request_duration_seconds_sum{handler="/metrics",method="GET"} 0.03350375100023939
+http_request_duration_seconds_bucket{handler="/ok",le="0.1",method="GET"} 11.0
+http_request_duration_seconds_bucket{handler="/ok",le="0.5",method="GET"} 11.0
+http_request_duration_seconds_bucket{handler="/ok",le="1.0",method="GET"} 11.0
+http_request_duration_seconds_bucket{handler="/ok",le="+Inf",method="GET"} 11.0
+http_request_duration_seconds_count{handler="/ok",method="GET"} 11.0
+http_request_duration_seconds_sum{handler="/ok",method="GET"} 0.0057574619999059
+http_request_duration_seconds_bucket{handler="/bad",le="0.1",method="GET"} 3.0
+http_request_duration_seconds_bucket{handler="/bad",le="0.5",method="GET"} 3.0
+http_request_duration_seconds_bucket{handler="/bad",le="1.0",method="GET"} 3.0
+http_request_duration_seconds_bucket{handler="/bad",le="+Inf",method="GET"} 3.0
+http_request_duration_seconds_count{handler="/bad",method="GET"} 3.0
+http_request_duration_seconds_sum{handler="/bad",method="GET"} 0.0016988620000120136
+http_request_duration_seconds_bucket{handler="none",le="0.1",method="GET"} 3.0
+http_request_duration_seconds_bucket{handler="none",le="0.5",method="GET"} 3.0
+http_request_duration_seconds_bucket{handler="none",le="1.0",method="GET"} 3.0
+http_request_duration_seconds_bucket{handler="none",le="+Inf",method="GET"} 3.0
+http_request_duration_seconds_count{handler="none",method="GET"} 3.0
+http_request_duration_seconds_sum{handler="none",method="GET"} 0.0012450319999288695
+http_request_duration_seconds_bucket{handler="/error",le="0.1",method="GET"} 4.0
+http_request_duration_seconds_bucket{handler="/error",le="0.5",method="GET"} 4.0
+http_request_duration_seconds_bucket{handler="/error",le="1.0",method="GET"} 4.0
+http_request_duration_seconds_bucket{handler="/error",le="+Inf",method="GET"} 4.0
+http_request_duration_seconds_count{handler="/error",method="GET"} 4.0
+http_request_duration_seconds_sum{handler="/error",method="GET"} 0.0023694570000998283
+http_request_duration_seconds_bucket{handler="/crash",le="0.1",method="GET"} 4.0
+http_request_duration_seconds_bucket{handler="/crash",le="0.5",method="GET"} 4.0
+http_request_duration_seconds_bucket{handler="/crash",le="1.0",method="GET"} 4.0
+http_request_duration_seconds_bucket{handler="/crash",le="+Inf",method="GET"} 4.0
+http_request_duration_seconds_count{handler="/crash",method="GET"} 4.0
+http_request_duration_seconds_sum{handler="/crash",method="GET"} 0.0010196390001055988
+http_request_duration_seconds_bucket{handler="/slow",le="0.1",method="GET"} 0.0
+http_request_duration_seconds_bucket{handler="/slow",le="0.5",method="GET"} 3.0
+http_request_duration_seconds_bucket{handler="/slow",le="1.0",method="GET"} 3.0
+http_request_duration_seconds_bucket{handler="/slow",le="+Inf",method="GET"} 3.0
+http_request_duration_seconds_count{handler="/slow",method="GET"} 3.0
+http_request_duration_seconds_sum{handler="/slow",method="GET"} 0.4545563570000013
+# HELP http_request_duration_seconds_created Latency with only few buckets by handler. Made to be only used if aggregation by handler is important. 
+# TYPE http_request_duration_seconds_created gauge
+http_request_duration_seconds_created{handler="/metrics",method="GET"} 1.7958036296112301e+09
+http_request_duration_seconds_created{handler="/ok",method="GET"} 1.7958036296228025e+09
+http_request_duration_seconds_created{handler="/bad",method="GET"} 1.7958036296294992e+09
+http_request_duration_seconds_created{handler="none",method="GET"} 1.7958036296371195e+09
+http_request_duration_seconds_created{handler="/error",method="GET"} 1.7958036296446462e+09
+http_request_duration_seconds_created{handler="/crash",method="GET"} 1.7958036296522276e+09
+http_request_duration_seconds_created{handler="/slow",method="GET"} 1.7958036298194273e+09

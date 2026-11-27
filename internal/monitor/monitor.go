@@ -167,6 +167,8 @@ func (m *Monitor) IntegrationType() string {
 		return config.TargetTypeQuarkus
 	case *collector.StatliteMetricsCollector:
 		return config.TargetTypeStatliteMetrics
+	case *collector.FastAPICollector:
+		return config.TargetTypeFastAPI
 	case *collector.TraefikCollector:
 		return config.TargetTypeTraefik
 	case *collector.CaddyCollector:
@@ -248,6 +250,11 @@ func (m *Monitor) PollNow(ctx context.Context) (*storage.Snapshot, error) {
 		return snapshot, collectErr
 	}
 
+	if result.TracksCounterContinuity {
+		// Anonymous run IDs also represent non-restart boundaries. Retain
+		// the process identity separately for the next live observation.
+		snapshot.Result.ProcessStartTime = result.ProcessStartTime
+	}
 	m.recordSuccess(result.PollFinishedAt, pollID, snapshot)
 	return snapshot, nil
 }
@@ -409,12 +416,12 @@ func (m *Monitor) detectAppRun(ctx context.Context, result *collector.Collection
 		// These runs represent counter boundaries independently of application lifecycle.
 		// Loaded history alone cannot establish continuity for this monitor, and
 		// any failed attempt (including persistence) invalidates its baseline.
-		result.ProcessStartTime = nil
+		restarted := m.processStartChanged(result)
 		status := m.Status()
 		if status.LastSuccessfulPollAt == nil || status.ConsecutivePollFailures > 0 ||
-			result.CounterContinuityBreak || m.previous == nil || m.previous.AppRunID == nil {
+			restarted || result.CounterContinuityBreak || m.previous == nil || m.previous.AppRunID == nil {
 			id, err := m.store.EnsureAppRun(ctx, result.TargetName, nil, result.PollStartedAt)
-			return id, false, "", err
+			return id, restarted, "process.start.time changed", err
 		}
 		return *m.previous.AppRunID, false, "", m.touchAppRun(ctx, *m.previous.AppRunID, result.PollStartedAt)
 	}

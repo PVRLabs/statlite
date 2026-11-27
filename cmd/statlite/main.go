@@ -60,7 +60,7 @@ func runInspectWithTyped(args []string, stdout, stderr io.Writer, inspectApplica
 	inspectFlags.Usage = func() {
 		printInspectHelp(stderr)
 	}
-	typed := inspectFlags.String("type", "", "inspect a specific target type (currently: quarkus, micronaut, traefik)")
+	typed := inspectFlags.String("type", "", "inspect a specific target type (currently: quarkus, micronaut, traefik, fastapi)")
 	service := inspectFlags.String("service", "", "provider-qualified service for type traefik")
 	name := inspectFlags.String("name", "", "target name (default: derived from type, host, and port)")
 	createPath := inspectFlags.String("create-config", "", "create a new configuration file at PATH")
@@ -348,6 +348,7 @@ Usage:
   statlite inspect --type quarkus <application-or-metrics-url>
   statlite inspect --type micronaut <application-or-metrics-url>
   statlite inspect --type traefik --service <name@provider> <metrics-url>
+  statlite inspect --type fastapi <metrics-url>
   statlite inspect <application-url> --create-config PATH
   statlite inspect <application-url> --add-to-config PATH
   statlite --version
@@ -395,7 +396,8 @@ URL resolves to /prometheus; non-root paths allow one context fallback after a
 conclusive miss. URLs with a query are exact endpoints. Micronaut inspection
 checks compatibility without proving framework identity; untyped inspection
 does not recognize Micronaut.
-Use --type traefik with an exact metrics URL and --service name@provider.`)
+Use --type traefik with an exact metrics URL and --service name@provider.
+Use --type fastapi with the exact Instrumentator metrics URL.`)
 }
 
 const configurationDocsURL = "https://github.com/PVRLabs/statlite/blob/main/docs/configuration.md"
@@ -466,6 +468,8 @@ func renderInspectionWithOptions(result *inspect.Result, target suggestedTarget,
 
 func inspectionPresentation(targetType inspect.TargetType) (inspectionTargetPresentation, error) {
 	switch targetType {
+	case inspect.TargetFastAPI:
+		return inspectionTargetPresentation{displayName: "FastAPI Metrics", targetType: config.TargetTypeFastAPI, errorContext: "fastapi target"}, nil
 	case inspect.TargetTraefik:
 		return inspectionTargetPresentation{displayName: "Traefik Metrics", targetType: config.TargetTypeTraefik, errorContext: "traefik target"}, nil
 	case inspect.TargetSpring:

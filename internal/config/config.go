@@ -17,6 +17,7 @@ import (
 
 const (
 	// When adding a target type, also update targetTypeHelp in the dashboard.
+	TargetTypeFastAPI         = "fastapi"
 	TargetTypeTraefik         = "traefik"
 	TargetTypeCaddy           = "caddy"
 	TargetTypeSpring          = "spring"
@@ -314,16 +315,16 @@ func (c *Config) validateTargets() error {
 			if err := validateMicronautTarget(target); err != nil {
 				return err
 			}
-		case TargetTypeStatliteMetrics:
-			if err := validateStatliteMetricsTarget(target); err != nil {
+		case TargetTypeFastAPI, TargetTypeStatliteMetrics:
+			if err := validateExactMetricsTarget(target); err != nil {
 				return err
 			}
 		default:
-			return targetError(target, "type", fmt.Sprintf("unsupported value %q (supported: spring, quarkus, micronaut, statlite-metrics, caddy, traefik)", targetType))
+			return targetError(target, "type", fmt.Sprintf("unsupported value %q (supported: spring, quarkus, micronaut, statlite-metrics, caddy, traefik, fastapi)", targetType))
 		}
 		if target.Auth != nil {
-			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus && targetType != TargetTypeMicronaut && targetType != TargetTypeCaddy && targetType != TargetTypeTraefik {
-				return targetError(target, "auth", "is supported only for type spring, quarkus, micronaut, caddy, and traefik")
+			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus && targetType != TargetTypeMicronaut && targetType != TargetTypeCaddy && targetType != TargetTypeTraefik && targetType != TargetTypeFastAPI {
+				return targetError(target, "auth", "is supported only for type spring, quarkus, micronaut, caddy, traefik, and fastapi")
 			}
 			if target.Auth.Type != "basic" {
 				return targetError(target, "auth.type", fmt.Sprintf("unsupported value %q (only basic is supported)", target.Auth.Type))
@@ -426,7 +427,7 @@ func validateMicronautTarget(target *TargetConfig) error {
 	return nil
 }
 
-func validateStatliteMetricsTarget(target *TargetConfig) error {
+func validateExactMetricsTarget(target *TargetConfig) error {
 	if target.URL == "" {
 		return targetError(target, "url", fmt.Sprintf("is required for type %s", target.Type))
 	}

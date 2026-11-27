@@ -60,3 +60,23 @@ func (previous requestBaseline) breaksContinuity(current requestBaseline, newTup
 	}
 	return false
 }
+
+type prometheusDuration struct {
+	count, sum       float64
+	hasCount, hasSum bool
+}
+
+func (d *prometheusDuration) accept(isCount bool, value float64) bool {
+	if isCount {
+		if d.hasCount || !validPrometheusCount(value) {
+			return false
+		}
+		d.count, d.hasCount = value, true
+	} else {
+		if d.hasSum || !finiteNonnegative(value) {
+			return false
+		}
+		d.sum, d.hasSum = value, true
+	}
+	return true
+}

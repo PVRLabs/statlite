@@ -28,7 +28,7 @@ type TraefikCollector struct {
 	client                        *prometheus.Client
 	mu                            sync.Mutex
 	previous                      requestBaseline
-	previousDurations             map[string]traefikDuration
+	previousDurations             map[string]prometheusDuration
 	previousReloadCount           float64
 }
 
@@ -92,15 +92,10 @@ func (c *TraefikCollector) Collect(ctx context.Context) (*CollectionResult, erro
 	return result, nil
 }
 
-type traefikDuration struct {
-	count, sum       float64
-	hasCount, hasSum bool
-}
-
 type traefikScrape struct {
 	service         string
 	requests        map[string]httpRequestTuple
-	durations       map[string]traefikDuration
+	durations       map[string]prometheusDuration
 	badDurations    bool
 	recognized      bool
 	proxyStart      float64
@@ -115,7 +110,7 @@ func scrapeTraefik(ctx context.Context, endpoint, service string, client *promet
 	}
 	s := &traefikScrape{
 		service: service, requests: make(map[string]httpRequestTuple),
-		durations: make(map[string]traefikDuration), reloadCount: -1,
+		durations: make(map[string]prometheusDuration), reloadCount: -1,
 	}
 	if _, err := client.Scrape(ctx, endpoint, s.accept); err != nil {
 		return nil, fmt.Errorf("scraping Traefik metrics: %w", err)
@@ -205,16 +200,8 @@ func (s *traefikScrape) addDuration(sample prometheus.Sample) bool {
 	if !exists && len(s.durations) >= traefikMaxTuples {
 		return false
 	}
-	if sample.Name == traefikCount {
-		if tuple.hasCount || !validPrometheusCount(sample.Value) {
-			return false
-		}
-		tuple.count, tuple.hasCount = sample.Value, true
-	} else {
-		if tuple.hasSum || !finiteNonnegative(sample.Value) {
-			return false
-		}
-		tuple.sum, tuple.hasSum = sample.Value, true
+	if !tuple.accept(sample.Name == traefikCount, sample.Value) {
+		return false
 	}
 	s.durations[key] = tuple
 	return true

@@ -13,7 +13,7 @@ import (
 )
 
 func TestDashboardCPUUnitsPreservePublicAndRawSamples(t *testing.T) {
-	for _, targetType := range []string{"spring", "quarkus", "micronaut", "statlite-metrics"} {
+	for _, targetType := range []string{"spring", "quarkus", "micronaut", "statlite-metrics", "fastapi"} {
 		t.Run(targetType, func(t *testing.T) {
 			store := newPublicTestStore(t)
 			mon := newServerTestMonitor(t, "app", store, &countingCollector{})
@@ -42,7 +42,7 @@ func TestDashboardCPUUnitsPreservePublicAndRawSamples(t *testing.T) {
 				}
 			}
 			expectedUnit, expected := "ratio", .625
-			if targetType == "statlite-metrics" {
+			if targetType == "statlite-metrics" || targetType == "fastapi" {
 				expectedUnit, expected = "cores", 1.875
 			}
 			for _, raw := range []bool{false, true} {

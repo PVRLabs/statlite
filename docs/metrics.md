@@ -30,7 +30,7 @@ sample can lack a unit. Missing observations are unavailable, not zero.
 | `http_4xx_total` | counter | `requests` | Cumulative HTTP 400–499 responses, including 404; helps identify client/request failures. |
 | `http_5xx_total` | counter | `requests` | Cumulative HTTP 500–599 responses; helps identify server failures. |
 | `http_request_time_total_seconds` | counter | `seconds` | Cumulative request duration; paired request-count deltas yield average latency. This is not elapsed wall time or a maximum latency. |
-| `process_cpu_usage` | gauge | `ratio` for JVM adapters; `cores` for v1 | Process CPU consumption. The unit depends on the source; see CPU interpretation below. |
+| `process_cpu_usage` | gauge | `ratio` for JVM adapters; `cores` for v1 and FastAPI | Process CPU consumption. The unit depends on the source; see CPU interpretation below. |
 | `jvm_heap_used_bytes` | gauge | `bytes` | JVM heap currently used, summed over heap pools; helps track heap pressure and growth. |
 | `runtime_heap_used_bytes` | gauge | `bytes` | Producer-defined runtime-managed memory currently used; helps track memory trends within the same runtime and instrumentation. |
 | `process_start_time` | gauge | `unix_seconds` | Process start as Unix seconds, potentially fractional; also sets process-start metadata used to identify restarts. |
@@ -119,7 +119,7 @@ JVM `process_cpu_usage` is a ratio in `[0, 1]`. A ratio of `0.25` represents
 25% of the capacity used by the source's denominator. StatLite does not discover
 or change that denominator.
 
-StatLite Metrics v1 uses `process_cpu_usage` for logical CPU equivalents: CPU
+StatLite Metrics v1 and FastAPI use `process_cpu_usage` for logical CPU equivalents: CPU
 time consumed per elapsed wall time. `0.25` means one quarter of a logical CPU;
 `2.75` means 2.75 logical CPUs. These values are not fractions of total capacity.
 Converting them to a capacity ratio requires a known denominator that StatLite
@@ -127,7 +127,7 @@ does not collect.
 
 Each target's CPU chart uses one unit based on its configured integration:
 JVM/Micrometer targets display normalized utilization as a percentage; StatLite
-Metrics v1 targets display logical CPU consumption in cores. For example, a
+Metrics v1 and FastAPI targets display logical CPU consumption in cores. For example, a
 JVM ratio of `0.25` displays as `25%`, and v1 consumption of `2.75` displays as
 `2.75 cores`. The existing CPU axis and tooltip use that unit for the whole chart.
 
@@ -176,7 +176,7 @@ do not fabricate measurements.
 | Response errors | `http_404`, `http_4xx`, `http_5xx` | Counter deltas; API v1 exposes 4xx/5xx counts with paired-coverage rules. |
 | Mean request latency | `average_latency_seconds` | Dashboard milliseconds; API `avg_latency_ms`, with `latency_requests` indicating covered requests. |
 | Runtime memory | `heap_used_bytes` | Dashboard bytes / 1024² (labeled MB); API `runtime_memory_bytes` in bytes. |
-| Process CPU | `process_cpu_usage` | Dashboard percentage for JVM ratios or cores for v1; see chart-unit rules and the API field description. |
+| Process CPU | `process_cpu_usage` | Dashboard percentage for JVM ratios or cores for v1 and FastAPI; see chart-unit rules and the API field description. |
 | Host CPU | `host_cpu_usage` | Ratio in series/API; percentage on dashboard. |
 | Host memory | `host_memory_used_bytes`, `host_memory_total_bytes`, `host_memory_usage` | Usage ratio requires a valid pair with `0 <= used <= total` and `total > 0`. API exposes the usage ratio. |
 | Host disk | `host_disk_used_bytes`, `host_disk_total_bytes`, `host_disk_usage` | Same pair validation; API exposes the usage ratio. |
@@ -240,3 +240,36 @@ consecutive compatible observations. The proxy start time
 is only a counter continuity signal. If a counter resets and regrows between
 polls without a detectable exporter identity or scope change, the reset is
 unobservable. A reload may briefly leave the old service labels visible.
+
+
+## FastAPI HTTP and process metrics
+
+The `fastapi` target reads the default
+`prometheus-fastapi-instrumentator` metrics from one application process.
+It maps completed responses from `http_requests_total`, including
+unmatched routes labelled `handler="none"`. Status groups contribute to
+4xx and 5xx. Exact 404 is available with
+`should_group_status_codes=False`.
+
+StatLite excludes the metrics route from the request and labelled duration
+populations using the configured URL path. For a path-rewriting proxy,
+exclude the internal scrape handler at the exporter and use an external
+path that matches no application handler label. The labelled duration count
+and sum must pair by handler and method, and each duration count must match the
+scoped request count. A mismatch leaves latency unavailable while preserving
+HTTP counts. The collector uses the unlabelled high-resolution histogram
+signature for typed recognition alone. Before application traffic, HTTP
+capabilities can be unavailable.
+
+When available, `process_start_time_seconds` identifies the process lifetime
+and supplies process uptime. StatLite derives process CPU in cores from
+`process_cpu_seconds_total` growth over elapsed time across consecutive
+observations of that lifetime. Heap is unavailable.
+
+The collector bounds request and duration state to 256 tuples each.
+Request overflow fails collection. Duration overflow leaves latency
+unavailable. A changed process start, scrape failure, or disappeared or
+decreased request tuple starts a fresh request baseline. A new positive
+request tuple also starts a fresh baseline when process identity is
+unavailable. Undetected counter resets can occur if counters regrow between
+polls without an observable identity change.
