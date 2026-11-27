@@ -45,6 +45,14 @@ Preserve the poll and storage model documented in `docs/product.md`:
 
 ## Verification
 
+Keep public CI fast and self-contained. Use unit tests, focused regressions,
+minimal synthetic fixtures, and integration smoke tests. When private
+certification exposes a product bug, add a minimal synthetic regression
+here. Keep recorded traffic, raw exporter captures, extensive replays, and
+comprehensive certification workloads and runners in the private
+certification repository unless publication is explicitly approved. Public
+guides cover supported configurations, verified capabilities, and limits.
+
 Use the `lite-tools` skill for routine npm/Node and Go test workflows.
 
 For dashboard changes, run

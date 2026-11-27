@@ -21,6 +21,7 @@ func TestFastAPIMonitorWiring(t *testing.T) {
 			http.Error(w, "unexpected scrape", http.StatusBadRequest)
 			return
 		}
+		w.Header().Set("Content-Type", "text/plain; version=1.0.0; charset=utf-8")
 		fmt.Fprint(w, `http_request_duration_highr_seconds_count 4
 http_request_duration_highr_seconds_sum 0.4
 http_requests_total{handler="none",method="GET",status="404"} 3

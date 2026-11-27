@@ -111,7 +111,8 @@ StatLite filters the configured URL path from both request and duration
 metrics, so a matching application handler would lose its traffic from
 both. FastAPI polling supports Basic Auth through the shared configuration
 block. Send an application request
-before inspecting a cold endpoint to see its HTTP capabilities.
+before inspecting a cold endpoint to see its HTTP capabilities. See the
+[FastAPI target guide](targets/fastapi.md) for both verified recipes.
 
 On success, plain `inspect` prints the recognized capabilities, a minimal
 configuration, and commands to create or add it. The suggested target gets a

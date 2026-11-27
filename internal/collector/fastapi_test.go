@@ -1,14 +1,10 @@
 package collector
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"math"
 	"net/http"
-	"os"
-	"slices"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -95,146 +91,77 @@ func fastAPISample(result *CollectionResult, key string) (MetricSample, bool) {
 	return MetricSample{}, false
 }
 
-func TestFastAPIRecordedRecipes(t *testing.T) {
-	batches := []struct {
-		name                               string
-		requests, notFound, client, server int
+func TestFastAPISyntheticRecipes(t *testing.T) {
+	for _, recipe := range []struct {
+		name                      string
+		ok, bad, missing, failure string
+		exact                     bool
 	}{
-		{"scrape_only", 0, 0, 0, 0}, {"200", 3, 0, 0, 0}, {"400", 3, 0, 3, 0},
-		{"404", 3, 3, 3, 0}, {"500", 3, 0, 0, 3}, {"unhandled", 3, 0, 0, 3},
-		{"slow", 3, 0, 0, 0}, {"mixed", 10, 0, 0, 2},
-	}
-	for _, recipe := range []string{"default", "configured"} {
-		t.Run(recipe, func(t *testing.T) {
-			final, err := os.ReadFile("testdata/fastapi/fastapi-" + recipe + ".prom")
-			if err != nil {
-				t.Fatal(err)
-			}
-			data, err := os.ReadFile("testdata/fastapi/fastapi-" + recipe + ".json")
-			if err != nil {
-				t.Fatal(err)
-			}
-			var recorded struct {
-				Scenarios map[string]struct {
-					Deltas [][]json.RawMessage
-				}
-			}
-			if err := json.Unmarshal(data, &recorded); err != nil {
-				t.Fatal(err)
-			}
-
-			// The spike saved the final raw scrape and ordered batch deltas.
-			// Reconstruct intermediate snapshots by undoing each batch.
-			snapshots := make([]string, len(batches)+1)
-			snapshots[len(batches)] = string(final)
-			values := make(map[string]float64)
-			for _, line := range strings.Split(string(final), "\n") {
-				key, raw, ok := strings.Cut(line, " ")
-				if !ok || !fastAPIReplayFamily(key) {
-					continue
-				}
-				value, err := strconv.ParseFloat(raw, 64)
-				if err != nil {
-					t.Fatal(err)
-				}
-				values[key] = value
-			}
-			for i := len(batches) - 1; i >= 0; i-- {
-				for _, delta := range recorded.Scenarios[batches[i].name].Deltas {
-					var family string
-					var labels map[string]string
-					var change float64
-					for j, dest := range []any{&family, &labels, &change} {
-						if err := json.Unmarshal(delta[j], dest); err != nil {
-							t.Fatal(err)
-						}
-					}
-					if !fastAPIReplayFamily(family) {
-						continue
-					}
-					var tuple []string
-					for key, value := range labels {
-						tuple = append(tuple, key+"="+strconv.Quote(value))
-					}
-					slices.Sort(tuple)
-					key := family
-					if len(tuple) > 0 {
-						key += "{" + strings.Join(tuple, ",") + "}"
-					}
-					values[key] -= change
-					if math.Abs(values[key]) < 1e-10 {
-						values[key] = 0
-					}
-				}
-				var body strings.Builder
-				for key, value := range values {
-					// Drop lazy zero children to exercise first positive tuples.
-					if value == 0 && strings.Contains(key, "{") {
-						continue
-					}
-					fmt.Fprintf(&body, "%s %g\n", key, value)
-				}
-				snapshots[i] = body.String()
-			}
-
+		{"grouped", "2xx", "4xx", "4xx", "5xx", false},
+		{"exact", "200", "400", "404", "500", true},
+	} {
+		t.Run(recipe.name, func(t *testing.T) {
 			transport := &fastAPITestTransport{status: 200}
 			client, err := prometheus.NewClientWithTransport(time.Second, FastAPIPrometheusLimits(), nil, transport)
 			if err != nil {
 				t.Fatal(err)
 			}
 			c := NewFastAPICollector("app", "http://localhost/metrics", client)
-			poll := func(i int) *CollectionResult {
+			poll := func(traffic, scrapes int) *CollectionResult {
 				t.Helper()
-				transport.body = snapshots[i]
+				var body strings.Builder
+				body.WriteString("http_request_duration_highr_seconds_count 100\nhttp_request_duration_highr_seconds_sum 10\nprocess_start_time_seconds 100\n")
+				route := func(handler, status string, count int, duration float64) {
+					fmt.Fprintf(&body, "http_requests_total{handler=%q,method=\"GET\",status=%q} %d\n", handler, status, count)
+					fmt.Fprintf(&body, "http_request_duration_seconds_count{handler=%q,method=\"GET\"} %d\n", handler, count)
+					fmt.Fprintf(&body, "http_request_duration_seconds_sum{handler=%q,method=\"GET\"} %g\n", handler, duration)
+				}
+				route("/ok", recipe.ok, 10+8*traffic, 1+float64(traffic))
+				if !recipe.exact {
+					route("/metrics", recipe.ok, scrapes, float64(scrapes))
+				}
+				if traffic > 0 {
+					route("/error", recipe.failure, traffic, 0.25*float64(traffic))
+					route("/crash", recipe.failure, traffic, 0.25*float64(traffic))
+					route("/bad", recipe.bad, traffic, 0.25*float64(traffic))
+					route("none", recipe.missing, traffic, 0.25*float64(traffic))
+				}
+				transport.body = body.String()
 				result, err := c.Collect(t.Context())
 				if err != nil {
 					t.Fatal(err)
 				}
 				return result
 			}
-			previous := poll(0)
-			for i, batch := range batches {
-				result := poll(i + 1)
-				if batch.name != "scrape_only" && batch.name != "200" && result.CounterContinuityBreak {
-					t.Fatalf("%s broke continuity", batch.name)
+			assertDelta := func(before, after *CollectionResult, requests, client, server, notFound, duration float64) {
+				t.Helper()
+				if after.CounterContinuityBreak {
+					t.Fatal("unexpected continuity break")
 				}
-				for key, want := range map[string]int{
-					"http_requests_total": batch.requests, "http_404_total": batch.notFound,
-					"http_4xx_total": batch.client, "http_5xx_total": batch.server,
+				for key, want := range map[string]float64{
+					"http_requests_total": requests, "http_4xx_total": client,
+					"http_5xx_total": server, "http_404_total": notFound,
+					"http_request_time_total_seconds": duration,
 				} {
-					old, _ := fastAPISample(previous, key)
-					current, ok := fastAPISample(result, key)
-					if key == "http_404_total" && recipe == "default" {
-						if ok {
-							t.Fatalf("%s exact 404 present", batch.name)
+					old, hadOld := fastAPISample(before, key)
+					new, hasNew := fastAPISample(after, key)
+					if key == "http_404_total" && !recipe.exact {
+						if hadOld || hasNew {
+							t.Fatalf("grouped status exposed exact 404: %v, %v", old, new)
 						}
 						continue
 					}
-					if (!ok && i > 0) || current.Value-old.Value != float64(want) {
-						t.Fatalf("%s %s = %g, want %d (present: %v)", batch.name, key, current.Value-old.Value, want, ok)
+					if !hadOld || !hasNew || new.Value-old.Value != want {
+						t.Fatalf("%s delta = %g, want %g (before: %v, after: %v)", key, new.Value-old.Value, want, hadOld, hasNew)
 					}
 				}
-				old, _ := fastAPISample(previous, "http_request_time_total_seconds")
-				latency, ok := fastAPISample(result, "http_request_time_total_seconds")
-				delta := latency.Value - old.Value
-				if (batch.requests > 0 && (!ok || delta <= 0)) ||
-					(batch.name == "scrape_only" && delta != 0) || (batch.name == "slow" && (delta < 0.45 || delta > 0.60)) {
-					t.Fatalf("%s duration delta = %g (present: %v)", batch.name, delta, ok)
-				}
-				previous = result
 			}
+			initial := poll(0, 1)
+			idle := poll(0, 5)
+			assertDelta(initial, idle, 0, 0, 0, 0, 0)
+			active := poll(1, 6)
+			assertDelta(idle, active, 12, 2, 2, 1, 2)
 		})
-	}
-}
-
-func fastAPIReplayFamily(key string) bool {
-	family, _, _ := strings.Cut(key, "{")
-	switch family {
-	case fastAPIRequests, fastAPICount, fastAPISum, fastAPISignatureCount, fastAPISignatureSum,
-		"process_start_time_seconds", "process_cpu_seconds_total":
-		return true
-	default:
-		return false
 	}
 }
 
