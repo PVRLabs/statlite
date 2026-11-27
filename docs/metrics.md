@@ -200,7 +200,7 @@ See the guide for exact mappings, initial missing metrics, and sampling limits.
 
 ## Traefik service HTTP source
 
-The Traefik profile selects one exact provider-qualified service, such as
+The [Traefik profile](targets/traefik.md) selects one exact provider-qualified service, such as
 `alpha@file`, from the configured Prometheus metrics URL. It uses
 `traefik_service_requests_total` for requests and exact HTTP status classes.
 Code 404 also contributes to 4xx. Code 0 contributes to requests and has
