@@ -139,6 +139,7 @@ statlite inspect --type flask 'http://localhost:8000/metrics'
 
 Send an application request before inspecting a cold endpoint to see its HTTP
 capabilities. Configure Basic Auth manually for polling protected endpoints.
+See the [Flask target guide](targets/flask.md) for setup and verified coverage.
 
 On success, plain `inspect` prints the recognized capabilities, a minimal
 configuration, and commands to create or add it. The suggested target gets a
