@@ -27,6 +27,7 @@ jobs:
             app_port: 18081
           - case: django
             app_port: 18082
+          - case: flask
           - case: net-http
             app_port: 8080
           - case: gin
@@ -49,7 +50,7 @@ jobs:
             examples/go-gin-demo/go.sum
 
       - name: Set up Python
-        if: matrix.case == 'fastapi' || matrix.case == 'django'
+        if: matrix.case == 'fastapi' || matrix.case == 'django' || matrix.case == 'flask'
         uses: actions/setup-python@v5
         with:
           python-version: "3.14.6"
@@ -58,6 +59,7 @@ jobs:
             examples/python-fastapi-demo/requirements.txt
             examples/python-fastapi-demo/requirements-test.txt
             examples/python-django-demo/requirements.txt
+            test/integration/flask/requirements.txt
 
       - name: Install FastAPI dependencies
         if: matrix.case == 'fastapi'
@@ -66,6 +68,10 @@ jobs:
       - name: Install Django dependencies
         if: matrix.case == 'django'
         run: python -m pip install -r examples/python-django-demo/requirements.txt
+
+      - name: Install Flask dependencies
+        if: matrix.case == 'flask'
+        run: python -m pip install -r test/integration/flask/requirements.txt
 
       - name: Set up Node
         if: matrix.case == 'express'
@@ -172,6 +178,10 @@ jobs:
           APP_PORT: ${{ matrix.app_port }}
           STATLITE_BIN: ${{ runner.temp }}/statlite
         run: ./scripts/ci/integration-direct-v1.sh "$CASE"
+
+      - name: Run Flask integration smoke test
+        if: matrix.case == 'flask'
+        run: python test/integration/flask/run.py "$RUNNER_TEMP/statlite"
 
       - name: Run Spring integration journey
         if: matrix.case == 'spring'
