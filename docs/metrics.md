@@ -295,3 +295,22 @@ The collector tracks at most 256 response tuples. After a failed scrape,
 process restart, or missing or decreased tuple, it starts a fresh request
 baseline. A new positive tuple also starts a fresh baseline when process
 identity is unavailable.
+
+## Flask HTTP and process metrics
+
+The `flask` target reads the default prometheus-flask-exporter metrics
+from one application process. StatLite derives requests, exact 404, 4xx,
+and 5xx from the completed statuses in `flask_http_request_total`.
+The exporter counts unhandled exceptions as 500 responses and excludes
+its own metrics endpoint by default.
+
+Latency requires matching histogram counts and sums for every
+method, concrete path, and status tuple. The summed path counts must match
+the request counts for each method and status. The collector tracks up to
+256 request tuples and 256 duration tuples. Exceeding the duration limit,
+losing a duration series, or observing inconsistent duration counters leaves
+latency unavailable while preserving valid HTTP totals. Stored latency
+resumes after two consecutive compatible observations.
+
+Compatible process metrics supply uptime, restart detection, and CPU in
+cores. Heap and application health are unavailable.

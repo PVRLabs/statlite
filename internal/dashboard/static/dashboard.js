@@ -479,7 +479,9 @@ function targetPresentation(target) {
         ? "UP means StatLite can collect FastAPI metrics. Application health is unavailable."
         : targetType === "django"
           ? "UP means StatLite can collect Django metrics. Application health is unavailable."
-          : "";
+          : targetType === "flask"
+            ? "UP means StatLite can collect Flask metrics. Application health is unavailable."
+            : "";
   const statusExplanation = collectionExplanation || (springHealthUnknown
     ? "StatLite collected metrics but could not retrieve Spring Actuator health."
     : "");
@@ -859,6 +861,8 @@ function targetTypeHelp(value) {
     return "Monitors HTTP requests for one Traefik service. Response time is measured at Traefik. Backend health and resources are unavailable.";
   case "django":
     return "Monitors a Django application through django-prometheus. Average latency requires a separate metrics listener.";
+  case "flask":
+    return "Monitors a Flask application through prometheus-flask-exporter. Average latency depends on the number and continuity of concrete path series.";
   case "fastapi":
     return "Monitors a FastAPI application through its Instrumentator metrics endpoint. CPU and restart detection require process metrics.";
   case "quarkus":

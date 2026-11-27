@@ -130,6 +130,16 @@ statlite inspect --type django --django-metrics-mode separate 'http://localhost:
 Send an application request before inspecting a cold endpoint to see its HTTP
 capabilities. Configure Basic Auth manually for polling protected endpoints.
 
+Flask uses `type: flask` and the metrics URL exposed by the default
+`PrometheusMetrics(app)` setup in one Flask process:
+
+```bash
+statlite inspect --type flask 'http://localhost:8000/metrics'
+```
+
+Send an application request before inspecting a cold endpoint to see its HTTP
+capabilities. Configure Basic Auth manually for polling protected endpoints.
+
 On success, plain `inspect` prints the recognized capabilities, a minimal
 configuration, and commands to create or add it. The suggested target gets a
 stable `<type>-<host>-<port>` name. Override it with `--name` if needed;

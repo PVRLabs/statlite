@@ -19,6 +19,7 @@ const (
 	// When adding a target type, also update targetTypeHelp in the dashboard.
 	TargetTypeDjango          = "django"
 	TargetTypeFastAPI         = "fastapi"
+	TargetTypeFlask           = "flask"
 	TargetTypeTraefik         = "traefik"
 	TargetTypeCaddy           = "caddy"
 	TargetTypeSpring          = "spring"
@@ -327,16 +328,16 @@ func (c *Config) validateTargets() error {
 			if err := validateMicronautTarget(target); err != nil {
 				return err
 			}
-		case TargetTypeDjango, TargetTypeFastAPI, TargetTypeStatliteMetrics:
+		case TargetTypeDjango, TargetTypeFastAPI, TargetTypeFlask, TargetTypeStatliteMetrics:
 			if err := validateExactMetricsTarget(target); err != nil {
 				return err
 			}
 		default:
-			return targetError(target, "type", fmt.Sprintf("unsupported value %q (supported: spring, quarkus, micronaut, statlite-metrics, caddy, traefik, fastapi, django)", targetType))
+			return targetError(target, "type", fmt.Sprintf("unsupported value %q (supported: spring, quarkus, micronaut, statlite-metrics, caddy, traefik, fastapi, django, flask)", targetType))
 		}
 		if target.Auth != nil {
-			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus && targetType != TargetTypeMicronaut && targetType != TargetTypeCaddy && targetType != TargetTypeTraefik && targetType != TargetTypeFastAPI && targetType != TargetTypeDjango {
-				return targetError(target, "auth", "is supported only for type spring, quarkus, micronaut, caddy, traefik, fastapi, and django")
+			if targetType != TargetTypeSpring && targetType != TargetTypeQuarkus && targetType != TargetTypeMicronaut && targetType != TargetTypeCaddy && targetType != TargetTypeTraefik && targetType != TargetTypeFastAPI && targetType != TargetTypeDjango && targetType != TargetTypeFlask {
+				return targetError(target, "auth", "is supported only for type spring, quarkus, micronaut, caddy, traefik, fastapi, django, and flask")
 			}
 			if target.Auth.Type != "basic" {
 				return targetError(target, "auth.type", fmt.Sprintf("unsupported value %q (only basic is supported)", target.Auth.Type))

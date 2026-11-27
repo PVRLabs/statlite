@@ -169,6 +169,8 @@ func (m *Monitor) IntegrationType() string {
 		return config.TargetTypeStatliteMetrics
 	case *collector.DjangoCollector:
 		return config.TargetTypeDjango
+	case *collector.FlaskCollector:
+		return config.TargetTypeFlask
 	case *collector.FastAPICollector:
 		return config.TargetTypeFastAPI
 	case *collector.TraefikCollector:

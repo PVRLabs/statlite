@@ -60,7 +60,7 @@ func runInspectWithTyped(args []string, stdout, stderr io.Writer, inspectApplica
 	inspectFlags.Usage = func() {
 		printInspectHelp(stderr)
 	}
-	typed := inspectFlags.String("type", "", "inspect a specific target type (currently: quarkus, micronaut, traefik, fastapi, django)")
+	typed := inspectFlags.String("type", "", "inspect a specific target type (currently: quarkus, micronaut, traefik, fastapi, django, flask)")
 	djangoMode := inspectFlags.String("django-metrics-mode", "", "django-prometheus recipe: inline or separate")
 	service := inspectFlags.String("service", "", "provider-qualified service for type traefik")
 	name := inspectFlags.String("name", "", "target name (default: derived from type, host, and port)")
@@ -358,6 +358,7 @@ Usage:
   statlite inspect --type micronaut <application-or-metrics-url>
   statlite inspect --type traefik --service <name@provider> <metrics-url>
   statlite inspect --type fastapi <metrics-url>
+  statlite inspect --type flask <metrics-url>
   statlite inspect --type django --django-metrics-mode <inline|separate> <metrics-url>
   statlite inspect <application-url> --create-config PATH
   statlite inspect <application-url> --add-to-config PATH
@@ -408,6 +409,7 @@ checks compatibility without proving framework identity; untyped inspection
 does not recognize Micronaut.
 Use --type traefik with an exact metrics URL and --service name@provider.
 Use --type fastapi with the exact Instrumentator metrics URL.
+Use --type flask with the default prometheus-flask-exporter metrics endpoint.
 Use --type django with the exact django-prometheus URL and --django-metrics-mode.`)
 }
 
@@ -482,6 +484,8 @@ func inspectionPresentation(targetType inspect.TargetType) (inspectionTargetPres
 	switch targetType {
 	case inspect.TargetDjango:
 		return inspectionTargetPresentation{displayName: "Django Metrics", targetType: config.TargetTypeDjango, errorContext: "django target"}, nil
+	case inspect.TargetFlask:
+		return inspectionTargetPresentation{displayName: "Flask Metrics", targetType: config.TargetTypeFlask, errorContext: "flask target"}, nil
 	case inspect.TargetFastAPI:
 		return inspectionTargetPresentation{displayName: "FastAPI Metrics", targetType: config.TargetTypeFastAPI, errorContext: "fastapi target"}, nil
 	case inspect.TargetTraefik:
