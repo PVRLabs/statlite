@@ -152,8 +152,7 @@ Send an application request before inspecting a cold registry. For CPU, V8
 heap and process start, enable the bundle's
 `promClient: { collectDefaultMetrics: {} }` option. Configure Basic Auth
 manually for polling protected endpoints. See the
-[Express metric reference](metrics.md#express-http-and-process-metrics) for
-coverage and continuity behavior.
+[Express target guide](targets/express.md) for both recipes and verified coverage.
 
 On success, plain `inspect` prints the recognized capabilities, a minimal
 configuration, and commands to create or add it. The suggested target gets a
