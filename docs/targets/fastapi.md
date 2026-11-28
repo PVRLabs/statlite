@@ -1,6 +1,6 @@
 # FastAPI application monitoring
 
-Use `type: fastapi` to monitor a single FastAPI application process through
+Use `type: fastapi` to monitor a FastAPI application through
 `prometheus-fastapi-instrumentator`. The verified setup uses Linux, CPython
 3.12.3, FastAPI 0.121.3, Uvicorn 0.38.0, Instrumentator 7.1.0 and the Prometheus
 Python client 0.23.1. StatLite scrapes the application directly.
@@ -69,7 +69,35 @@ and requires two observations in the same process lifetime. A restart
 establishes a new HTTP baseline. UP reports successful collection.
 Application health is unavailable.
 
-Use a single process, such as Uvicorn with one worker. The verified recipes
-cover one process and its default Instrumentator registry. See the
-[metric reference](../metrics.md#fastapi-http-and-process-metrics) for latency
-matching, tuple limits and continuity.
+See the [metric reference](../metrics.md#fastapi-http-and-process-metrics)
+for latency matching, tuple limits and continuity.
+
+## Two Uvicorn workers with a shared registry
+
+Use the exact-status Instrumentator setup above, including the
+`/metrics` exclusion. Start both workers with the same
+`PROMETHEUS_MULTIPROC_DIR` environment variable set before Python imports
+the Prometheus client. Instrumentator's `.expose(app)` then serves the same
+deployment-wide registry from either worker. Use the same target YAML and
+typed inspection command.
+
+```sh
+export PROMETHEUS_MULTIPROC_DIR="$(mktemp -d)"
+uvicorn myapp:app --host 127.0.0.1 --port 8000 --workers 2
+```
+
+Create a fresh directory for each full deployment start. Keep the directory
+and its counter and histogram files across worker replacement so the totals
+retain requests handled by the departed worker. Clean up the old directory
+after the full deployment stops. The verified setup uses two Uvicorn workers
+on one host with a directory dedicated to that deployment. Ordinary
+worker-local metrics on a shared port are outside this recipe.
+
+The shared registry provides requests, exact 404, 4xx, 5xx, and average
+response time when duration counts match, for five of eight dashboard signals. Attention
+uses the aggregate request and error deltas. Process CPU, runtime heap, and
+restart identity are unavailable. An observed counter drop starts a fresh
+baseline. A full deployment restart can go undetected if the new counters
+regrow past their previous values between polls. The first positive value of
+a new method, handler, or status tuple also establishes a fresh baseline when
+process identity is unavailable.

@@ -112,7 +112,8 @@ metrics, so a matching application handler would lose its traffic from
 both. FastAPI polling supports Basic Auth through the shared configuration
 block. Send an application request
 before inspecting a cold endpoint to see its HTTP capabilities. See the
-[FastAPI target guide](targets/fastapi.md) for both verified recipes.
+[FastAPI target guide](targets/fastapi.md) for the single-process and
+two-worker shared registry recipes.
 
 Django uses `type: django` and requires `django_metrics_mode: inline` or
 `django_metrics_mode: separate`. Configure the exact django-prometheus

@@ -246,7 +246,8 @@ unobservable. A reload may briefly leave the old service labels visible.
 ## FastAPI HTTP and process metrics
 
 The `fastapi` target reads the default
-`prometheus-fastapi-instrumentator` metrics from one application process.
+`prometheus-fastapi-instrumentator` metrics from one application process or
+from the [shared registry for two Uvicorn workers](targets/fastapi.md#two-uvicorn-workers-with-a-shared-registry).
 It maps completed responses from `http_requests_total`, including
 unmatched routes labelled `handler="none"`. Status groups contribute to
 4xx and 5xx. Exact 404 is available with
@@ -265,7 +266,8 @@ capabilities can be unavailable.
 When available, `process_start_time_seconds` identifies the process lifetime
 and supplies process uptime. StatLite derives process CPU in cores from
 `process_cpu_seconds_total` growth over elapsed time across consecutive
-observations of that lifetime. Heap is unavailable.
+observations of that lifetime. Heap is unavailable. The shared registry
+provides HTTP counters and duration without process CPU or restart identity.
 
 The collector bounds request and duration state to 256 tuples each.
 Request overflow fails collection. Duration overflow leaves latency

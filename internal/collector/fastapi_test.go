@@ -232,3 +232,61 @@ http_request_duration_seconds_sum{handler="none",method="POST"} 0.8
 		t.Fatalf("requests = %+v", requests)
 	}
 }
+
+func TestFastAPIMultiprocessAggregate(t *testing.T) {
+	transport := &fastAPITestTransport{status: 200}
+	client, err := prometheus.NewClientWithTransport(time.Second, FastAPIPrometheusLimits(), nil, transport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const endpoint = "http://localhost/metrics"
+	c := NewFastAPICollector("app", endpoint, client)
+	for _, tc := range []struct {
+		name       string
+		ok, failed int
+		wantBreak  bool
+	}{
+		{"warm aggregate", 1, 1, true},
+		{"before replacement", 8, 4, false},
+		{"idle replacement", 8, 4, false},
+		{"after replacement", 15, 7, false},
+		{"fresh directory with visible reset", 2, 1, true},
+		{"after reset", 9, 4, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			total := tc.ok + tc.failed
+			transport.body = fmt.Sprintf(`http_request_duration_highr_seconds_count %[3]d
+http_request_duration_highr_seconds_sum %[3]d
+http_requests_total{handler="/ok",method="GET",status="200"} %[1]d
+http_requests_total{handler="/error",method="GET",status="500"} %[2]d
+http_request_duration_seconds_count{handler="/ok",method="GET"} %[1]d
+http_request_duration_seconds_sum{handler="/ok",method="GET"} %[1]d
+http_request_duration_seconds_count{handler="/error",method="GET"} %[2]d
+http_request_duration_seconds_sum{handler="/error",method="GET"} %[2]d
+`, tc.ok, tc.failed, total)
+			result, err := c.Collect(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.CounterContinuityBreak != tc.wantBreak || result.ProcessStartTime != nil {
+				t.Fatalf("unexpected continuity or process identity: %+v", result)
+			}
+			for key, want := range map[string]int{
+				"http_requests_total": total, "http_5xx_total": tc.failed,
+				"http_4xx_total": 0, "http_404_total": 0,
+				"http_request_time_total_seconds": total,
+			} {
+				if sample, ok := fastAPISample(result, key); !ok || sample.Value != float64(want) {
+					t.Errorf("%s = %+v, want %d", key, sample, want)
+				}
+			}
+			if len(result.Samples) != 5 {
+				t.Fatalf("expected only the five HTTP samples: %+v", result.Samples)
+			}
+		})
+	}
+	capabilities, warnings, err := InspectFastAPI(t.Context(), endpoint, client)
+	if err != nil || len(warnings) != 0 || strings.Join(capabilities, ",") != "metrics,requests,http_4xx,http_5xx,http_404,latency" {
+		t.Fatalf("unexpected aggregate inspection: %v, %v, %v", capabilities, warnings, err)
+	}
+}
