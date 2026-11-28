@@ -430,6 +430,16 @@ function renderFooterSummary(targets, now = new Date()) {
   setText("footer-refresh", now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
 }
 
+const collectionExplanations = new Map([
+  ["caddy", "UP means StatLite can collect Caddy metrics. It does not guarantee that the upstream application is healthy."],
+  ["traefik", "UP means StatLite can collect metrics for the selected Traefik service. Backend health is unavailable."],
+  ["fastapi", "UP means StatLite can collect FastAPI metrics. Application health is unavailable."],
+  ["django", "UP means StatLite can collect Django metrics. Application health is unavailable."],
+  ["flask", "UP means StatLite can collect Flask metrics. Application health is unavailable."],
+  ["express", "UP means StatLite can collect Express metrics. Application health is unavailable."],
+  ["fastify", "UP means StatLite can collect Fastify metrics. Application health is unavailable."],
+]);
+
 function targetPresentation(target) {
   const latest = (target && target.latest) || {};
   const monitor = (target && target.status) || {};
@@ -471,21 +481,7 @@ function targetPresentation(target) {
     tone = "neutral";
   }
 
-  const collectionExplanation = targetType === "caddy"
-    ? "UP means StatLite can collect Caddy metrics. It does not guarantee that the upstream application is healthy."
-    : targetType === "traefik"
-      ? "UP means StatLite can collect metrics for the selected Traefik service. Backend health is unavailable."
-      : targetType === "fastapi"
-        ? "UP means StatLite can collect FastAPI metrics. Application health is unavailable."
-        : targetType === "django"
-          ? "UP means StatLite can collect Django metrics. Application health is unavailable."
-          : targetType === "flask"
-            ? "UP means StatLite can collect Flask metrics. Application health is unavailable."
-            : targetType === "express"
-              ? "UP means StatLite can collect Express metrics. Application health is unavailable."
-              : targetType === "fastify"
-                ? "UP means StatLite can collect Fastify metrics. Application health is unavailable."
-                : "";
+  const collectionExplanation = collectionExplanations.get(targetType);
   const statusExplanation = collectionExplanation || (springHealthUnknown
     ? "StatLite collected metrics but could not retrieve Spring Actuator health."
     : "");

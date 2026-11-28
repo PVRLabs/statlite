@@ -9,6 +9,14 @@ import (
 
 const maxPrometheusHTTPTuples = 256
 
+// DirectRoutePrometheusLimits requires the actual scrape route so its handler
+// can be excluded from the request and duration populations.
+func DirectRoutePrometheusLimits() prometheus.Limits {
+	limits := prometheus.DefaultLimits
+	limits.MaxRedirects = 0
+	return limits
+}
+
 // prometheusHTTPStatus returns an exact code or a class representative (e.g. 400).
 func prometheusHTTPStatus(label string) (code int, grouped, valid bool) {
 	if len(label) != 3 || label[0] < '1' || label[0] > '5' {

@@ -19,7 +19,7 @@ func TestFastAPIStoredRestartAndLatencyGap(t *testing.T) {
 		fmt.Fprint(w, <-payload)
 	}))
 	defer server.Close()
-	client, err := prometheus.NewClient(time.Second, collector.FastAPIPrometheusLimits(), nil)
+	client, err := prometheus.NewClient(time.Second, collector.DirectRoutePrometheusLimits(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestFastAPIIdlePollsReuseAnonymousRun(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client, err := prometheus.NewClient(time.Second, collector.FastAPIPrometheusLimits(), nil)
+	client, err := prometheus.NewClient(time.Second, collector.DirectRoutePrometheusLimits(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -591,3 +591,22 @@ func TestNewCollectorUsesExplicitMicronautHealthURL(t *testing.T) {
 		t.Fatalf("health requests/status = %d %q/%q, want 1 UP/UP", healthRequests, result.HealthStatus, result.DBHealthStatus)
 	}
 }
+
+func TestFastifyPollingRejectsRedirect(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/alias" {
+			http.Redirect(w, r, "/metrics", http.StatusFound)
+			return
+		}
+		t.Errorf("followed redirect to %s", r.URL.Path)
+	}))
+	defer server.Close()
+	c, err := newCollector(config.TargetConfig{Name: "app", Type: config.TargetTypeFastify, URL: server.URL + "/alias"}, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.Collect(t.Context())
+	if err == nil || !strings.Contains(err.Error(), "redirect") {
+		t.Fatalf("expected redirect failure, got %v", err)
+	}
+}

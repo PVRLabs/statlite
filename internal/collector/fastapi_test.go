@@ -102,7 +102,7 @@ func TestFastAPISyntheticRecipes(t *testing.T) {
 	} {
 		t.Run(recipe.name, func(t *testing.T) {
 			transport := &fastAPITestTransport{status: 200}
-			client, err := prometheus.NewClientWithTransport(time.Second, FastAPIPrometheusLimits(), nil, transport)
+			client, err := prometheus.NewClientWithTransport(time.Second, DirectRoutePrometheusLimits(), nil, transport)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -167,7 +167,7 @@ func TestFastAPISyntheticRecipes(t *testing.T) {
 
 func TestFastAPIDurationPopulationAndContinuity(t *testing.T) {
 	transport := &fastAPITestTransport{status: 200}
-	client, err := prometheus.NewClientWithTransport(time.Second, FastAPIPrometheusLimits(), nil, transport)
+	client, err := prometheus.NewClientWithTransport(time.Second, DirectRoutePrometheusLimits(), nil, transport)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ http_request_duration_seconds_sum{handler="/ok",method="GET"} 0.2
 http_request_duration_seconds_count{handler="none",method="POST"} 8
 http_request_duration_seconds_sum{handler="none",method="POST"} 0.8
 `}
-	client, err := prometheus.NewClientWithTransport(time.Second, FastAPIPrometheusLimits(), nil, transport)
+	client, err := prometheus.NewClientWithTransport(time.Second, DirectRoutePrometheusLimits(), nil, transport)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +235,7 @@ http_request_duration_seconds_sum{handler="none",method="POST"} 0.8
 
 func TestFastAPIMultiprocessAggregate(t *testing.T) {
 	transport := &fastAPITestTransport{status: 200}
-	client, err := prometheus.NewClientWithTransport(time.Second, FastAPIPrometheusLimits(), nil, transport)
+	client, err := prometheus.NewClientWithTransport(time.Second, DirectRoutePrometheusLimits(), nil, transport)
 	if err != nil {
 		t.Fatal(err)
 	}

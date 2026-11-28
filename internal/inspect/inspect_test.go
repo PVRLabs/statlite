@@ -845,3 +845,18 @@ func (b *trackingBody) Close() error {
 	b.closed = true
 	return nil
 }
+
+func TestFastifyInspectionRejectsRedirect(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/alias" {
+			http.Redirect(w, r, "/metrics", http.StatusFound)
+			return
+		}
+		t.Errorf("followed redirect to %s", r.URL.Path)
+	}))
+	defer server.Close()
+	_, err := inspectFastify(t.Context(), server.URL+"/alias")
+	if err == nil || !strings.Contains(err.Error(), "redirect") {
+		t.Fatalf("expected redirect failure, got %v", err)
+	}
+}

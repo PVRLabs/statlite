@@ -19,7 +19,7 @@ func inspectFastAPI(ctx context.Context, endpoint string) (*Result, error) {
 	if u.User != nil || strings.TrimSpace(endpoint) != endpoint {
 		return nil, errors.New("FastAPI metrics URL must exclude user information and surrounding whitespace")
 	}
-	client, err := prometheus.NewClient(defaultTimeout, collector.FastAPIPrometheusLimits(), nil)
+	client, err := prometheus.NewClient(defaultTimeout, collector.DirectRoutePrometheusLimits(), nil)
 	if err != nil {
 		return nil, &Failure{Kind: FailureIncomplete, Err: err}
 	}

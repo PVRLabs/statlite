@@ -61,7 +61,7 @@ func newCollector(target config.TargetConfig, timeout time.Duration) (monitor.Co
 		}
 		return collector.NewFlaskCollector(target.Name, target.URL, client), nil
 	case config.TargetTypeFastify:
-		client, err := prometheus.NewClient(timeout, prometheus.DefaultLimits, prometheusAuthConfig(target.Auth))
+		client, err := prometheus.NewClient(timeout, collector.DirectRoutePrometheusLimits(), prometheusAuthConfig(target.Auth))
 		if err != nil {
 			return nil, fmt.Errorf("fastify metrics client: %w", err)
 		}
@@ -73,7 +73,7 @@ func newCollector(target config.TargetConfig, timeout time.Duration) (monitor.Co
 		}
 		return collector.NewExpressCollector(target.Name, target.URL, client), nil
 	case config.TargetTypeFastAPI:
-		client, err := prometheus.NewClient(timeout, collector.FastAPIPrometheusLimits(), prometheusAuthConfig(target.Auth))
+		client, err := prometheus.NewClient(timeout, collector.DirectRoutePrometheusLimits(), prometheusAuthConfig(target.Auth))
 		if err != nil {
 			return nil, fmt.Errorf("fastapi metrics client: %w", err)
 		}

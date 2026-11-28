@@ -34,14 +34,6 @@ type FastAPICollector struct {
 	process              prometheusProcessBaseline
 }
 
-// FastAPIPrometheusLimits requires the actual scrape route so its handler
-// can be excluded from the request and duration populations.
-func FastAPIPrometheusLimits() prometheus.Limits {
-	limits := prometheus.DefaultLimits
-	limits.MaxRedirects = 0
-	return limits
-}
-
 func NewFastAPICollector(targetName, endpoint string, client *prometheus.Client) *FastAPICollector {
 	return &FastAPICollector{targetName: targetName, endpoint: endpoint, client: client}
 }

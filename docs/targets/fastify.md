@@ -37,7 +37,7 @@ The default endpoint adds its own scrapes to the exporter's histogram.
 `disableMetrics: true` excludes them at the source. StatLite also filters
 the route that matches the configured metrics URL path from requests,
 errors, and duration. Use a direct exporter URL whose path matches the
-Fastify route.
+Fastify route. Polling and typed inspection reject redirects.
 
 ## Configure and inspect the target
 
