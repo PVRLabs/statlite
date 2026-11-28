@@ -48,6 +48,9 @@ The shared matrix currently exercises:
   [`statlite-metrics/v1` guide](integrate/python/fastapi.md).
 - [Express](../examples/node-express-demo/) through the
   [`statlite-metrics/v1` guide](integrate/node/express.md).
+- [Fastify](targets/fastify.md) through the pinned
+  [native exporter smoke test](../test/integration/fastify/), covering scrape
+  exclusion, unmatched 404s, an unhandled 500, and average latency.
 - [Django](../examples/python-django-demo/) through the
   [`statlite-metrics/v1` guide](integrate/python/django.md).
 - [Go `net/http`](../examples/go-net-http-demo/) through the
@@ -72,7 +75,7 @@ It runs for every pull request, every push to `main`, and weekly on Monday at
 not hide the results for the others.
 
 The release workflow reuses this same workflow as a prerequisite before it
-creates a release tag, so a release cannot proceed until all nine public cases
+creates a release tag, so a release cannot proceed until all public cases
 pass on the dispatched commit.
 
 These are focused public integration checks for the documented monitoring

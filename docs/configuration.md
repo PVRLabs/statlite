@@ -167,7 +167,8 @@ exclude the scrape endpoint at source. Send an application request and a
 request to an unmatched URL before inspecting. With no unmatched-route
 observations, inspection reports partial compatibility and totals cover only
 the instrumented traffic seen so far. Configure Basic Auth manually for
-polling protected endpoints. See [Fastify metric scope](metrics.md#fastify-http-and-process-metrics).
+polling protected endpoints. See the [Fastify target guide](targets/fastify.md)
+for setup, telemetry coverage, and the request tuple limit.
 
 On success, plain `inspect` prints the recognized capabilities, a minimal
 configuration, and commands to create or add it. The suggested target gets a

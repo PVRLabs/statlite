@@ -20,6 +20,7 @@ incompatible measurements. See the
 | Quarkus 3.39.x | Supported | Micrometer Prometheus/OpenMetrics exposition; optional SmallRye Health | Conventional `/q/metrics`; optional `/q/health` | Explicit `quarkus` target; datasource health is normalized when published. |
 | [Micronaut 5.2.11 (tested setup)](targets/micronaut.md#tested-versions) | Supported | Micrometer 1.17.1 Prometheus exposition; optional management health | Exact `/prometheus`; optional `/health` | Public CI and private certification; explicit `micronaut` target; JDBC health requires visible aggregate details. |
 | [Caddy 2.11.4](targets/caddy.md) | Supported | Built-in per-host HTTP duration counters | Exact metrics URL plus required host | Named HTTPS site with one direct reverse proxy; HTTP charts only, no application health or resources. |
+| [Fastify 5.6.2](targets/fastify.md) | Supported | fastify-metrics 12.1.0 | Direct metrics URL | Single process with unmatched-route tracking and scrape exclusion. |
 | StatLite Metrics v1 | Supported | Fixed `statlite-metrics/v1` response | `/statlite/metrics` | Fixed producer contract for StatLite and compatible applications. See the [direct integration guides](integrate/). |
 
 Support means that the integration has an owned endpoint and source contract,

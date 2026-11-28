@@ -22,6 +22,7 @@ AGENTS.local.md
 examples/python-fastapi-demo/__pycache__/
 examples/node-express-demo/node_modules/
 test/integration/express/node_modules/
+test/integration/fastify/node_modules/
 examples/python-django-demo/**/__pycache__/
 test/api-automation-e2e/__pycache__/
 badger-codemap-statlite.html

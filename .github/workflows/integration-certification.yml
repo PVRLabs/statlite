@@ -25,6 +25,9 @@ jobs:
             app_port: 18080
           - case: express
             app_port: 18081
+            node_version: "24.21.0"
+          - case: fastify
+            node_version: "25.9.0"
           - case: django
             app_port: 18082
           - case: flask
@@ -74,14 +77,15 @@ jobs:
         run: python -m pip install -r test/integration/flask/requirements.txt
 
       - name: Set up Node
-        if: matrix.case == 'express'
+        if: matrix.case == 'express' || matrix.case == 'fastify'
         uses: actions/setup-node@v4
         with:
-          node-version: "24.21.0"
+          node-version: ${{ matrix.node_version }}
           cache: npm
           cache-dependency-path: |
             examples/node-express-demo/package-lock.json
             test/integration/express/package-lock.json
+            test/integration/fastify/package-lock.json
 
       - name: Set up Java
         if: matrix.case == 'spring' || matrix.case == 'quarkus'
@@ -107,6 +111,11 @@ jobs:
       - name: Install native Express smoke dependencies
         if: matrix.case == 'express'
         working-directory: test/integration/express
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Install native Fastify smoke dependencies
+        if: matrix.case == 'fastify'
+        working-directory: test/integration/fastify
         run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Report FastAPI versions
@@ -191,6 +200,12 @@ jobs:
         env:
           STATLITE_BIN: ${{ runner.temp }}/statlite
         run: node --test test/integration/express/smoke.test.cjs
+
+      - name: Run native Fastify integration smoke test
+        if: matrix.case == 'fastify'
+        env:
+          STATLITE_BIN: ${{ runner.temp }}/statlite
+        run: node --test test/integration/fastify/smoke.test.cjs
 
       - name: Run Flask integration smoke test
         if: matrix.case == 'flask'
