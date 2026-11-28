@@ -16,10 +16,14 @@ const nodeDuration = "http_request_duration_seconds"
 type nodeProfile struct {
 	source string
 	// httpStatus returns the status label or an empty string for an excluded
-	// tuple. Labels here exclude the bucket boundary.
-	httpStatus func([]prometheus.Label) (string, error)
-	// coldMarker is optional evidence for an empty exporter registry.
-	coldMarker string
+	// tuple, and reports whether it represents an unmatched route.
+	// Labels here exclude the bucket boundary.
+	httpStatus func([]prometheus.Label) (status string, unmatched bool, err error)
+	// A cold registry can have exporter or runtime samples before its first
+	// HTTP observation.
+	coldMarker   string
+	coldRuntime  bool
+	scopeWarning string
 }
 
 type nodeCollector struct {
@@ -50,6 +54,9 @@ func (c *nodeCollector) Collect(ctx context.Context) (*CollectionResult, error) 
 	c.process = s.process.emit(result, c.process, result.PollStartedAt)
 	if s.heap.valid {
 		result.addSample("runtime_heap_used_bytes", MetricKindGauge, s.heap.value, "bytes")
+	}
+	if c.profile.scopeWarning != "" && !s.unmatched {
+		result.addEvent(EventSeverityWarning, "node_route_scope_unverified", "http_requests_total", c.profile.scopeWarning)
 	}
 	if len(s.requests) == 0 {
 		result.CounterContinuityBreak = c.previous.tuples != nil
@@ -96,6 +103,7 @@ type nodeScrape struct {
 	histogram   bool
 	observed    bool
 	invalidSums bool
+	unmatched   bool
 }
 
 var errNodeIncompatible = errors.New("expected Node.js exporter histogram or cold registry was not observed")
@@ -128,15 +136,19 @@ func scrapeNode(ctx context.Context, endpoint string, client *prometheus.Client,
 	}); err != nil {
 		return nil, fmt.Errorf("scraping %s metrics: %w", profile.source, err)
 	}
-	if !s.histogram && (s.observed || !s.marker.valid || s.marker.value != 1) {
-		return nil, errNodeIncompatible
+	if !s.histogram {
+		cold := s.marker.valid && s.marker.value == 1 ||
+			profile.coldRuntime && s.heap.valid && s.process.cpu.valid && s.process.startTime(time.Now()) != nil
+		if s.observed || !cold {
+			return nil, errNodeIncompatible
+		}
 	}
 	return s, nil
 }
 
 func (s *nodeScrape) acceptHTTP(sample prometheus.Sample, profile nodeProfile) error {
 	isCount := sample.Name == nodeDuration+"_count"
-	status, err := profile.httpStatus(sample.Labels)
+	status, unmatched, err := profile.httpStatus(sample.Labels)
 	if err == nil && status == "" {
 		return nil
 	}
@@ -158,6 +170,7 @@ func (s *nodeScrape) acceptHTTP(sample prometheus.Sample, profile nodeProfile) e
 			return errors.New("invalid, duplicate, or excessive Node.js response count")
 		}
 		s.requests[key] = httpRequestTuple{count: sample.Value}
+		s.unmatched = s.unmatched || unmatched && sample.Value > 0
 	} else if _, exists := s.sums[key]; exists || len(s.sums) >= maxPrometheusHTTPTuples || !finiteNonnegative(sample.Value) {
 		s.invalidSums = true
 	} else {
@@ -191,6 +204,9 @@ func inspectNode(ctx context.Context, endpoint string, client *prometheus.Client
 		return nil, nil, err
 	}
 	capabilities = []string{"metrics"}
+	if profile.scopeWarning != "" && !s.unmatched {
+		warnings = append(warnings, profile.scopeWarning)
+	}
 	if len(s.requests) == 0 {
 		warnings = append(warnings, nodeColdWarning)
 	} else {

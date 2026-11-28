@@ -171,6 +171,8 @@ func (m *Monitor) IntegrationType() string {
 		return config.TargetTypeDjango
 	case *collector.FlaskCollector:
 		return config.TargetTypeFlask
+	case *collector.FastifyCollector:
+		return config.TargetTypeFastify
 	case *collector.ExpressCollector:
 		return config.TargetTypeExpress
 	case *collector.FastAPICollector:

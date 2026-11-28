@@ -154,6 +154,21 @@ heap and process start, enable the bundle's
 manually for polling protected endpoints. See the
 [Express target guide](targets/express.md) for both recipes and verified coverage.
 
+Fastify uses `type: fastify` and the direct metrics URL from one application
+process running `fastify-metrics`:
+
+```bash
+statlite inspect --type fastify 'http://localhost:3000/metrics'
+```
+
+Use `routeMetrics: { registeredRoutesOnly: false }` to record unmatched URLs.
+Set `endpoint: { url: '/metrics', config: { disableMetrics: true } }` to
+exclude the scrape endpoint at source. Send an application request and a
+request to an unmatched URL before inspecting. With no unmatched-route
+observations, inspection reports partial compatibility and totals cover only
+the instrumented traffic seen so far. Configure Basic Auth manually for
+polling protected endpoints. See [Fastify metric scope](metrics.md#fastify-http-and-process-metrics).
+
 On success, plain `inspect` prints the recognized capabilities, a minimal
 configuration, and commands to create or add it. The suggested target gets a
 stable `<type>-<host>-<port>` name. Override it with `--name` if needed;

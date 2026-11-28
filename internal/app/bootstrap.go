@@ -60,6 +60,12 @@ func newCollector(target config.TargetConfig, timeout time.Duration) (monitor.Co
 			return nil, fmt.Errorf("flask metrics client: %w", err)
 		}
 		return collector.NewFlaskCollector(target.Name, target.URL, client), nil
+	case config.TargetTypeFastify:
+		client, err := prometheus.NewClient(timeout, prometheus.DefaultLimits, prometheusAuthConfig(target.Auth))
+		if err != nil {
+			return nil, fmt.Errorf("fastify metrics client: %w", err)
+		}
+		return collector.NewFastifyCollector(target.Name, target.URL, client), nil
 	case config.TargetTypeExpress:
 		client, err := prometheus.NewClient(timeout, prometheus.DefaultLimits, prometheusAuthConfig(target.Auth))
 		if err != nil {

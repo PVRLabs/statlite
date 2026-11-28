@@ -36,6 +36,7 @@ const (
 	TargetFastAPI         TargetType = "fastapi"
 	TargetFlask           TargetType = "flask"
 	TargetExpress         TargetType = "express"
+	TargetFastify         TargetType = "fastify"
 	TargetTraefik         TargetType = "traefik"
 	TargetSpring          TargetType = "spring"
 	TargetQuarkus         TargetType = "quarkus"
@@ -139,6 +140,8 @@ func Inspect(ctx context.Context, targetType TargetType, rawURL string) (*Result
 		return Django(ctx, rawURL, "")
 	case TargetFlask:
 		return inspectFlask(ctx, rawURL)
+	case TargetFastify:
+		return inspectFastify(ctx, rawURL)
 	case TargetExpress:
 		return inspectExpress(ctx, rawURL)
 	case TargetFastAPI:
@@ -148,7 +151,7 @@ func Inspect(ctx context.Context, targetType TargetType, rawURL string) (*Result
 	default:
 		return nil, &Failure{
 			Kind: FailureTypeUnsupported,
-			Err:  fmt.Errorf("unsupported inspection type %q (supported: quarkus, micronaut, traefik, fastapi, django, flask, express)", targetType),
+			Err:  fmt.Errorf("unsupported inspection type %q (supported: quarkus, micronaut, traefik, fastapi, django, flask, express, fastify)", targetType),
 		}
 	}
 }
@@ -159,7 +162,7 @@ func Inspect(ctx context.Context, targetType TargetType, rawURL string) (*Result
 func inspectSpring(context.Context, string) (*Result, error) {
 	return nil, &Failure{
 		Kind: FailureTypeUnavailable,
-		Err:  errors.New("typed inspection type \"spring\" is not available (supported: quarkus, micronaut, traefik, fastapi, django, flask, express)"),
+		Err:  errors.New("typed inspection type \"spring\" is not available (supported: quarkus, micronaut, traefik, fastapi, django, flask, express, fastify)"),
 	}
 }
 

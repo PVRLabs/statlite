@@ -30,7 +30,7 @@ sample can lack a unit. Missing observations are unavailable, not zero.
 | `http_4xx_total` | counter | `requests` | Cumulative HTTP 400–499 responses, including 404; helps identify client/request failures. |
 | `http_5xx_total` | counter | `requests` | Cumulative HTTP 500–599 responses; helps identify server failures. |
 | `http_request_time_total_seconds` | counter | `seconds` | Cumulative request duration; paired request-count deltas yield average latency. This is not elapsed wall time or a maximum latency. |
-| `process_cpu_usage` | gauge | `ratio` for JVM adapters; `cores` for v1, FastAPI, and Django | Process CPU consumption. The unit depends on the source; see CPU interpretation below. |
+| `process_cpu_usage` | gauge | `ratio` for JVM adapters; `cores` for v1, FastAPI, Django, Flask, Express, and Fastify | Process CPU consumption. The unit depends on the source; see CPU interpretation below. |
 | `jvm_heap_used_bytes` | gauge | `bytes` | JVM heap currently used, summed over heap pools; helps track heap pressure and growth. |
 | `runtime_heap_used_bytes` | gauge | `bytes` | Producer-defined runtime-managed memory currently used; helps track memory trends within the same runtime and instrumentation. |
 | `process_start_time` | gauge | `unix_seconds` | Process start as Unix seconds, potentially fractional; also sets process-start metadata used to identify restarts. |
@@ -127,9 +127,10 @@ does not collect.
 
 Each target's CPU chart uses one unit based on its configured integration:
 JVM/Micrometer targets display normalized utilization as a percentage; StatLite
-Metrics v1, FastAPI, and Django targets display logical CPU consumption in cores. For example, a
-JVM ratio of `0.25` displays as `25%`, and v1 consumption of `2.75` displays as
-`2.75 cores`. The existing CPU axis and tooltip use that unit for the whole chart.
+Metrics v1, FastAPI, Django, Flask, Express, and Fastify targets display logical
+CPU consumption in cores. For example, a JVM ratio of `0.25` displays as `25%`,
+and v1 consumption of `2.75` displays as `2.75 cores`. The CPU axis and tooltip
+use that unit for the whole chart.
 
 Stored CPU samples whose explicit unit conflicts with the chart unit are
 excluded before chart averaging, with a notice. Other metrics remain available.
@@ -176,7 +177,7 @@ do not fabricate measurements.
 | Response errors | `http_404`, `http_4xx`, `http_5xx` | Counter deltas; API v1 exposes 4xx/5xx counts with paired-coverage rules. |
 | Mean request latency | `average_latency_seconds` | Dashboard milliseconds; API `avg_latency_ms`, with `latency_requests` indicating covered requests. |
 | Runtime memory | `heap_used_bytes` | Dashboard bytes / 1024² (labeled MB); API `runtime_memory_bytes` in bytes. |
-| Process CPU | `process_cpu_usage` | Dashboard percentage for JVM ratios or cores for v1, FastAPI, and Django; see chart-unit rules and the API field description. |
+| Process CPU | `process_cpu_usage` | Dashboard percentage for JVM ratios or cores for v1, FastAPI, Django, Flask, Express, and Fastify; see chart-unit rules and the API field description. |
 | Host CPU | `host_cpu_usage` | Ratio in series/API; percentage on dashboard. |
 | Host memory | `host_memory_used_bytes`, `host_memory_total_bytes`, `host_memory_usage` | Usage ratio requires a valid pair with `0 <= used <= total` and `total > 0`. API exposes the usage ratio. |
 | Host disk | `host_disk_used_bytes`, `host_disk_total_bytes`, `host_disk_usage` | Same pair validation; API exposes the usage ratio. |
@@ -336,3 +337,22 @@ requires two consecutive observations from the same process. The bundle's
 `up` gauge does not report application health. Use a single process with
 the default histogram labels. Summary mode, grouped statuses, custom
 labels, and worker aggregation are outside this profile.
+
+## Fastify HTTP and process metrics
+
+The `fastify` target reads the default `fastify-metrics` duration histogram
+from a single process. It uses the same `method`, `route`, and exact
+`status_code` tuples for completed requests, 404s, 4xx, 5xx, and paired duration
+sums in seconds. The collector ignores the summary and excludes the route that
+matches the configured metrics URL path from all HTTP measurements. Use the
+direct exporter URL with its Fastify route path.
+
+The default exporter tracks registered routes, including handlers that return
+404. Use `registeredRoutesOnly: false` to include unmatched URLs as
+`route="__unknown__"`. Until such a response is observed, inspection and
+collection report that unmatched-route coverage is unverified. Attention uses
+5xx and request totals from the same observed route population.
+
+Process metrics supply CPU in cores, V8 heap used in bytes, and process start
+for uptime and restart detection. Application health and cluster-wide metrics
+are unavailable.

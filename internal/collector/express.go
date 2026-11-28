@@ -12,13 +12,13 @@ const ExpressMetricsSource = "express-prom-bundle"
 var expressProfile = nodeProfile{
 	source:     ExpressMetricsSource,
 	coldMarker: "up",
-	httpStatus: func(labels []prometheus.Label) (string, error) {
+	httpStatus: func(labels []prometheus.Label) (string, bool, error) {
 		// In the default bundle configuration the scrape bypasses the timer.
 		// Route-labelled populations require a different profile.
 		if len(labels) != 1 || labels[0].Name != "status_code" || labels[0].Value == "" {
-			return "", ErrExpressIncompatible
+			return "", false, ErrExpressIncompatible
 		}
-		return labels[0].Value, nil
+		return labels[0].Value, false, nil
 	},
 }
 
